@@ -4,7 +4,7 @@
 /// dimensions below are the PROVISIONAL implementation baseline; M1 may tune
 /// them exactly once through an ADR before combat content is authored. Arena
 /// logic never changes with device, safe area, window size, or display scale.
-public struct ArenaSpecification: Equatable, Sendable {
+public struct ArenaSpecification: Codable, Equatable, Sendable {
     /// Terrain cells along X; valid cell coordinates are `0..<cellsWide`.
     public let cellsWide: Int
     /// Terrain cells along Y; valid cell coordinates are `0..<cellsHigh`.

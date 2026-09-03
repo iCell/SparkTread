@@ -20,11 +20,11 @@ public struct PixelShowcaseView: View {
 
     public var body: some View {
         TabView(selection: $page) {
-            SpriteView(scene: battleScene).ignoresSafeArea().tag(0)
-            SpriteView(scene: rosterScene).ignoresSafeArea().tag(1)
-            SpriteView(scene: directionsScene).ignoresSafeArea().tag(2)
-            SpriteView(scene: itemsScene).ignoresSafeArea().tag(3)
-            BootstrapArenaView().tag(4)
+            MovementLabView().tag(0)
+            SpriteView(scene: battleScene).ignoresSafeArea().tag(1)
+            SpriteView(scene: rosterScene).ignoresSafeArea().tag(2)
+            SpriteView(scene: directionsScene).ignoresSafeArea().tag(3)
+            SpriteView(scene: itemsScene).ignoresSafeArea().tag(4)
         }
 #if os(iOS)
         .tabViewStyle(.page(indexDisplayMode: .always))
