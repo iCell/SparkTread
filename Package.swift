@@ -32,6 +32,18 @@ let package = Package(
             dependencies: ["GameApplication", "GameCore"],
             path: "Sources/AppleAdapters"
         ),
+        // Content tooling: may import Foundation and application/core code;
+        // production core code must not import tools (§14.1).
+        .target(
+            name: "ContentValidatorKit",
+            dependencies: ["GameApplication"],
+            path: "Tools/ContentValidator/Kit"
+        ),
+        .executableTarget(
+            name: "content-validator",
+            dependencies: ["ContentValidatorKit"],
+            path: "Tools/ContentValidator/CLI"
+        ),
         .testTarget(
             name: "GameCoreTests",
             dependencies: ["GameCore"],
@@ -41,6 +53,12 @@ let package = Package(
             name: "GameApplicationTests",
             dependencies: ["GameApplication"],
             path: "Tests/GameApplicationTests"
+        ),
+        .testTarget(
+            name: "ContentValidationTests",
+            dependencies: ["ContentValidatorKit"],
+            path: "Tests/ContentValidationTests",
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

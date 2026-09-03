@@ -1,0 +1,30 @@
+{
+  "format_version": 1,
+  "notes": "Canonical stable-ID registry (GE-020, plan §15.2). Single source for every gameplay ID; documents, content, and asset filenames conform to it. IDs are lowercase snake_case, never localized, never renamed without a migration entry. Stage IDs beyond the three vertical-slice stages are seeded at M4.",
+  "rulesets": ["campaign_v1"],
+  "difficulties": ["casual", "standard", "veteran"],
+  "weapons": ["normal", "rapid", "fire", "ap", "explosion", "mine"],
+  "equipment": ["amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea"],
+  "pickups": [
+    "speed_up", "armor_up", "power_up", "level_up", "max_speed_power",
+    "amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea",
+    "score_200", "score_500", "score_1000", "score_2000",
+    "invincibility", "base_shield", "freeze_enemy", "bomb", "extra_life",
+    "max_armor_ammo", "ammo_crate",
+    "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "mine_weapon"
+  ],
+  "enemies": [
+    "normal_a", "normal_b", "normal_c", "normal_d",
+    "rapid_a", "rapid_b", "rapid_c", "rapid_d",
+    "fire_a", "fire_b", "fire_c", "fire_d",
+    "ap_a", "ap_b", "ap_c", "ap_d",
+    "explosion_a", "explosion_b", "explosion_c", "explosion_d",
+    "mine_a", "mine_b", "mine_c", "mine_d"
+  ],
+  "themes": ["frontier", "floodplain", "frozen_works", "iron_citadel"],
+  "stages": [
+    "frontier_01_first_defense",
+    "floodplain_02_split_current",
+    "iron_citadel_03_eagle_under_siege"
+  ]
+}

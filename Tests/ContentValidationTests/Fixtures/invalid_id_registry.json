@@ -1,0 +1,11 @@
+{
+  "format_version": 99,
+  "surprise_field": true,
+  "rulesets": ["campaign_v1", "campaign_v1"],
+  "difficulties": ["casual", "Standard", "veteran"],
+  "weapons": [],
+  "equipment": ["amphi_tank", "anti__skid", "shield_of_moon_"],
+  "pickups": ["speed-up"],
+  "enemies": ["ap_c"],
+  "themes": ["frontier"]
+}

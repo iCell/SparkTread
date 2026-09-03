@@ -28,8 +28,14 @@ xcodegen generate
 ## Build, test, run
 
 ```sh
-# Full non-interactive gate (architecture check, package tests, scheme tests):
+# Full non-interactive gate (architecture check, content validation,
+# package tests, scheme tests). CI (.github/workflows/ci.yml) runs the same
+# script once a GitHub remote is configured:
 sh Scripts/ci.sh
+
+# Content validation alone (Content/Schemas/id_registry.json is the
+# canonical stable-ID registry, GE-020):
+swift run content-validator Content
 
 # Individual steps:
 sh Scripts/check-architecture.sh
