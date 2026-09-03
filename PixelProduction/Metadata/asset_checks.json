@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "textureCount": 1617,
+  "atlasCount": 17,
+  "allRGBA": true,
+  "magentaLeak": false,
+  "treadAlphaInvariant": true,
+  "directionalHulls": 20,
+  "directionalTurrets": 28,
+  "tankCombinations": 30,
+  "baseStates": 4,
+  "pickupIDs": 25,
+  "topologyMasks": 47,
+  "effectRecipes": 32,
+  "runtimeDeviceAccepted": false
+}

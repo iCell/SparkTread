@@ -1,0 +1,124 @@
+{
+  "arenaCells" : [
+    48,
+    27
+  ],
+  "assetManifestSHA256" : "a05e6a7c6ebafcdf8889bf466103053f14f01cdba823e5f05a0262b368433d60",
+  "checks" : [
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    }
+  ],
+  "deviceFixture" : "phone",
+  "imageSHA256" : "ef2bc2c4c6cc94ddb5fad9fc51de42e00ae24190e721b32c42ad7e3b1e03446c",
+  "mode" : "directions",
+  "objects" : [
+
+  ],
+  "passed" : true,
+  "phase" : 0,
+  "pixelSize" : [
+    1688,
+    780
+  ],
+  "renderer" : "SpriteKit SKView.texture",
+  "scope" : "scripted art fixture, not a playable campaign, iOS build or physical-device acceptance",
+  "sizePoints" : [
+    844,
+    390
+  ],
+  "tankCount" : 12
+}

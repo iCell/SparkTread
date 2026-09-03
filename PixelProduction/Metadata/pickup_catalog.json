@@ -1,0 +1,206 @@
+{
+  "formatVersion": 1,
+  "requiredCount": 25,
+  "items": [
+    {
+      "id": 0,
+      "key": "speed_up",
+      "labelZH": "速度提升",
+      "texture": "px_pickup_speed_up",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 1,
+      "key": "armor_up",
+      "labelZH": "装甲提升",
+      "texture": "px_pickup_armor_up",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 2,
+      "key": "power_up",
+      "labelZH": "火力提升",
+      "texture": "px_pickup_power_up",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 3,
+      "key": "level_up",
+      "labelZH": "综合升级",
+      "texture": "px_pickup_level_up",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 4,
+      "key": "max_speed_power",
+      "labelZH": "速度／火力满级",
+      "texture": "px_pickup_max_speed_power",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 5,
+      "key": "amphi_tank",
+      "labelZH": "两栖模块",
+      "texture": "px_pickup_amphi_tank",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 6,
+      "key": "anti_skid",
+      "labelZH": "防滑模块",
+      "texture": "px_pickup_anti_skid",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 7,
+      "key": "shield_of_moon",
+      "labelZH": "月牙护盾",
+      "texture": "px_pickup_shield_of_moon",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 8,
+      "key": "memory_of_sea",
+      "labelZH": "海之记忆",
+      "texture": "px_pickup_memory_of_sea",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 9,
+      "key": "score_200",
+      "labelZH": "200 分",
+      "texture": "px_pickup_score_200",
+      "displayNumber": 200,
+      "available": true
+    },
+    {
+      "id": 10,
+      "key": "score_500",
+      "labelZH": "500 分",
+      "texture": "px_pickup_score_500",
+      "displayNumber": 500,
+      "available": true
+    },
+    {
+      "id": 11,
+      "key": "score_1000",
+      "labelZH": "1000 分",
+      "texture": "px_pickup_score_1000",
+      "displayNumber": 1000,
+      "available": true
+    },
+    {
+      "id": 12,
+      "key": "score_2000",
+      "labelZH": "2000 分",
+      "texture": "px_pickup_score_2000",
+      "displayNumber": 2000,
+      "available": true
+    },
+    {
+      "id": 13,
+      "key": "invincibility",
+      "labelZH": "无敌",
+      "texture": "px_pickup_invincibility",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 14,
+      "key": "base_shield",
+      "labelZH": "基地护盾",
+      "texture": "px_pickup_base_shield",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 15,
+      "key": "freeze_enemy",
+      "labelZH": "冻结敌军",
+      "texture": "px_pickup_freeze_enemy",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 16,
+      "key": "bomb",
+      "labelZH": "全场炸弹",
+      "texture": "px_pickup_bomb",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 17,
+      "key": "extra_life",
+      "labelZH": "额外生命",
+      "texture": "px_pickup_extra_life",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 18,
+      "key": "max_armor_ammo",
+      "labelZH": "装甲／弹药强化",
+      "texture": "px_pickup_max_armor_ammo",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 19,
+      "key": "ammo_crate",
+      "labelZH": "弹药箱",
+      "texture": "px_pickup_ammo_crate",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 20,
+      "key": "rapid_weapon",
+      "labelZH": "快弹",
+      "texture": "px_pickup_rapid_weapon",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 21,
+      "key": "fire_weapon",
+      "labelZH": "燃烧弹",
+      "texture": "px_pickup_fire_weapon",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 22,
+      "key": "ap_weapon",
+      "labelZH": "穿甲弹",
+      "texture": "px_pickup_ap_weapon",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 23,
+      "key": "explosion_weapon",
+      "labelZH": "爆破弹",
+      "texture": "px_pickup_explosion_weapon",
+      "displayNumber": null,
+      "available": true
+    },
+    {
+      "id": 24,
+      "key": "mine_weapon",
+      "labelZH": "地雷",
+      "texture": "px_pickup_mine_weapon",
+      "displayNumber": null,
+      "available": true
+    }
+  ]
+}

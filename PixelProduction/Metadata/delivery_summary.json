@@ -1,0 +1,84 @@
+{
+  "scope": "core art prototype, not final game or physical-device acceptance",
+  "assetManifestSHA256": "a05e6a7c6ebafcdf8889bf466103053f14f01cdba823e5f05a0262b368433d60",
+  "textureCount": 1617,
+  "atlasCount": 17,
+  "atlasCounts": {
+    "PixelBase": 9,
+    "PixelDecals": 12,
+    "PixelEffects": 54,
+    "PixelEquipment": 16,
+    "PixelFoliage": 143,
+    "PixelGround": 36,
+    "PixelLiquids": 376,
+    "PixelMines": 8,
+    "PixelPickups": 31,
+    "PixelProjectiles": 10,
+    "PixelStatus": 68,
+    "PixelTanks": 20,
+    "PixelTerrain": 20,
+    "PixelTreads": 160,
+    "PixelTurrets": 28,
+    "PixelUI": 46,
+    "PixelWalls": 580
+  },
+  "decodedRGBABytes": 7591168,
+  "resourceAndStateChecks": 4115,
+  "resourceAndStateChecksPassed": true,
+  "sceneCaptures": 52,
+  "sceneChecks": 2285,
+  "sceneChecksPassed": true,
+  "galleryCaptures": 7,
+  "gifFrames": 24,
+  "gifDurationMilliseconds": 2000,
+  "gifSHA256": "13078f4a55f9e52089c14d798b69a3e98f511ff55f36fcb97aacbbaefb4e78ec",
+  "readability": {
+    "compact": {
+      "sizePoints": [
+        667,
+        375
+      ],
+      "minVisibleTankWHPoints": [
+        19.41802978515625,
+        14.887176513671875
+      ],
+      "old28x28GatePassed": false,
+      "physicalDeviceTested": false
+    },
+    "phone": {
+      "sizePoints": [
+        844,
+        390
+      ],
+      "minVisibleTankWHPoints": [
+        20.272216796875,
+        15.542037963867188
+      ],
+      "old28x28GatePassed": false,
+      "physicalDeviceTested": false
+    },
+    "tablet": {
+      "sizePoints": [
+        1194,
+        834
+      ],
+      "minVisibleTankWHPoints": [
+        37.348388671875,
+        28.6337890625
+      ],
+      "old28x28GatePassed": true,
+      "physicalDeviceTested": false
+    }
+  },
+  "notAccepted": [
+    "small-phone readability",
+    "iOS compiled atlases",
+    "UIKit build",
+    "physical-device input/performance",
+    "complete gameplay interactions",
+    "campaign thumbnails",
+    "full menu/HUD/tutorial behavior"
+  ],
+  "generativeMethod": "built-in imagegen plus user-authorized deterministic local finishing",
+  "runtimeUsesGeneratedSourceSheets": false
+}

@@ -1,0 +1,289 @@
+{
+  "arenaCells" : [
+    48,
+    27
+  ],
+  "assetManifestSHA256" : "a05e6a7c6ebafcdf8889bf466103053f14f01cdba823e5f05a0262b368433d60",
+  "checks" : [
+    {
+      "name" : "tank 0 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 0 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 0 1",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 0 2",
+      "passed" : true
+    },
+    {
+      "name" : "tank 1 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 1 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "tank 2 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 2 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "tank 3 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 3 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 3 1",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 3 2",
+      "passed" : true
+    },
+    {
+      "name" : "tank 4 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 4 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 4 1",
+      "passed" : true
+    },
+    {
+      "name" : "bullet readable 4 2",
+      "passed" : true
+    },
+    {
+      "name" : "tank 5 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 5 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "tank 6 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 6 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "tank 7 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 7 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "tank 8 entirely visible",
+      "passed" : true
+    },
+    {
+      "name" : "tank 8 no physics",
+      "passed" : true
+    },
+    {
+      "name" : "whole fixed 48x27 arena",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    }
+  ],
+  "deviceFixture" : "tablet",
+  "imageSHA256" : "e6ace81d1a4109c7215f19b4e7a76d42bf8a1bc4d7184f0e764e3174126efced",
+  "mode" : "arena",
+  "objects" : [
+    {
+      "kind" : "base",
+      "rect" : [
+        557.1619873046875,
+        126.12200164794922,
+        79.677001953125,
+        79.677001953125
+      ]
+    },
+    {
+      "kind" : "player",
+      "rect" : [
+        456.867431640625,
+        187.33650207519531,
+        37.34844970703125,
+        36.437088012695312
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        213.95077514648438,
+        641.5906982421875,
+        37.34844970703125,
+        32.36865234375
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        554.03411865234375,
+        644.01983642578125,
+        37.348388671875,
+        32.36865234375
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        894.11749267578125,
+        528.664794921875,
+        37.348388671875,
+        31.12371826171875
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        985.059326171875,
+        310.039794921875,
+        43.5732421875,
+        28.6337890625
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        286.82577514648438,
+        361.11300659179688,
+        38.5933837890625,
+        29.878753662109375
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        772.65911865234375,
+        212.87312316894531,
+        37.348388671875,
+        34.858551025390625
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        141.07577514648438,
+        187.33650207519531,
+        37.34844970703125,
+        38.593399047851562
+      ]
+    },
+    {
+      "kind" : "enemy",
+      "rect" : [
+        554.03411865234375,
+        384.15972900390625,
+        37.348388671875,
+        29.878753662109375
+      ]
+    }
+  ],
+  "passed" : true,
+  "phase" : 1,
+  "pixelSize" : [
+    2388,
+    1668
+  ],
+  "renderer" : "SpriteKit SKView.texture",
+  "scope" : "scripted art fixture, not a playable campaign, iOS build or physical-device acceptance",
+  "sizePoints" : [
+    1194,
+    834
+  ],
+  "tankCount" : 9
+}

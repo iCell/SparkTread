@@ -1,0 +1,268 @@
+{
+  "arenaCells" : [
+    48,
+    27
+  ],
+  "assetManifestSHA256" : "a05e6a7c6ebafcdf8889bf466103053f14f01cdba823e5f05a0262b368433d60",
+  "checks" : [
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    },
+    {
+      "name" : "direction rig no rotation",
+      "passed" : true
+    },
+    {
+      "name" : "full tank texture registration",
+      "passed" : true
+    }
+  ],
+  "deviceFixture" : "phone",
+  "imageSHA256" : "e89b20421f2d2098d24783b1a554afd28f4fff4bb5b27c70e1c1b2131cbb45a9",
+  "mode" : "roster",
+  "objects" : [
+
+  ],
+  "passed" : true,
+  "phase" : 1,
+  "pixelSize" : [
+    1688,
+    780
+  ],
+  "renderer" : "SpriteKit SKView.texture",
+  "scope" : "scripted art fixture, not a playable campaign, iOS build or physical-device acceptance",
+  "sizePoints" : [
+    844,
+    390
+  ],
+  "tankCount" : 30
+}
