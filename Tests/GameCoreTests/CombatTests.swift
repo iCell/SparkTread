@@ -114,6 +114,27 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(world.projectiles.isEmpty)
     }
 
+    /// Regression (owner-reported): fragments beside the drill line must not
+    /// linger — a shot carves a cell-wide strip, and a second aligned shot
+    /// removes the back layer, leaving clean ground.
+    @Test func twoAlignedShotsClearBrickCompletely() {
+        var world = makeCombatWorld { w in
+            w.terrain[9, 3] = TerrainCell(kind: .brick)
+            w.terrain[9, 4] = TerrainCell(kind: .brick)
+        }
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 34, events: &events) // impact + cooldown
+        // First shot: front layer gone across the full cell width.
+        #expect(world.terrain[9, 3].quadrantMask == 0b1010)
+        #expect(world.terrain[9, 4].quadrantMask == 0b1010)
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 34, events: &events)
+        // Second shot: fragments fully removed, cells revert to ground.
+        #expect(world.terrain[9, 3].kind == .ground)
+        #expect(world.terrain[9, 4].kind == .ground)
+    }
+
     @Test func normalCannotHurtSteelButAPCan() {
         var worldA = makeCombatWorld { w in w.terrain[9, 3] = TerrainCell(kind: .steel); w.terrain[9, 4] = TerrainCell(kind: .steel) }
         var events: [DomainEvent] = []

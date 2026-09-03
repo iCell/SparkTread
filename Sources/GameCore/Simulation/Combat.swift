@@ -520,17 +520,24 @@ enum Combat {
 
     // MARK: - Damage application
 
-    /// Destroys quadrant layers at the impact point: layer i falls when the
+    /// Destroys quadrant layers at the impact point. Layer i falls when the
     /// material's damage value exceeds i (brick 1 = front layer, 2 = full
-    /// cell depth; steel 0 = indestructible to this weapon). Returns the
-    /// number of quadrants destroyed (each one consumes penetration).
+    /// cell depth; steel 0 = indestructible to this weapon).
+    ///
+    /// Blast width (reference-heritage): the destroyed strip spans the FULL
+    /// cross-axis width of every cell the projectile's box touches — a shot
+    /// carves a cell-wide notch, and a second aligned shot removes the back
+    /// layer entirely, so no unhittable slivers linger beside the drill
+    /// line. Only the quadrants the projectile's own box pierces consume
+    /// `penetration_count`; collateral strip quadrants do not. Returns the
+    /// pierced-quadrant count.
     private static func applyTerrainDamage(
         _ world: inout WorldState, entryQuadrant: (qx: Int, qy: Int), direction: Direction,
         crossCenter: Vec2i, half: Int, brickDamage: Int, steelDamage: Int,
         events: inout [DomainEvent]
     ) -> Int {
         let quadrant = SpatialUnits.subunitsPerQuadrant
-        var destroyedCount = 0
+        var piercedCount = 0
         var changedCells = Set<Int>()
         let maxLayers = max(brickDamage, steelDamage)
         for layer in 0..<max(1, maxLayers) {
@@ -541,16 +548,16 @@ enum Combat {
             case .down: (lqx, lqy) = (entryQuadrant.qx, entryQuadrant.qy + layer)
             case .up: (lqx, lqy) = (entryQuadrant.qx, entryQuadrant.qy - layer)
             }
-            // Cross-axis: every quadrant row/column the projectile box spans.
-            var quadrants: [(Int, Int)] = []
-            if direction.vector.x != 0 {
-                let lo = (crossCenter.y - half) / quadrant, hi = (crossCenter.y + half - 1) / quadrant
-                for qy in lo...hi { quadrants.append((lqx, qy)) }
-            } else {
-                let lo = (crossCenter.x - half) / quadrant, hi = (crossCenter.x + half - 1) / quadrant
-                for qx in lo...hi { quadrants.append((qx, lqy)) }
-            }
-            for (qx, qy) in quadrants where solidQuadrant(world.terrain, qx: qx, qy: qy) {
+            // Pierced band: quadrants the projectile box itself spans.
+            let horizontal = direction.vector.x != 0
+            let pierceLo = (horizontal ? crossCenter.y - half : crossCenter.x - half) / quadrant
+            let pierceHi = (horizontal ? crossCenter.y + half - 1 : crossCenter.x + half - 1) / quadrant
+            // Strip: widen to the full width of every touched cell.
+            let stripLo = (pierceLo / 2) * 2
+            let stripHi = (pierceHi / 2) * 2 + 1
+            for cross in stripLo...stripHi {
+                let (qx, qy) = horizontal ? (lqx, cross) : (cross, lqy)
+                guard solidQuadrant(world.terrain, qx: qx, qy: qy) else { continue }
                 let cx = qx / 2, cy = qy / 2
                 let kind = world.terrain[cx, cy].kind
                 let damage = kind == .brick ? brickDamage : steelDamage
@@ -559,7 +566,7 @@ enum Combat {
                 cell.quadrantMask &= ~(1 << ((qy % 2) * 2 + (qx % 2)))
                 if cell.quadrantMask == 0 { cell = TerrainCell(kind: .ground) }
                 world.terrain[cx, cy] = cell
-                destroyedCount += 1
+                if (pierceLo...pierceHi).contains(cross) { piercedCount += 1 }
                 changedCells.insert(cy * world.arena.cellsWide + cx)
             }
         }
@@ -568,7 +575,7 @@ enum Combat {
             events.append(.terrainChanged(cellX: cx, cellY: cy,
                                           quadrantMask: world.terrain[cx, cy].quadrantMask))
         }
-        return destroyedCount
+        return piercedCount
     }
 
     private static func applyTankDamage(
