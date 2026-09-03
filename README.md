@@ -69,7 +69,7 @@ xcrun simctl launch "iPhone 17" vip.icell.ProjectGoldenEagle
 integration contract: the 17 `.atlas` folders, `pixel_assets.json`, and the
 runtime adapters in `Sources/AppleAdapters/Presentation/Pixel/`
 (`PixelArt.swift`, `PixelPresentation.swift` — presentation only, no rules).
-Reference docs live in `docs/pixel/`. The current app root is
-`PixelShowcaseView`: swipeable SpriteKit pages (battle arena, tank roster,
-directions/equipment, item sheet, M0 grid) — a scripted art fixture for
-review, not gameplay. Launch env `SHOWCASE_PAGE=0…4` preselects a page.
+Reference docs live in `docs/pixel/`. The app root is the M1
+`MovementLabView` (touch joystick, keyboard arrows/WASD, controller D-pad);
+launch env `MOVEMENT_LAB_AUTODRIVE=1` runs a scripted demo drive. The
+delivery's own preview renders remain in the source package's `Previews/`.

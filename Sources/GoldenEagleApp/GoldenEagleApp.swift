@@ -5,7 +5,7 @@ import SwiftUI
 struct GoldenEagleApp: App {
     var body: some Scene {
         WindowGroup {
-            PixelShowcaseView()
+            MovementLabView()
         }
     }
 }

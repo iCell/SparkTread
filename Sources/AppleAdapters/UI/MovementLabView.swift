@@ -112,8 +112,7 @@ public struct MovementLabView: View {
                                   y: origin.y + stickOffset.height.clamped(to: -34...34))
                 }
             }
-            // Left 60% only, so page swiping stays available on the right.
-            .frame(width: geometry.size.width * 0.6, height: geometry.size.height, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
