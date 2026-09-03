@@ -10,7 +10,7 @@ public enum MovementLabFixture {
     /// corridors matching the 2×2-cell tank), a water pool and an ice patch
     /// (ice slide stays inert in M1), and the player tank on a spawn cell.
     public static func makeWorld() -> WorldState {
-        let arena = ArenaSpecification.provisionalBaseline
+        let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
 
         for x in 0..<arena.cellsWide {
@@ -28,14 +28,17 @@ public enum MovementLabFixture {
         func brickRow(y: Int, xRange: ClosedRange<Int>) {
             for x in xRange { terrain[x, y] = TerrainCell(kind: .brick); terrain[x, y + 1] = TerrainCell(kind: .brick) }
         }
-        // Corridor lattice: vertical spines with gaps, one horizontal shelf.
+        // Corridor lattice: vertical spines with gaps, horizontal shelves,
+        // laid out for the 56-cell width (ADR-0009).
         brickColumn(x: 9, yRange: 1...16)
         brickColumn(x: 19, yRange: 9...25)
         brickColumn(x: 29, yRange: 1...16)
+        brickColumn(x: 45, yRange: 9...25)
         brickRow(y: 19, xRange: 33...42)
         brickRow(y: 5, xRange: 36...42)
+        brickRow(y: 5, xRange: 49...53)
 
-        for y in 9...12 { for x in 40...44 { terrain[x, y] = TerrainCell(kind: .water) } }
+        for y in 9...12 { for x in 49...53 { terrain[x, y] = TerrainCell(kind: .water) } }
         for y in 21...24 { for x in 4...8 { terrain[x, y] = TerrainCell(kind: .ice) } }
 
         var world = WorldState(terrain: terrain, seed: seed)

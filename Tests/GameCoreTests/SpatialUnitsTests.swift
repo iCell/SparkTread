@@ -24,11 +24,12 @@ import Testing
 }
 
 @Suite struct ArenaSpecificationTests {
-    @Test func provisionalBaselineIs48By27() {
-        let arena = ArenaSpecification.provisionalBaseline
-        #expect(arena.cellsWide == 48)
+    @Test func universalArenaIs56By27() {
+        // Pinned by ADR-0009 (the one-shot M1 dimension tuning).
+        let arena = ArenaSpecification.universal
+        #expect(arena.cellsWide == 56)
         #expect(arena.cellsHigh == 27)
-        #expect(arena.widthSubunits == 48 * 1024)
+        #expect(arena.widthSubunits == 56 * 1024)
         #expect(arena.heightSubunits == 27 * 1024)
     }
 }

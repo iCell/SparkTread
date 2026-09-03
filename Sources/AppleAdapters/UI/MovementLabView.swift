@@ -70,20 +70,27 @@ public struct MovementLabView: View {
     public init() {}
 
     public var body: some View {
-        ZStack {
-            SpriteView(scene: liveScene)
-                .ignoresSafeArea()
-            joystickOverlay
+        GeometryReader { geometry in
+            ZStack {
+                SpriteView(scene: liveScene(for: geometry.size))
+                    .ignoresSafeArea()
+                joystickOverlay
+            }
         }
+        .ignoresSafeArea()
         .background(Color.black)
         .persistentSystemOverlays(.hidden)
         .onAppear { controller.start() }
         .onDisappear { controller.stop() }
     }
 
-    private var liveScene: MovementLabScene {
+    private func liveScene(for size: CGSize) -> MovementLabScene {
         if let scene { return scene }
-        let created = MovementLabScene(size: CGSize(width: 844, height: 390), controller: controller)
+        // Scene matches the real device surface so the uniform fit is
+        // computed against the true edge-to-edge bounds (ADR-0004).
+        let created = MovementLabScene(
+            size: size == .zero ? CGSize(width: 844, height: 390) : size,
+            controller: controller)
         DispatchQueue.main.async { scene = created }
         return created
     }

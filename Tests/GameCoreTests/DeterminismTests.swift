@@ -15,7 +15,7 @@ private func scriptedDirection(_ tick: Int) -> Direction? {
 }
 
 private func makeLabLikeWorld(seed: UInt64 = 7) -> WorldState {
-    var terrain = TerrainGrid(arena: .provisionalBaseline)
+    var terrain = TerrainGrid(arena: .universal)
     let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
     for x in 0..<w { terrain[x, 0] = TerrainCell(kind: .steel); terrain[x, h - 1] = TerrainCell(kind: .steel) }
     for y in 0..<h { terrain[0, y] = TerrainCell(kind: .steel); terrain[w - 1, y] = TerrainCell(kind: .steel) }

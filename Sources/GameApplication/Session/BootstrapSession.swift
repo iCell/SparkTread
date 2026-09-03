@@ -5,7 +5,7 @@ import GameCore
 public struct BootstrapSession: Sendable {
     public let arena: ArenaSpecification
 
-    public init(arena: ArenaSpecification = .provisionalBaseline) {
+    public init(arena: ArenaSpecification = .universal) {
         self.arena = arena
     }
 }

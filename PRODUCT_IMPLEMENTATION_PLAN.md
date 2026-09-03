@@ -253,7 +253,7 @@ The vertical slice MUST contain:
 |---|---|---|
 | D-001 | The project is a spiritual successor with new distributable art, audio, title, and branding. | Fixed |
 | D-002 | Swift, SpriteKit, and SwiftUI in the current stable Xcode toolchain are the implementation baseline. | Fixed for project initialization |
-| D-003 | All shipping stages use one universal fixed-size, approximately 16:9 arena. The initial implementation baseline is 48×27 base terrain cells; M1 may tune this once through an ADR before combat content is authored. | Fixed type; provisional dimensions |
+| D-003 | All shipping stages use one universal fixed-size arena. Dimensions pinned at 56×27 base terrain cells by ADR-0009 (the one-shot M1 tuning this row authorized; originally a provisional 48×27 at ~16:9). | Fixed |
 | D-004 | Gameplay is 2D top-down. The complete arena and every active tank remain visible at all times; there is no camera follow, scrolling, gameplay zoom, or split-screen. | Fixed |
 | D-005 | Simulation runs at a fixed 60 Hz tick using integer or fixed-point state. Rendering may interpolate. | Fixed |
 | D-006 | Core input is four-direction movement, normal fire, and special fire. | Fixed |
@@ -332,7 +332,7 @@ Challenge mode is DEFERRED until the campaign loop is stable. It may reuse campa
 - Positive X: right.
 - Positive Y: down.
 - Arena bounds use integer or fixed-point world units, never device pixels or SpriteKit points.
-- Initial base grid: 48×27 terrain cells; X `0..47`, Y `0..26`; PROVISIONAL until the M1 legibility gate.
+- Base grid: 56×27 terrain cells; X `0..55`, Y `0..26`; pinned by ADR-0009 (originally provisional 48×27).
 - One base terrain cell: `1024` simulation subunits per side; subunits are the only authoritative spatial unit (ADR-0001). There is no pixel-based authoritative unit.
 - Reference conversion: one reference-game pixel (16-pixel-cell era) equals `64` subunits; reference constants MUST pass through this documented conversion and never appear in modern data in pixel form.
 - Standard tank footprint: 2×2 base cells (`2048×2048` subunits) minus a PROVISIONAL collision inset.

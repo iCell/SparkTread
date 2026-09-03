@@ -4,7 +4,7 @@ import Testing
 /// Small custom worlds for precise movement geometry. Cell = 1024 subunits;
 /// tank footprint 2048² with 64-subunit collision inset (box 1920²).
 private func makeWorld(_ build: (inout TerrainGrid) -> Void = { _ in }) -> WorldState {
-    var terrain = TerrainGrid(arena: .provisionalBaseline)
+    var terrain = TerrainGrid(arena: .universal)
     let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
     for x in 0..<w { terrain[x, 0] = TerrainCell(kind: .steel); terrain[x, h - 1] = TerrainCell(kind: .steel) }
     for y in 0..<h { terrain[0, y] = TerrainCell(kind: .steel); terrain[w - 1, y] = TerrainCell(kind: .steel) }

@@ -4,6 +4,6 @@ import GameCore
 
 @Suite struct BootstrapSessionTests {
     @Test func defaultsToProvisionalArenaBaseline() {
-        #expect(BootstrapSession().arena == .provisionalBaseline)
+        #expect(BootstrapSession().arena == .universal)
     }
 }

@@ -36,11 +36,13 @@ final class MovementLabScene: SKScene {
         liquidSprites.removeAll()
         let world = controller.session.world
         let arena = world.arena
-        cellPoints = min((size.width - 28) / CGFloat(arena.cellsWide),
-                         (size.height - 34) / CGFloat(arena.cellsHigh))
+        // Edge-to-edge uniform fit (ADR-0004): min(w/arenaW, h/arenaH), no
+        // reserved margins; HUD overlays the arena and stays safe-area-aware.
+        cellPoints = min(size.width / CGFloat(arena.cellsWide),
+                         size.height / CGFloat(arena.cellsHigh))
         let width = CGFloat(arena.cellsWide) * cellPoints
         let height = CGFloat(arena.cellsHigh) * cellPoints
-        originPoint = CGPoint(x: (size.width - width) / 2, y: 10 + (size.height - 34 - height) / 2)
+        originPoint = CGPoint(x: (size.width - width) / 2, y: (size.height - height) / 2)
         pointsPerSubunit = cellPoints / CGFloat(SpatialUnits.subunitsPerCell)
         do {
             let art = try PixelArt()
@@ -138,7 +140,7 @@ final class MovementLabScene: SKScene {
         label.fontSize = 10
         label.fontColor = SKColor(white: 1, alpha: 0.8)
         label.horizontalAlignmentMode = .left
-        label.position = CGPoint(x: originPoint.x + 4, y: size.height - 14)
+        label.position = CGPoint(x: originPoint.x + 8, y: size.height - 16)
         label.zPosition = 9000
         addChild(label)
         debugLabel = label
