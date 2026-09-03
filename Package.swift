@@ -55,6 +55,11 @@ let package = Package(
             path: "Tests/GameApplicationTests"
         ),
         .testTarget(
+            name: "AppleAdapterTests",
+            dependencies: ["AppleAdapters", "GameApplication", "GameCore"],
+            path: "Tests/AppleAdapterTests"
+        ),
+        .testTarget(
             name: "ContentValidationTests",
             dependencies: ["ContentValidatorKit"],
             path: "Tests/ContentValidationTests",

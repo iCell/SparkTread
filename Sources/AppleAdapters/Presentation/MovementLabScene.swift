@@ -17,6 +17,7 @@ final class MovementLabScene: SKScene {
     private var travelledSubunits = 0
     private var lastPosition: Vec2i?
 
+    private var layout: ArenaLayout?
     private var cellPoints: CGFloat = 0
     private var originPoint: CGPoint = .zero
     private var pointsPerSubunit: CGFloat = 0
@@ -35,15 +36,13 @@ final class MovementLabScene: SKScene {
         removeAllChildren()
         liquidSprites.removeAll()
         let world = controller.session.world
-        let arena = world.arena
-        // Edge-to-edge uniform fit (ADR-0004): min(w/arenaW, h/arenaH), no
-        // reserved margins; HUD overlays the arena and stays safe-area-aware.
-        cellPoints = min(size.width / CGFloat(arena.cellsWide),
-                         size.height / CGFloat(arena.cellsHigh))
-        let width = CGFloat(arena.cellsWide) * cellPoints
-        let height = CGFloat(arena.cellsHigh) * cellPoints
-        originPoint = CGPoint(x: (size.width - width) / 2, y: (size.height - height) / 2)
-        pointsPerSubunit = cellPoints / CGFloat(SpatialUnits.subunitsPerCell)
+        // Edge-to-edge uniform fit (ADR-0004): no reserved margins; the HUD
+        // overlays the arena and stays safe-area-aware.
+        let layout = ArenaLayout(surface: size, arena: world.arena)
+        self.layout = layout
+        cellPoints = layout.cellPoints
+        originPoint = layout.origin
+        pointsPerSubunit = layout.pointsPerSubunit
         do {
             let art = try PixelArt()
             self.art = art
@@ -59,10 +58,9 @@ final class MovementLabScene: SKScene {
         }
     }
 
-    /// World subunits (Y-down) → scene points (Y-up): the single conversion.
+    /// World subunits (Y-down) → scene points (Y-up), via the shared layout.
     private func scenePoint(_ p: Vec2i) -> CGPoint {
-        CGPoint(x: originPoint.x + CGFloat(p.x) * pointsPerSubunit,
-                y: originPoint.y + (CGFloat(controller.session.world.arena.heightSubunits) - CGFloat(p.y)) * pointsPerSubunit)
+        layout?.scenePoint(p) ?? .zero
     }
 
     private func buildTerrain(_ art: PixelArt, world: WorldState) throws {

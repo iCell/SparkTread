@@ -122,6 +122,8 @@ private func run(_ world: inout WorldState, ticks: Int) {
                     && p.y + 2048 <= arena.heightSubunits,
                     "out of bounds at block \(block): \(p)")
             #expect(a.tanks[0].movementAccumulator < MovementRuleset.accumulatorUnitsPerSubunit)
+            #expect(WorldInvariants.violations(in: a).isEmpty,
+                    "invariants at block \(block): \(WorldInvariants.violations(in: a))")
             #expect(a.checksum() == b.checksum(), "drift at block \(block)")
         }
         #expect(a.tick == 108_000)

@@ -79,6 +79,8 @@ public struct MovementLabSession: Sendable {
         let events = Simulation.step(&world, commands: commands, ruleset: ruleset)
         if world.tick % Self.checksumInterval == 0 {
             recording.appendChecksum(tick: world.tick, checksum: world.checksum())
+            assert(WorldInvariants.violations(in: world).isEmpty,
+                   "invariants violated: \(WorldInvariants.violations(in: world))")
         }
         return events
     }

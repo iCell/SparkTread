@@ -52,4 +52,5 @@ schemes:
       targets:
         - package: GoldenEagleKit/GameCoreTests
         - package: GoldenEagleKit/GameApplicationTests
+        - package: GoldenEagleKit/AppleAdapterTests
         - package: GoldenEagleKit/ContentValidationTests
