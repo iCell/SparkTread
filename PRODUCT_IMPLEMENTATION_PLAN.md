@@ -2,7 +2,7 @@
 
 ## Product, Game Design, and Implementation Plan
 
-Document version: 2.1  
+Document version: 2.3  
 Status: Planning baseline for implementation and external AI review  
 Date: 2026-09-01  
 Primary stack: Swift + SpriteKit + SwiftUI in the current stable Xcode toolchain  
@@ -91,6 +91,23 @@ Version 2.0 supersedes the former Godot/macOS-first/local-co-op plan. It fixes t
 ### 1.7 Version 2.1 change record
 
 Version 2.1 locks the approved visual direction as **Soft Modern Mechanical Toy Arcade** and adds a consolidated Chinese master summary plus an enumeration-only asset checklist. It does not authorize or perform bulk asset generation.
+
+### 1.8 Version 2.2 change record
+
+Version 2.2 applies the accepted external design/engineering review (findings F-01–F-28) without changing product direction:
+
+- one spatial unit system: `1024` subunits per cell and `512`-subunit destruction quadrants (ADR-0001);
+- one external input contract, `PlayerCommand`, with a versioned `session_request` enum; AI intents are internal-only; turn buffering and alignment assistance are core-owned, serialized state (ADR-0002);
+- serializable value-type world state, mid-stage suspend/resume, required development/test checksums, and a resimulation throughput target (ADR-0003);
+- edge-to-edge arena rendering, a pinned 390-point-class minimum-device floor, and gutter-first touch layout rules (ADR-0004);
+- swept collision, a per-tick displacement cap, completed collision categories, chain-detonation ordering, and penetration/durability semantics;
+- mine launch/flight and ice-slide contracts; drop-table and authored base-repair contracts; reachability, spawn-blocked, and respawn-blocked rules;
+- campaign-spanning replay headers; Apple platform lifecycle requirements; raw multi-touch input requirement; terrain chunk-rendering rule;
+- `ArenaSpecification` extraction, ID-canon corrections (`freeze_enemy`, `ammo_crate`, `ap_c`), work-package path fixes, closure of the ammunition-retention question, and the new A0 style-lock milestone.
+
+### 1.9 Version 2.3 change record
+
+Version 2.3 records one owner gameplay decision (ADR-0005): allied damage to the player's own base becomes difficulty-scoped ruleset data (`allied_base_damage`) — disabled on Casual, enabled on Standard and Veteran with a clearly telegraphed own-fire cue. Future co-op player-versus-player damage remains disabled.
 
 ---
 
@@ -243,15 +260,15 @@ The vertical slice MUST contain:
 | D-007 | V1 ships as single-player only. Local multiplayer, split-screen, and networking are not implemented in V1. | Fixed |
 | D-008 | Authoritative state and commands use stable `PlayerID` values and support a future capacity of two players; V1 creates only one player. | Fixed |
 | D-009 | The modern ruleset is authoritative and may intentionally improve on the reference game. Reference behavior is research evidence, not a second shipping mode. | Fixed |
-| D-010 | Allied damage to the player's own base is disabled unless an explicit modern gameplay rule later enables a clearly telegraphed exception. | Fixed |
+| D-010 | Allied damage to the player's own base is difficulty-scoped ruleset data (`allied_base_damage`): disabled on Casual; enabled on Standard and Veteran with a clearly telegraphed own-fire hit cue (ADR-0005). Allied damage to allied tanks, including the future co-op partner, remains disabled. | Fixed |
 | D-011 | The first campaign contains 12 handcrafted stages; the vertical slice contains 3. | Fixed |
 | D-012 | Gameplay rules MUST NOT be implemented inside HUD, animation, audio, or scene scripts. | Fixed |
 | D-013 | Content is canonical in reviewable text files and validated before play. | Fixed |
 | D-014 | Agents MUST preserve determinism and must not use frame-rate-dependent gameplay logic. | Fixed |
 | D-015 | No original binary or extracted asset may be committed to the distributable game without confirmed rights. | Fixed |
-| D-016 | Device adaptation uses uniform scaling and safe-area-aware UI; device aspect ratio MUST NOT reveal or hide playable terrain. | Fixed |
-| D-017 | SpriteKit and SwiftUI are presentation/platform adapters. Authoritative rules live in a pure Swift `GameCore` module and MUST NOT import SpriteKit, SwiftUI, GameKit, AVFoundation, or platform UI APIs. | Fixed |
-| D-018 | Future online play consumes the same tick-addressed command API as local input. V1 implements replay/determinism foundations but no speculative networking layer or unused transport interface. | Fixed |
+| D-016 | Device adaptation uses uniform scaling and safe-area-aware UI; device aspect ratio MUST NOT reveal or hide playable terrain. The gameplay arena MAY render edge-to-edge beneath system UI overlays; HUD and interactive controls respect safe areas (ADR-0004). | Fixed |
+| D-017 | SpriteKit and SwiftUI are presentation/platform adapters. Authoritative rules live in a pure Swift `GameCore` module and MUST NOT import SpriteKit, SwiftUI, GameKit, AVFoundation, Foundation, or platform UI APIs. | Fixed |
+| D-018 | Future online play consumes the same tick-addressed command API as local input. V1 implements replay/determinism foundations but no speculative networking layer or unused transport interface. V1 obligations additionally include a fully serializable value-type `WorldState` (including RNG stream positions and buffered input state), a serialize→restore→resume checksum test from M1 onward, and a headless resimulation throughput target (ADR-0003). | Fixed |
 | D-019 | Shipping art uses the approved Soft Modern Mechanical Toy Arcade direction: moderately rounded silhouettes, large color panels, satin enamel and soft molded-plastic accents, restrained mechanical detail, strict top-down readability, and no faces/eyes or preschool styling. | Fixed |
 | D-020 | The soft v2 arena and tank-family styleboards are visual references, not shipping sprite sheets. Production assets require separate extraction/redraw, technical normalization, readability review, and provenance approval. | Fixed |
 
@@ -267,7 +284,7 @@ This is the default product experience.
 
 - Three difficulty presets: Casual, Standard, Veteran.
 - Base has visible durability instead of universal one-hit failure.
-- Allied friendly fire is disabled.
+- Allied fire never damages allied tanks. Whether the player's own fire damages the base is difficulty data: the base is immune on Casual and vulnerable on Standard and Veteran, with clear own-fire cues (ADR-0005).
 - Enemy special attacks receive clearer telegraphs.
 - Upgrade effects are named and previewed.
 - Previous special-weapon ammunition is retained when switching away and returning later.
@@ -299,7 +316,7 @@ Two-player online co-op is DEFERRED until the V1 campaign is stable. It will:
 - scale enemy composition and pacing through mode data rather than branching combat code;
 - choose matchmaking, transport, authority, prediction, rollback, reconnect, and host-migration policies in a dedicated pre-network ADR.
 
-V1 MUST NOT ship dormant sockets, matchmaking code, a generic `NetworkManager`, or an unused network abstraction. The V1 obligation is deterministic command simulation, snapshots, checksums, and multi-player-capable data identifiers.
+V1 MUST NOT ship dormant sockets, matchmaking code, a generic `NetworkManager`, or an unused network abstraction. The V1 obligation is deterministic command simulation, snapshots, required development checksums, multi-player-capable data identifiers, and a fully serializable, cheaply copyable authoritative state that supports faster-than-real-time resimulation (ADR-0003).
 
 ### 5.4 Future Challenge Mode
 
@@ -316,11 +333,13 @@ Challenge mode is DEFERRED until the campaign loop is stable. It may reuse campa
 - Positive Y: down.
 - Arena bounds use integer or fixed-point world units, never device pixels or SpriteKit points.
 - Initial base grid: 48×27 terrain cells; X `0..47`, Y `0..26`; PROVISIONAL until the M1 legibility gate.
-- One base terrain cell: `1024` simulation subunits per side.
-- Standard tank footprint: 2×2 base cells; collision inset is PROVISIONAL.
-- Terrain destruction subcell: half-cell quadrants, allowing four destructible quadrants per base cell.
+- One base terrain cell: `1024` simulation subunits per side; subunits are the only authoritative spatial unit (ADR-0001). There is no pixel-based authoritative unit.
+- Reference conversion: one reference-game pixel (16-pixel-cell era) equals `64` subunits; reference constants MUST pass through this documented conversion and never appear in modern data in pixel form.
+- Standard tank footprint: 2×2 base cells (`2048×2048` subunits) minus a PROVISIONAL collision inset.
+- Terrain destruction subcell: half-cell quadrants of `512×512` subunits, allowing four destructible quadrants per base cell.
 - All stage definitions MUST use the same final arena dimensions.
 - Rendering computes one uniform scale using `min(availableWidth / arenaWidth, availableHeight / arenaHeight)` and never stretches one axis independently.
+- `GameCore` uses the Y-down convention below; the SpriteKit presentation adapter owns the single Y-axis conversion into SpriteKit's Y-up scene space.
 
 ### 6.2 Direction convention
 
@@ -357,6 +376,8 @@ Modern control behavior:
 
 Input-buffer and alignment values are tuning parameters, not hardcoded constants.
 
+Ownership (ADR-0002): input adapters resolve concurrent physical inputs into at most one held direction per tick and never inspect collision state. `GameCore` owns turn buffering and alignment assistance, because both depend on authoritative collision legality. Buffer and assist state are authoritative simulation state: they are included in snapshots, checksums, and serialization, and their windows are ruleset data.
+
 ### 6.4 Player state
 
 ```text
@@ -378,9 +399,13 @@ TankState
   team_id: int
   owner_player_id: PlayerID | null
   archetype_id: string
-  position_subpx: Vec2i
+  position_subunits: Vec2i
   facing: Direction
   movement_intent: Direction | none
+  buffered_direction: Direction | none
+  buffered_direction_remaining_ticks: int
+  slide_direction: Direction | none
+  slide_momentum_subunits: int
   armor: int
   max_armor: int
   speed_level: int
@@ -410,7 +435,7 @@ The app, HUD, and touch adapters MUST NOT expose a second-player activation path
 ### 6.5 Player death and re-entry
 
 1. When armor reaches zero, the active tank is destroyed.
-2. If the player has another life, consume one life and schedule respawn after 60 ticks.
+2. If the player has another life, consume one life and schedule respawn after 60 ticks. If the configured respawn cell is blocked at the respawn tick, the respawn position resolves to the nearest legal cell by the deterministic ring-scan order; respawn never overlaps another entity or solid terrain.
 3. On campaign respawn, retain speed level, power level, equipment, selected special weapon, and stored special ammunition; reset armor to the configured respawn armor.
 4. Respawn protection is visible and prevents damage, but does not permit passing through solid terrain.
 5. If no life remains, the player becomes eliminated.
@@ -425,10 +450,11 @@ Campaign base behavior:
 
 - Base maximum durability: 3; PROVISIONAL.
 - Any unblocked damaging hit reduces durability according to weapon data.
+- Whether allied (player-originated) damage affects the base is the difficulty flag `allied_base_damage`: Casual `false`; Standard and Veteran `true` (ADR-0005). The flag governs every allied damage source — projectile, explosion, fire hazard, and mine — and overrides team-based exemptions for the base only. Enabled allied base hits use a distinct own-fire cue, and stage-authored repair events remain the recovery path.
 - Damage states are visually distinct at 3, 2, 1, and 0 durability.
 - Base shield prevents damage for a configured duration and MUST be visually obvious.
 - A shield pickup refreshes short remaining duration and extends long remaining duration according to ruleset data.
-- Base-adjacent terrain may be destroyed and repaired by explicit effects.
+- Base-adjacent terrain may be destroyed and repaired by explicit effects. In the V1 campaign, base repair is a stage-authored director effect (triggered by authored times or conditions in stage data) that restores base durability and/or adjacent wall quadrants in a deterministic restore order; repair MUST NOT restore terrain into a cell occupied by a tank, mine, or pickup. A repair pickup is not part of the V1 pickup set and MAY be added later as a content addition.
 - The base does not fire or move in the first campaign.
 
 ### 6.7 Win and loss
@@ -437,6 +463,7 @@ Campaign base behavior:
 - Loss: base durability reaches zero, or the V1 player is eliminated with no pending revival.
 - Win/loss is resolved after all damage and death events for the current tick.
 - Simultaneous destruction is ruleset-defined; the campaign defaults to loss if the base reaches zero on the same tick as the last enemy.
+- If the sole player is eliminated with no pending revival on the same tick the final enemy is destroyed and the base survives, the campaign default is a **win**; this precedence is ruleset data.
 
 ### 6.8 Stage pacing
 
@@ -447,6 +474,7 @@ Campaign base behavior:
 - EnemyDirector draws from finite per-archetype counts.
 - New enemies must telegraph their spawn for at least 45 ticks before becoming dangerous; PROVISIONAL.
 - Spawn protection or collision separation MUST prevent unavoidable spawn kills.
+- A spawn point blocked by a live tank defers the spawn, keeps or restarts its telegraph, and after a configured tick count selects the next legal spawn point in deterministic order.
 
 ---
 
@@ -455,10 +483,12 @@ Campaign base behavior:
 ### 7.1 Movement model
 
 - Tanks move only along cardinal axes.
-- Position uses integer subpixels with `256 subpixels = 1 logical pixel`.
+- Position uses integer subunits; `1024 subunits = 1 terrain cell` (ADR-0001).
 - Movement distance per tick is calculated with an integer accumulator to avoid drift.
-- Simulation MUST NOT multiply movement by variable `_process(delta)`.
+- Simulation MUST NOT multiply movement by a variable frame delta.
 - Tank-vs-terrain and tank-vs-tank collision resolution MUST be deterministic.
+- Tank movement is swept along the per-tick displacement segment; a tank cannot pass through geometry its swept footprint intersects.
+- Tank movement resolves in ascending `entity_id` order; this documented, deterministic priority is test-covered. The future co-op ADR must either accept documented ID priority or adopt a deterministic rotating tiebreak before behavior goldens are treated as locked.
 - A tank may turn only when the new movement vector is collision-free after permitted alignment assistance.
 
 ### 7.2 Campaign speed levels
@@ -479,7 +509,7 @@ The base pixels-per-second value is PROVISIONAL and must be selected in the Move
 | Terrain | Blocks tanks | Blocks shots | Destructible | Special behavior |
 |---|---|---|---|---|
 | Ground | No | No | No | Default movement |
-| Brick | Yes | Yes | Yes, by 8×8 quadrant | Damage mask changes collision |
+| Brick | Yes | Yes | Yes, by 512×512-subunit quadrant | Damage mask changes collision |
 | Steel | Yes | Yes | By qualified weapons/levels | High resistance |
 | Water | Yes by default | No | No | AmphiTank permits traversal and water mines |
 | Ice | No | No | No | Adds inertia/turning friction unless AntiSkid |
@@ -489,11 +519,14 @@ The base pixels-per-second value is PROVISIONAL and must be selected in the Move
 
 ### 7.4 Destructible terrain
 
-- A 16×16 brick/steel cell stores a four-bit quadrant mask.
+- Each destructible brick/steel cell stores a four-bit quadrant mask; each quadrant is `512×512` subunits.
 - A projectile collision computes impacted quadrants from impact point, direction, radius, and weapon terrain damage.
 - Collision geometry updates in the same simulation tick as damage.
 - Rendering consumes `TerrainChanged` events and MUST NOT own the authoritative mask.
 - Explosion damage may affect multiple adjacent subcells using a deterministic scan order.
+- Projectile advancement uses swept segment collision: each tick, a projectile tests its full displacement segment against terrain quadrants, mines, tanks, the base, and other projectiles, resolving intersections in deterministic parametric-entry order along the segment. Discrete point sampling is prohibited.
+- As a data-sanity cap, the content validator rejects any weapon whose per-tick displacement can exceed one cell (`1023` subunits per tick).
+- Required tests: the fastest configured weapon versus a single-quadrant wall, a mine trigger radius, and a crossing projectile.
 
 ### 7.5 Equipment traversal
 
@@ -559,23 +592,25 @@ WeaponDefinition
   max_ammo: int
   cooldown_ticks[4]: int
   max_active[4]: int
-  initial_speed_subpx_per_tick[4]: int
-  acceleration_subpx_per_tick2[4]: int
-  max_speed_subpx_per_tick[4]: int
+  initial_speed_subunits_per_tick[4]: int
+  acceleration_subunits_per_tick2[4]: int
+  max_speed_subunits_per_tick[4]: int
   lifetime_ticks[4]: int
   tank_damage[4]: int
   brick_damage[4]: int
   steel_damage[4]: int
   projectile_durability[4]: int
   penetration_count[4]: int
-  explosion_radius_subpx[4]: int
-  mine_trigger_radius_subpx[4]: int
+  explosion_radius_subunits[4]: int
+  mine_trigger_radius_subunits[4]: int
   status_effect_id: string | null
   friendly_fire_policy: string
   presentation_id: string
 ```
 
 The simulation MUST NOT branch on display names or sprite names.
+
+Field semantics (fixed): `penetration_count` is the number of destroyable targets (tank, brick quadrant, steel quadrant, mine) a projectile may pass through before despawning. `projectile_durability` is the comparison value for projectile-versus-projectile contact: the higher durability survives and the lower is destroyed; equal durabilities destroy both.
 
 ### 8.5 Collision categories
 
@@ -590,9 +625,21 @@ The weapon rules matrix MUST explicitly cover:
 - projectile vs mine;
 - explosion vs every category above;
 - fire hazard vs each team;
-- mine vs tank with each equipment type.
+- mine vs tank with each equipment type;
+- projectile vs water, ice, and foliage (default pass-over/no-block semantics per the terrain table);
+- projectile vs pickup;
+- projectile vs spawning/telegraph-state tank;
+- projectile vs arena boundary;
+- projectile vs base shield and vs invincible tank (deflection);
+- fire hazard vs terrain (foliage flammability is stage data, default off);
+- mine vs mine (placement legality and stacking);
+- explosion vs mine chain detonation.
 
 An unlisted collision is a content-validation failure, not an implicit no-op.
+
+Chain detonations resolve breadth-first: each wave collects all mines triggered by the previous wave's explosions and detonates them in ascending `entity_id` order within the same tick, bounded by a content-defined recursion cap (default 8 waves).
+
+Allied-source damage against the base resolves through the active difficulty's `allied_base_damage` flag before weapon damage applies (ADR-0005).
 
 ### 8.6 Mines and equipment
 
@@ -605,6 +652,8 @@ Required interactions:
 - Memory of Sea prevents post-survival launch/flight and slow effects, but does not grant damage immunity.
 - Explosion weapons detonate mines with level less than or equal to explosion power level.
 - Friendly-mine behavior is ruleset data.
+
+Launch/flight contract (fixed shape; values are PROVISIONAL ruleset data): when a surviving, non-immune tank triggers a qualifying mine, it is displaced along its movement direction at the trigger tick by a mine-level-defined distance in subunits; it gains an `airborne` status for a defined tick count during which it is uncontrollable, untargetable, and suspended from all interactions; it lands at the nearest legal cell to the nominal landing point using the deterministic ring-scan order. A ruleset or stage MAY disable launch entirely. Slow effects use the standard status-effect system.
 
 ### 8.7 Fire team filtering
 
@@ -652,6 +701,7 @@ No implementation may collapse these values into one generic tank level.
 - Collection is processed after movement and damage for the tick.
 - Score-only pickups cannot be collected by enemies.
 - An enemy with Memory of Sea may collect allowed non-score pickups if the active ruleset enables the reference behavior.
+- Kill-triggered drops draw from the stage's drop table through the `drop` RNG stream; a drop spawns at the defeated enemy's cell center, falling back to the nearest legal cell by the deterministic ring-scan order.
 
 ### 9.4 Required vertical-slice pickups
 
@@ -665,11 +715,11 @@ No implementation may collapse these values into one generic tank level.
 | Four equipment pickups | Replace equipment |
 | `invincibility` | Timed damage immunity |
 | `base_shield` | Timed base protection |
-| `freeze_enemies` | Timed enemy hold |
+| `freeze_enemy` | Timed enemy hold |
 | `bomb` | Damage/destroy qualified active enemies |
 | `extra_life` | Add/reactivate a player life |
 | `max_armor_ammo` | Max armor and current special ammunition |
-| `ammo` | Refill current special weapon |
+| `ammo_crate` | Refill current special weapon |
 | Five weapon pickups | Switch and refill the selected weapon |
 
 Score pickups may be added during the results/score milestone.
@@ -694,6 +744,7 @@ Variants differ by:
 - equipment;
 - special ammunition;
 - score/reward class;
+- drop class (`drop_class`) selecting entries in the stage's drop table;
 - visual silhouette or palette;
 - AI behavior weights.
 
@@ -715,7 +766,7 @@ AI is divided into two responsibilities:
 
 - receives a read-only world query and its tank state;
 - selects a tactical target and behavior state;
-- emits the same `TankCommand` shape used by a player;
+- emits an internal `TankIntent` carrying the same movement/fire fields as `PlayerCommand`; AI intents are derived deterministically inside the simulation and never enter the external command-ingestion API;
 - never changes world state directly.
 
 ### 10.3 Required behavior states
@@ -742,6 +793,7 @@ Not every archetype needs every state.
 - Path choice uses deterministic tie breaking derived from the stage RNG.
 - AI may use short local steering to align shots but may not bypass tank collision.
 - Recalculation is budgeted; every enemy does not need a full path search every tick.
+- Two tanks mutually blocking each other head-on MUST resolve within a bounded, configured tick count through the Retreat/Reposition behavior; the resolution choice is deterministic.
 
 ### 10.5 Tactical target selection
 
@@ -770,11 +822,12 @@ Target score SHOULD combine:
 |---|---:|---:|---:|
 | Targeted behavior | Low | Medium | High |
 | Base focus | Low | Medium | High but interruptible |
-| Special ammo | 70% | 100% | 140% |
+| Enemy special ammo | 70% | 100% | 140% |
 | Reaction interval | Long | Normal | Short |
 | Coordinated role behavior | Rare | Occasional | Frequent |
 | Telegraph duration | Long | Normal | Never below fairness floor |
 | Enemy composition | Forgiving | Authored baseline | More advanced variants |
+| Allied base damage | Off | On | On |
 
 Exact numbers live in `DifficultyDefinition`; the table defines intent.
 
@@ -790,8 +843,7 @@ StageDefinition
   id: string
   display_name_key: string
   theme_id: string
-  arena_width_cells: 48  # provisional until M1 gate; then universal
-  arena_height_cells: 27 # provisional until M1 gate; then universal
+  arena_spec_id: string  # references the single universal ArenaSpecification content file
   terrain_layers: array
   base_spawn: GridPos
   player_spawns_by_id: map<PlayerID, GridPos> # V1 activates only player 1
@@ -800,7 +852,8 @@ StageDefinition
   max_alive_enemies: int
   initial_enemy_delay_ticks: int
   pickup_spawns: array
-  hidden_pickups: array
+  hidden_pickups: array  # each spawns when the final quadrant of its covering brick cell is destroyed
+  drop_table_id: string | null
   stage_mutators: array<string>
   intro_text_key: string
   tutorial_steps: array
@@ -815,7 +868,7 @@ StageDefinition
 - Destructible terrain should create changing routes rather than only decoration.
 - Water and ice must change tactics when present.
 - Foliage must not hide lethal information without a readable cue.
-- Hidden pickups should be learnable through visual language, not arbitrary pixel hunting.
+- Hidden pickups should be learnable through visual language, not arbitrary pixel hunting; a hidden pickup spawns when the final quadrant of its covering brick cell is destroyed, and the covering-cell association is stage data.
 - The stage must remain completable if all destructible terrain is removed.
 - The reserved future player-2 spawn must not trap either player or create a safer route unavailable to player 1.
 - Enemy composition must exercise the terrain and pickup opportunities of the map.
@@ -982,14 +1035,14 @@ SwiftUI App / SpriteKit / Touch / Controller / Audio / Persistence
 
 The domain layer MUST NOT import or access:
 
-- `SpriteKit`, `SwiftUI`, `GameKit`, `GameController`, `AVFoundation`, or UIKit/AppKit view types;
+- `SpriteKit`, `SwiftUI`, `GameKit`, `GameController`, `AVFoundation`, `Foundation`, or UIKit/AppKit view types;
 - `SKScene`, `SKNode`, `SKPhysicsWorld`, `SpriteView`, or texture/asset identifiers;
 - filesystem APIs;
 - window/display APIs;
 - wall-clock time;
 - nondeterministic global random calls.
 
-It MAY use Swift standard-library and Foundation value types whose behavior is explicitly normalized for determinism and serialization. Authoritative vectors, timers, and IDs must be project-owned value types.
+`GameCore` MUST NOT import Foundation; it uses the Swift standard library only (`Codable`, integers, arrays, and dictionaries are standard-library features). A specific Foundation type may be admitted only by name in the architecture-check allowlist with a documented determinism note. Authoritative vectors, timers, and IDs must be project-owned value types.
 
 ### 13.2 Interface ownership
 
@@ -1012,7 +1065,10 @@ Authoritative simulation state includes:
 - enemy composition and spawn timers;
 - base state;
 - RNG state;
-- stage objective state.
+- stage objective state;
+- turn-buffer, alignment-assist, and slide state.
+
+Authoritative simulation state is a value type and fully `Codable`, including RNG stream positions, buffered input, and deferred effects (ADR-0003).
 
 Presentation-only state includes:
 
@@ -1046,7 +1102,7 @@ Every simulation tick executes in this exact top-level order:
 
 1. consume player commands for the tick;
 2. decrement timers and update existing status effects;
-3. compute AI commands from the pre-movement world query;
+3. compute AI intents from the pre-movement world query;
 4. validate activation, continue, and respawn requests;
 5. resolve facing, alignment assistance, and tank movement;
 6. process normal-fire and special-fire requests;
@@ -1060,23 +1116,31 @@ Every simulation tick executes in this exact top-level order:
 14. update objective/win/loss state;
 15. emit ordered domain events;
 16. produce the new immutable presentation snapshot;
-17. compute optional development checksum.
+17. compute the periodic state checksum (required in development, test, and golden-replay configurations; optional in release).
 
 Within a step, ordering rules must be documented and covered by collision tests. An agent may not reorder steps to fix a local symptom without an ADR.
+
+Fixed clarifications: a projectile spawned in step 7 does not advance in step 8 of the same tick; its first advancement occurs on the following tick. Tank movement in step 5 resolves in ascending `entity_id` order (see §7.1).
 
 ### 13.7 Command model
 
 ```text
-TankCommand
-  actor: player(PlayerID) | ai(EntityID)
-  target_tick
+PlayerCommand  # the only external input contract (ADR-0002)
+  player_id: PlayerID
+  target_tick: int
   move_direction: Direction | none
   normal_fire_pressed: bool
   special_fire_pressed: bool
-  confirm_pressed: bool
+  session_request: none | confirm | continue | activation  # versioned enum
+
+TankIntent  # internal-only AI output; same movement/fire fields, never ingested externally
+  entity_id: int
+  move_direction: Direction | none
+  normal_fire_pressed: bool
+  special_fire_pressed: bool
 ```
 
-Input adapters produce commands. AI produces the same movement/fire fields. The simulation validates all commands.
+Input adapters produce `PlayerCommand` values. AI brains emit `TankIntent` values deterministically inside the simulation; they are never transmitted, recorded as external input, or accepted by the ingestion API. A tick with no command for a player resolves to neutral input (no movement, no fire, no request). The simulation validates all commands.
 
 Local touch/controller/keyboard adapters may only emit commands for the V1 local `PlayerID`. A future network adapter will deserialize authenticated remote input into the same command value; it will not call tank methods or mutate `WorldState` directly.
 
@@ -1215,6 +1279,8 @@ Only `Sources/AppleAdapters/Bootstrap/` and the application entry target wire co
 
 Canonical gameplay content MUST be stored as UTF-8 JSON decoded through explicit versioned `Codable` schemas or another approved reviewable text format. SpriteKit scene archives and Xcode asset catalogs MAY contain presentation-only data but are not authoritative gameplay content.
 
+The universal arena dimensions live in a single `ArenaSpecification` content file referenced by ruleset ID; stage files do not carry their own copies.
+
 ### 15.2 Stable identifiers
 
 - IDs use lowercase snake case.
@@ -1227,11 +1293,13 @@ Examples:
 ```text
 weapon: ap
 equipment: shield_of_moon
-enemy: ap_variant_c
+enemy: ap_c
 pickup: base_shield
 stage: frontier_01_first_defense
 ruleset: campaign_v1
 ```
+
+The stable-ID registry created by GE-020 (`Content/Schemas/id_registry`) is the single canonical source for every ID; documents, content, and asset filenames conform to it.
 
 ### 15.3 Validation requirements
 
@@ -1241,12 +1309,15 @@ The content validator MUST reject:
 - missing references;
 - wrong array lengths;
 - unknown enum values;
-- out-of-range armor, speed, power, or grid coordinates;
+- armor, speed, power, or grid coordinates outside the per-entity-class legal ranges declared in the schema (player speed `0..3`; enemy speed levels may be negative within the declared enemy range);
 - negative timers/ammunition unless explicitly allowed;
-- stage grid dimensions other than declared dimensions;
+- terrain layers inconsistent with the referenced `ArenaSpecification`;
 - enemy totals inconsistent with counts;
 - spawn points inside blocking terrain;
 - unreachable required base/player regions where reachability is mandated;
+- an enemy archetype in `enemy_counts` whose assigned spawns cannot reach the base region under that archetype's traversal profile on the undamaged map (a per-stage waiver flag with written justification is permitted);
+- drop-table references to unknown pickups, or a missing `drop_table_id` while any listed enemy declares a `drop_class`;
+- weapon data whose per-tick displacement can exceed one cell (`1023` subunits per tick);
 - missing collision matrix entries;
 - missing localization keys;
 - content schema version mismatches.
@@ -1275,9 +1346,12 @@ Separate files:
 settings.json
 profile.json
 campaign_progress.json
+suspended_session.json
 ```
 
 All files include `schema_version` and are written atomically. Migration functions are version-to-version and tested.
+
+`suspended_session.json` stores a mid-stage authoritative `WorldState` snapshot plus the command log to date, written when the app leaves the foreground mid-stage (§17.5); it is validated on load and deleted on stage completion or abandonment.
 
 ### 16.2 Campaign progress
 
@@ -1303,13 +1377,16 @@ ReplayHeader
   difficulty_id + difficulty_hash
   seed
   simulation_tick_rate
+  initial_session_state  # versioned + hashed: per-player carried upgrades/ammo/lives and campaign checkpoint hash
 
 ReplayBody
   commands_by_tick
-  optional periodic checksums
+  periodic checksums  # required for golden replays and dev/test recordings; optional in release recordings
 ```
 
 Replays are a testing requirement before they are a player-facing feature.
+
+A campaign replay is an ordered list of stage replays; the replay harness verifies that each stage's exit state equals the next stage's `initial_session_state`.
 
 ---
 
@@ -1323,10 +1400,13 @@ Replays are a testing requirement before they are a player-facing feature.
 - Vertical-slice stress fixture: 30 tanks, 200 active projectile/hazard entities, 100 mines, and maximum terrain damage without simulation slowdown on target hardware.
 - Snapshot/event queues remain bounded.
 - Navigation recalculation is budgeted and measurable.
+- Headless resimulation runs at 10× real time or faster on the minimum supported device (rollback/resync feasibility evidence; ADR-0003).
 
 ### 17.2 Renderer
 
 SpriteKit owns 2D rendering, sprite batching, animation, particles, effects, and the orthographic full-arena presentation. SpriteKit physics MUST NOT be authoritative for movement, projectiles, terrain, mines, damage, or victory. SwiftUI owns application shell screens and may host gameplay through `SpriteView`; authoritative simulation timing remains in the application/core boundary.
+
+Destructible terrain rendering uses composited chunk textures (for example 6×6-cell chunks) regenerated from `TerrainChanged` events; a one-node-per-quadrant scene graph is prohibited at arena scale.
 
 ### 17.3 Resolution behavior
 
@@ -1338,24 +1418,38 @@ SpriteKit owns 2D rendering, sprite batching, animation, particles, effects, and
 - Touch controls overlay the presentation with adjustable opacity and must automatically fade further when they overlap an active tank or critical telegraph.
 - The minimum-supported-device legibility test must confirm that tanks, mines, projectiles, pickups, destructible subcells, and warning telegraphs remain distinguishable while the whole arena is visible.
 
-M1 provisional legibility gates on the selected minimum-supported iPhone:
+Fixed rendering policy (ADR-0004): the gameplay arena renders edge-to-edge and MAY extend beneath system UI overlays; HUD and interactive controls remain safe-area-aware; bottom-edge system gestures are deferred during gameplay. The pinned minimum-supported-device floor is the 390×844-point class (iPhone 12/13/14-generation standard sizes and later); 375-point-height devices (iPhone SE, mini) are below the floor, which may widen only through a new ADR after the M1 gate. At 48×27 with edge-to-edge rendering the floor yields a standard-tank footprint of at least 28.9 screen points.
 
-- a standard tank's visible footprint is at least 28×28 screen points;
+M1 provisional legibility gates on the pinned floor device:
+
+- a standard tank's visible footprint is at least 18 screen points wide (revised by ADR-0006 to the accepted PixelProduction scale, ~19–20×15 points; originally 28×28);
 - every touch action target is at least 44×44 screen points even when its visible art is smaller;
 - projectile and mine silhouettes remain identifiable without relying on color alone;
 - no opaque HUD element fully covers an active tank, spawn telegraph, base, pickup, or damaging hazard;
-- a five-second screenshot/video review can identify the player, base, highest-threat enemy, and active special weapon effect at normal viewing distance.
+- a five-second screenshot/video review can identify the player, base, highest-threat enemy, and active special weapon effect at normal viewing distance;
+- the default touch layout keeps thumb contact zones in the horizontal gutters where the device aspect provides them, and a thumb-zone occlusion review passes on the floor device.
 
 If these gates fail, the team must reduce the universal grid dimensions, enlarge unit-to-cell ratios, simplify visual density, or revise UI layout. Cropping, scrolling, device-dependent playable area, and non-uniform stretching are not permitted fixes.
 
 ### 17.4 Input devices
 
 - iPhone/iPad touch controls: floating movement control plus normal fire and special fire;
+- gameplay touch input is captured as raw multi-touch events through a UIKit/AppKit hosting view owned by the input adapter; SwiftUI gesture recognizers are limited to menus and HUD;
+- the default touch layout anchors controls in the horizontal gutters produced by uniform arena fit on taller-than-16:9 devices and overlays the arena only where the device is approximately 16:9;
 - supported Apple-platform game controllers through `GameController`;
 - keyboard on iPad/macOS where available;
 - exactly one active local input source controls the V1 player;
 - input hot-plug and source reassignment remain outside authoritative deterministic simulation state;
 - device disconnect pauses when it removes control from the only active player.
+
+### 17.5 Platform lifecycle
+
+- Losing foreground/active status pauses gameplay immediately and, when mid-stage, writes `suspended_session.json` before suspension.
+- Cold launch after a mid-stage termination offers deterministic resume from the suspended snapshot; declining discards it.
+- Audio-session interruptions (calls, Siri, route changes) pause gameplay and restore cleanly.
+- Bottom-edge system gestures are deferred during gameplay; the home indicator uses its dimmed/auto-hide behavior.
+- The simulation clock driver is a display-link-driven accumulator owned by the application adapter, pinned by an M0/M1 decision record; SpriteKit's automatic view pausing MUST NOT become an undocumented second clock authority.
+- The fixed 60 Hz simulation is unaffected by 120 Hz ProMotion, Low Power Mode, or thermal throttling; rendering degrades independently.
 
 ---
 
@@ -1378,7 +1472,9 @@ Required for:
 - EnemyDirector finite counts;
 - win/loss simultaneous-event rules;
 - save migrations;
-- content validation.
+- content validation;
+- swept-collision/tunneling cases (fastest weapon versus a single quadrant, a mine trigger radius, a crossing projectile);
+- buffered turns executing ticks after the press.
 
 #### Simulation integration tests
 
@@ -1390,7 +1486,8 @@ Run complete headless stage fixtures with scripted inputs and assert:
 - base/player state;
 - enemy counts consumed;
 - absence of invalid positions.
-- a test-only two-`PlayerID` fixture accepts independent tick command streams and produces stable checksums without any network or second local-input implementation.
+- a test-only two-`PlayerID` fixture accepts independent tick command streams and produces stable checksums without any network or second local-input implementation;
+- serializing the world mid-run, restoring, and continuing produces checksums identical to an uninterrupted run (ADR-0003).
 
 #### Scene integration tests
 
@@ -1404,7 +1501,8 @@ Verify:
 - touch controls meet minimum target size and do not create an opaque critical-information region;
 - pause and restart;
 - stage transitions;
-- save/load behavior.
+- save/load behavior;
+- backgrounding mid-stage pauses gameplay, writes the suspended session, and resumes deterministically.
 
 #### Replay golden tests
 
@@ -1457,6 +1555,8 @@ xcodebuild test -scheme ProjectGoldenEagle -destination '<pinned CI simulator de
 
 M0 must pin the exact scheme and simulator destination in repository documentation. One documented command or CI script must execute content validation, core tests, replay goldens, and the app smoke suite without manual Xcode interaction.
 
+The real-device release gate runs on CI-attached hardware where available; otherwise it is a documented manual checklist executed on the floor device before merging to a release branch.
+
 ### 18.4 Definition of Done
 
 A task is not complete merely because it runs locally. It is complete when:
@@ -1484,7 +1584,9 @@ Deliverables:
 - domain/application/adapter dependency guardrails;
 - content loader and validator skeleton;
 - CI running an empty headless test suite;
-- ADR template and agent handoff template.
+- ADR template and agent handoff template;
+- simulation clock-driver decision record (display-link accumulator owned by the application adapter);
+- canonical stable-ID registry seeded for weapons, equipment, pickups, enemies, stages, and themes.
 
 Exit criteria:
 
@@ -1492,6 +1594,21 @@ Exit criteria:
 - non-interactive test commands succeed locally and in CI;
 - forbidden domain dependencies are detected by a simple architecture check;
 - invalid sample content fails with actionable errors.
+
+### A0: Style-Lock Masters
+
+A0 gates the M1 arena-dimension ADR; it may run in parallel with early M1 engineering.
+
+Deliverables:
+
+- recorded owner authorization covering Phase 0 of `ASSET_PRODUCTION_MANIFEST.md` only;
+- one player-tank master, one enemy master, one terrain sample, and the minimum-iPhone readability board produced through the Phase 0 controlled redraw workflow;
+- readability captures on the pinned floor device (ADR-0004).
+
+Exit criteria:
+
+- Phase 0 masters exist with complete provenance records;
+- the M1 legibility gate can run with representative silhouettes instead of debug art.
 
 ### M1: Movement Lab
 
@@ -1504,7 +1621,9 @@ Deliverables:
 - four-direction movement;
 - collision, buffered turns, and alignment assistance;
 - debug renderer and movement replay.
-- fixed SpriteKit full-map presentation on the minimum supported iPhone simulator and one real iPhone.
+- fixed SpriteKit full-map presentation on the floor-device simulator and one real floor-class iPhone;
+- serialize→restore→resume checksum test;
+- inert `TankState` fields for turn-buffer and ice-slide state present from the first golden.
 
 Exit criteria:
 
@@ -1512,7 +1631,8 @@ Exit criteria:
 - tank cannot enter solid terrain or leave bounds;
 - corridor turning passes touch, keyboard, and controller input scripts;
 - 30-minute soak test shows no positional drift.
-- the full arena and player remain visible and legible with no camera movement.
+- the full arena and player remain visible and legible with no camera movement;
+- mid-run serialize/restore/resume produces checksums identical to an uninterrupted run.
 
 ### M2: Combat Lab
 
@@ -1531,7 +1651,8 @@ Exit criteria:
 - every listed collision category has a passing test;
 - no frame-time-dependent projectile differences;
 - weapon identities are distinguishable in blind control tests;
-- stress fixture meets simulation target.
+- stress fixture meets simulation target;
+- tunneling tests pass for the fastest configured weapons.
 
 ### M3: One-Stage Core Slice
 
@@ -1555,6 +1676,8 @@ Exit criteria:
 
 ### M4: Three-Stage Single-Player Vertical Slice
 
+Entry dependency: recorded authorization for asset-production Phase 1.
+
 Deliverables:
 
 - VS-01, VS-02, VS-03;
@@ -1564,7 +1687,8 @@ Deliverables:
 - final replacement visual language for one theme;
 - complete screen flow and checkpoint save;
 - settings, accessibility baseline, controller support;
-- external playtest build.
+- external playtest build;
+- lifecycle interruption handling and suspended-session resume.
 
 Exit criteria:
 
@@ -1572,7 +1696,9 @@ Exit criteria:
 - all design pillars are demonstrated;
 - solo novice and experienced touch playtests can read and recover from at least one base crisis;
 - no critical or high-severity test issue remains;
-- performance and export targets pass.
+- performance and export targets pass;
+- lifecycle interruption tests pass;
+- the campaign-spanning three-stage replay passes using chained `initial_session_state` headers.
 
 ### M5: Campaign Production
 
@@ -1590,7 +1716,8 @@ Exit criteria:
 - all stages pass solo completion testing on touch and at least one external controller;
 - no enemy/pickup/equipment content is unused without explanation;
 - difficulty curves meet playtest targets;
-- campaign checkpoint migration tests pass.
+- campaign checkpoint migration tests pass;
+- full-campaign stress/performance targets re-validated on the floor device.
 
 ### M6: Release Candidate
 
@@ -1622,7 +1749,7 @@ Exit criteria:
 | Readable power and danger | snapshot/event presentation | M4 | accessibility/readability review |
 | Three-stage fun loop | level content and progression | M4 | full-run playtest matrix |
 | Multi-agent compatibility | dependency boundaries and task ownership | M0 onward | architecture check + scoped handoffs |
-| Future two-player online readiness | stable PlayerID, deterministic commands/snapshots/replay | M1 onward | repeated cross-run checksums + two-command-stream core fixture |
+| Future two-player online readiness | stable PlayerID, deterministic commands/snapshots/replay, serializable world state | M1 onward | repeated cross-run checksums + two-command-stream core fixture + serialize/restore/resume test |
 
 ---
 
@@ -1633,7 +1760,7 @@ Work packages are dependency-aware ownership units. An agent receives one packag
 | Package | Primary ownership | Depends on |
 |---|---|---|
 | WP-000 Bootstrap | project, CI, docs templates | none |
-| WP-010 Simulation Kernel | `src/domain/simulation`, core models | WP-000 |
+| WP-010 Simulation Kernel | `Sources/GameCore/Simulation/`, `Sources/GameCore/Model/` | WP-000 |
 | WP-020 Content System | schemas, loader, validation | WP-000 |
 | WP-030 Terrain and Movement | terrain/movement systems and tests | WP-010, WP-020 |
 | WP-040 Combat | weapons/projectiles/mines/collision tests | WP-030 |
@@ -1720,6 +1847,7 @@ Compatibility/migration notes
 - GE-023 Encode reference-derived enemy table and modern campaign overrides.
 - GE-024 Encode equipment and pickup definitions.
 - GE-025 Implement stage JSON and validation fixture.
+- GE-026 Encode drop tables and the universal `ArenaSpecification`.
 
 ### Simulation
 
@@ -1748,6 +1876,7 @@ Compatibility/migration notes
 - GE-084 Implement EnemyDirector finite composition and spawn telegraphs.
 - GE-085 Implement EnemyBrain baseline movement, target, and fire decisions.
 - GE-086 Implement navigation profiles and terrain invalidation.
+- GE-087 Implement mid-stage suspend snapshot save/restore and lifecycle pause integration.
 
 ### Presentation and UX
 
@@ -1836,15 +1965,15 @@ After each playtest ask:
 These are intentionally open and must not be guessed into fixed product rules prematurely:
 
 1. Final commercial title and visual identity.
-2. Exact campaign base durability and repair availability.
+2. Exact campaign base durability and authored repair-event frequency.
 3. Exact movement base speed and turn-assistance window.
 4. Exact weapon per-level damage/cooldown arrays.
 5. Whether a limited continue option exists after the V1 player exhausts all lives.
 6. Final score economy and extra-life thresholds.
-7. Whether weapon-switch pickups retain all previous ammunition or a reduced amount.
-8. Exact pacing, ordering, and optional branching among the fixed twelve campaign stages.
-9. Final minimum supported iPhone model after the M1 full-map legibility and stress tests.
-10. Whether foliage blocks AI perception, only presentation, or both in selected stages.
+7. Exact pacing, ordering, and optional branching among the fixed twelve campaign stages.
+8. Whether foliage blocks AI perception, only presentation, or both in selected stages.
+
+Closed by version 2.2: weapon-switch ammunition retention is fixed at full retention (a `retention_percent` ruleset parameter, default 100, preserves balance flexibility); the minimum-device floor is fixed by ADR-0004 and may only widen after the M1 gate, never shrink silently.
 
 Each question has a safe interface/data boundary in the architecture. None justifies delaying simulation, movement, combat, or the one-stage slice.
 
@@ -1921,6 +2050,7 @@ Before the first coding task starts, confirm:
 - [ ] The enumeration-only asset list and provenance fields are accepted.
 - [ ] iPhone signing, simulator, and at least one real-device development path are available.
 - [ ] First movement replay fixture is defined.
+- [ ] ADR-0001 through ADR-0004 are accepted and reflected in this document.
 
 Before M4 vertical-slice review, confirm:
 

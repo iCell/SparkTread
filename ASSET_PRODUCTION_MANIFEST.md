@@ -2,8 +2,8 @@
 
 ## Visual and Audio Asset Production Manifest
 
-Document version: 0.2  
-Status: Production baseline; soft v2 visual direction approved; bulk asset generation paused pending an explicit later request  
+Document version: 0.3  
+Status: Production baseline; soft v2 visual direction approved; bulk asset generation paused pending an explicit later request. Phase 0 style-lock masters are scheduled as milestone A0 in the implementation plan and require a recorded owner authorization before generation  
 Visual direction: Soft Modern Mechanical Toy Arcade  
 Primary presentation: 2D orthographic top-down, full arena always visible  
 Primary device: iPhone landscape  
@@ -77,7 +77,8 @@ Exact accessible color values will be locked only after grayscale and color-visi
 
 ### 2.5 Lighting
 
-- Consistent soft key light from the upper-left.
+- Non-rotating elements (terrain, base, structures, UI, key art) use a consistent soft key light from the upper-left.
+- Rotating gameplay sprites (tank chassis, turrets, attachments, projectiles, mines) use near-neutral, top-centered lighting with only radial/ambient shading, so 90-degree runtime rotation never changes the apparent light direction; emissive strips and the separate shadow layer carry directional readability.
 - Short, soft contact shadow directly below each object.
 - No long shadow may hide grid position or overlap another tank.
 - Emissive weapon effects may temporarily override local color but not silhouette.
@@ -91,6 +92,7 @@ Exact accessible color values will be locked only after grayscale and color-visi
 - Universal arena baseline: 48×27 base cells, provisional until the M1 legibility gate.
 - Standard tank footprint: 2×2 base cells.
 - Authoring master for one base terrain cell: 128×128 px.
+- One base cell equals `1024` simulation subunits (ADR-0001); source pixels never enter authoritative data.
 - Authoring master for one standard tank: 256×256 px transparent canvas.
 - Runtime world sizes are independent of source pixels.
 - Source masters should retain layers where the production tool supports them.
@@ -106,7 +108,7 @@ Exact accessible color values will be locked only after grayscale and color-visi
 
 ### 3.3 Runtime rotation and animation
 
-- Strict top-down tanks use one canonical UP-facing master and rotate in 90-degree increments at runtime unless art review proves direction-specific frames necessary.
+- Strict top-down tanks use one canonical UP-facing master and rotate in 90-degree increments at runtime unless art review proves direction-specific frames necessary. Rotating masters follow the neutral-lighting rule in section 2.5 so rotation never changes the apparent light direction.
 - Chassis, turret, equipment, damage, team-color, and shadow should be separate compositing layers where practical.
 - Movement tread loops use two or four frames.
 - Destruction, fire, smoke, shield, spawn, and pickup glows should prefer code-driven particles and small reusable texture primitives.
@@ -462,7 +464,7 @@ Asset type: 2D top-down arcade tank game visual asset
 Primary request: original modern mechanical toy arcade design
 Style/medium: polished high-definition 2D game illustration; soft modern mechanical tabletop-toy design; crisp production concept art
 Composition/framing: strict orthographic top-down view; no horizon; no isometric or three-quarter perspective
-Lighting/mood: bright diffuse upper-left key light; short soft contact shadows; welcoming, energetic, and readable, not grim
+Lighting/mood: non-rotating elements use a bright diffuse upper-left key light; rotatable gameplay sprites use neutral top-centered diffuse lighting with no directional key; short soft contact shadows; welcoming, energetic, and readable, not grim
 Color palette: accessible high-contrast player/enemy/weapon-role colors; shape carries meaning in addition to color
 Materials/textures: satin enamel-painted metal, rubber tracks, soft molded-plastic accents, restrained seams and edge wear, small emissive strips
 Constraints: original design; strong silhouette at small size; no national insignia; no military trademarks; no text; no logos; no watermark
@@ -489,6 +491,8 @@ shipping_filename
 category
 creator_or_generator
 generation_prompt_or_brief
+generator_tool_and_version
+generator_terms_snapshot
 source_files
 source_url_if_any
 license_or_contract

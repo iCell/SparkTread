@@ -24,6 +24,14 @@
 
 原版研究事实不能覆盖现代产品中已经固定的平台、地图、视角、单人范围、美术和架构决定。
 
+## 已接受 ADR
+
+- `docs/decisions/ADR-0001-spatial-unit-system.md`：1 格 = 1024 子单位，象限 = 512。
+- `docs/decisions/ADR-0002-command-contract-and-input-buffering.md`：`PlayerCommand` 唯一外部输入契约；缓冲由核心持有。
+- `docs/decisions/ADR-0003-serializable-world-state.md`：权威状态可完整序列化，支持挂起恢复与快速重模拟。
+- `docs/decisions/ADR-0004-arena-rendering-and-device-floor.md`：全屏渲染；设备基线 390 点级别。
+- `docs/decisions/ADR-0005-allied-base-damage-by-difficulty.md`：己方火力对基地按难度生效——Casual 免疫，Standard/Veteran 开启。
+
 ## 当前固定摘要
 
 - Swift + SpriteKit + SwiftUI；
@@ -35,7 +43,10 @@
 - 后续两人在线合作；
 - 一套现代游戏规则；
 - 柔和现代机械玩具街机风；
-- 当前素材工作只列清单，不进行新生成。
+- 当前素材工作只列清单，不进行新生成（A0 风格锁定母版需单独记录授权）；
+- 1 格 = 1024 子单位；`PlayerCommand` 为唯一外部输入契约；
+- 权威状态可完整序列化并支持快速重模拟；
+- 设备基线 390 点级别；竞技场全屏渲染。
 
 ## 风格参考
 
