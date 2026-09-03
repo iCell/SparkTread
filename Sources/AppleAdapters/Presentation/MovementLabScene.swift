@@ -23,8 +23,11 @@ final class MovementLabScene: SKScene {
     private var mineNodes: [Int: (node: SKSpriteNode, phase: MinePhase)] = [:]
     private var hazardNodes: [Int: SKSpriteNode] = [:]
     private var wallNodes: [Int: SKSpriteNode] = [:]
+    private var pickupNodes: [Int: PixelPickupNode] = [:]
+    private var telegraphNodes: [Int: SKSpriteNode] = [:]
     private var baseNode: PixelBaseNode?
     private var transientEffects: [(node: PixelEffectNode, born: Int)] = []
+    private var builtGeneration = -1
 
     private var cellPoints: CGFloat = 0
     private var artScale: CGFloat = 0
@@ -40,9 +43,16 @@ final class MovementLabScene: SKScene {
     required init?(coder: NSCoder) { fatalError("Programmatic scene") }
 
     override func didMove(to view: SKView) {
+        rebuildWorldView()
+    }
+
+    private func rebuildWorldView() {
+        builtGeneration = controller.worldGeneration
         removeAllChildren()
         liquidSprites.removeAll(); tankNodes.removeAll(); projectileNodes.removeAll()
         mineNodes.removeAll(); hazardNodes.removeAll(); wallNodes.removeAll()
+        pickupNodes.removeAll(); telegraphNodes.removeAll()
+        tankFacings.removeAll(); tankTravel.removeAll(); tankPositions.removeAll()
         transientEffects.removeAll(); baseNode = nil
         let world = controller.session.world
         let layout = ArenaLayout(surface: size, arena: world.arena)
@@ -163,16 +173,69 @@ final class MovementLabScene: SKScene {
     // MARK: - Per-frame mirror
 
     override func update(_ currentTime: TimeInterval) {
+        if builtGeneration != controller.worldGeneration {
+            rebuildWorldView() // stage restart rebuilt the world
+        }
         guard let art else { return }
         let world = controller.session.world
         syncTanks(art, world: world)
         syncProjectiles(art, world: world)
         syncMines(art, world: world)
         syncHazards(art, world: world)
+        syncPickups(art, world: world)
+        syncTelegraphs(art, world: world)
         syncBase(art, world: world)
         processEvents(art, world: world)
         animateLiquids(art, world: world)
         updateDebugOverlay(world: world)
+    }
+
+    private func syncPickups(_ art: PixelArt, world: WorldState) {
+        var seen = Set<Int>()
+        for pickup in world.pickups {
+            seen.insert(pickup.entityID)
+            if pickupNodes[pickup.entityID] == nil {
+                guard let catalogID = art.manifest.pickups.first(where: { $0.key == pickup.pickupID })?.id,
+                      let node = try? PixelPickupNode(id: catalogID, pixelScale: artScale * 0.65, art: art)
+                else { continue }
+                node.position = scenePoint(pickup.positionSubunits)
+                node.zPosition = 610
+                addChild(node)
+                pickupNodes[pickup.entityID] = node
+            }
+            try? pickupNodes[pickup.entityID]?.update(
+                phase: pickup.graceTicksRemaining > 0 ? .spawning : .idle,
+                age: Double(world.tick % 600) / 60)
+        }
+        for (id, node) in pickupNodes where !seen.contains(id) {
+            node.removeFromParent()
+            pickupNodes[id] = nil
+        }
+    }
+
+    private func syncTelegraphs(_ art: PixelArt, world: WorldState) {
+        var seen = Set<Int>()
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        for telegraph in world.spawnTelegraphs {
+            seen.insert(telegraph.entityID)
+            let center = centerPoint(telegraph.positionSubunits, size: footprint)
+            let node: SKSpriteNode
+            if let existing = telegraphNodes[telegraph.entityID] {
+                node = existing
+            } else {
+                guard let created = try? art.sprite("px_prop_spawn", scale: artScale * 0.9) else { continue }
+                created.zPosition = 300
+                addChild(created)
+                telegraphNodes[telegraph.entityID] = created
+                node = created
+            }
+            node.position = center // deferred telegraphs can relocate
+            node.alpha = 0.45 + 0.45 * abs(sin(Double(world.tick) / 8))
+        }
+        for (id, node) in telegraphNodes where !seen.contains(id) {
+            node.removeFromParent()
+            telegraphNodes[id] = nil
+        }
     }
 
     private func syncTanks(_ art: PixelArt, world: WorldState) {
@@ -184,9 +247,24 @@ final class MovementLabScene: SKScene {
             if let existing = tankNodes[tank.entityID] {
                 node = existing
             } else {
-                let kind = tank.ownerPlayerID != nil ? "player" : "standard"
+                // Archetype tier → chassis silhouette; family → turret.
+                let kind: String
+                let weapon: String
+                if tank.ownerPlayerID != nil {
+                    kind = "player"; weapon = "normal"
+                } else {
+                    let parts = tank.archetypeID.split(separator: "_").map(String.init)
+                    kind = switch parts.last ?? "a" {
+                    case "b": "standard"
+                    case "c": "armored"
+                    case "d": "heavy"
+                    default: "scout"
+                    }
+                    weapon = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
+                        .contains(parts.first ?? "") ? parts.first! : "normal"
+                }
                 guard let created = try? PixelTankNode(
-                    kind: kind, weapon: "normal", direction: tank.facing.rawValue,
+                    kind: kind, weapon: weapon, direction: tank.facing.rawValue,
                     pixelScale: artScale * 0.82, art: art) else { continue }
                 created.zPosition = 500
                 addChild(created)

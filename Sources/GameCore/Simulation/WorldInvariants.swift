@@ -97,6 +97,20 @@ public enum WorldInvariants {
         if let base = world.base, base.durability < 0 || base.durability > base.maxDurability {
             issues.append("base durability \(base.durability) outside 0...\(base.maxDurability)")
         }
+        for p in world.pickups {
+            if !seenEntityIDs.insert(p.entityID).inserted { issues.append("duplicate entity id \(p.entityID)") }
+        }
+        for t in world.spawnTelegraphs {
+            if !seenEntityIDs.insert(t.entityID).inserted { issues.append("duplicate entity id \(t.entityID)") }
+        }
+        if let stage = world.stage {
+            // §18.2: remaining + alive + spawning stays within the expected
+            // finite total (equality is checked per stage in fixture tests).
+            let alive = world.tanks.filter { $0.teamID != 1 }.count
+            if alive + world.spawnTelegraphs.count > stage.maxAliveEnemies {
+                issues.append("alive+spawning exceeds max_alive_enemies")
+            }
+        }
 
         for (index, cell) in world.terrain.cells.enumerated() {
             if cell.quadrantMask < 0 || cell.quadrantMask > 0b1111 {

@@ -56,8 +56,10 @@ public struct BaseState: Codable, Equatable, Sendable {
     public var maxDurability: Int
     public var shieldRemainingTicks: Int
 
-    public init(teamID: Int, topLeftSubunits: Vec2i, durability: Int = 100,
-                maxDurability: Int = 100, shieldRemainingTicks: Int = 0) {
+    /// Campaign base durability is 3 (§6.6, PROVISIONAL); damage states are
+    /// visually distinct at 3/2/1/0.
+    public init(teamID: Int, topLeftSubunits: Vec2i, durability: Int = 3,
+                maxDurability: Int = 3, shieldRemainingTicks: Int = 0) {
         self.teamID = teamID
         self.topLeftSubunits = topLeftSubunits
         self.durability = durability

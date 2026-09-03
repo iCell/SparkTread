@@ -211,8 +211,8 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
                              at: Vec2i(x: 13 * 1024, y: 4096), direction: .left)
         var events: [DomainEvent] = []
         tickAll(&world, 20, events: &events)
-        #expect(world.base?.durability == 99)
-        #expect(events.contains { if case .baseDamaged(1, 99) = $0 { true } else { false } })
+        #expect(world.base?.durability == 2)
+        #expect(events.contains { if case .baseDamaged(1, 2) = $0 { true } else { false } })
     }
 
     @Test func alliedBaseDamageGatedByDifficultyFlag() {
@@ -223,7 +223,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         var events: [DomainEvent] = []
         tickAll(&world, 1, normal: true, events: &events)
         tickAll(&world, 30, events: &events)
-        #expect(world.base?.durability == 99)
+        #expect(world.base?.durability == 2)
 
         // Casual (flag off): the shot stops at the base without damage.
         var casualWeapons = WeaponRuleset.provisional
@@ -236,7 +236,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
                 playerID: .one, targetTick: world2.tick, moveDirection: nil,
                 normalFirePressed: world2.tick == 0)], weapons: casualWeapons)
         }
-        #expect(world2.base?.durability == 100)
+        #expect(world2.base?.durability == 3)
         #expect(world2.projectiles.isEmpty) // still physically stopped
     }
 
@@ -249,7 +249,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
                              at: Vec2i(x: 13 * 1024, y: 4096), direction: .left)
         var events: [DomainEvent] = []
         tickAll(&world, 20, events: &events)
-        #expect(world.base?.durability == 100)
+        #expect(world.base?.durability == 3)
         #expect(world.projectiles.isEmpty)
     }
 }

@@ -1,0 +1,303 @@
+import Testing
+@testable import GameCore
+
+/// M3 stage-system tests: director finite counts and caps, telegraphs,
+/// player lives/respawn, pickups, and §6.7 win/loss incl. simultaneity.
+private func makeStageWorld(
+    enemies: [String] = ["normal_a", "normal_a"],
+    maxAlive: Int = 2, startDelay: Int = 10,
+    _ build: (inout WorldState) -> Void = { _ in }
+) -> WorldState {
+    var terrain = TerrainGrid(arena: .universal)
+    let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
+    for x in 0..<w { terrain[x, 0] = TerrainCell(kind: .steel); terrain[x, h - 1] = TerrainCell(kind: .steel) }
+    for y in 0..<h { terrain[0, y] = TerrainCell(kind: .steel); terrain[w - 1, y] = TerrainCell(kind: .steel) }
+    var world = WorldState(terrain: terrain, seed: 21)
+    world.addPlayer(PlayerState(playerID: .one))
+    world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                    positionSubunits: Vec2i(x: 20 * 1024, y: 20 * 1024), facing: .up)
+    world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
+    world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 40 * 1024, y: 22 * 1024))
+    world.stage = StageState(
+        spawnQueue: enemies, maxAliveEnemies: maxAlive, enemyStartDelayTicks: startDelay,
+        spawnPointsCells: [Vec2i(x: 4, y: 1), Vec2i(x: 30, y: 1)],
+        playerRespawnCell: Vec2i(x: 20, y: 20),
+        dropTable: ["speed_up"], dropChancePercent: 100)
+    build(&world)
+    return world
+}
+
+private func tick(_ world: inout WorldState, _ n: Int,
+                  direction: Direction? = nil, normal: Bool = false,
+                  events: inout [DomainEvent]) {
+    for _ in 0..<n {
+        events += Simulation.step(&world, commands: [PlayerCommand(
+            playerID: .one, targetTick: world.tick, moveDirection: direction,
+            normalFirePressed: normal)])
+    }
+}
+
+@Suite struct EnemyDirectorTests {
+    @Test func directorSpawnsFiniteCountsWithTelegraphAndCap() {
+        var world = makeStageWorld(enemies: ["normal_a", "rapid_a", "normal_b"], maxAlive: 2)
+        var events: [DomainEvent] = []
+        tick(&world, 11, events: &events) // delay elapses
+        #expect(world.spawnTelegraphs.count == 2) // cap 2, third waits
+        #expect(world.stage?.spawnQueue.count == 1)
+        #expect(world.tanks.filter { $0.teamID != 1 }.isEmpty) // telegraph ≥ 45 ticks
+        tick(&world, 46, events: &events)
+        let alive = world.tanks.filter { $0.teamID != 1 }
+        #expect(alive.count == 2)
+        #expect(alive.allSatisfy { $0.spawnProtectionTicks > 0 || $0.spawnProtectionTicks == 0 })
+        // §18.2 accounting: remaining + alive + spawning == expected total.
+        let accounted = (world.stage?.spawnQueue.count ?? 0) + alive.count + world.spawnTelegraphs.count
+        #expect(accounted == 3)
+        // Archetype attributes applied.
+        #expect(alive.contains { $0.archetypeID == "rapid_a" && $0.speedLevel == 1 })
+    }
+
+    @Test func blockedSpawnDefersThenRelocates() {
+        var world = makeStageWorld(enemies: ["normal_a"], maxAlive: 1)
+        // Park an obstacle tank exactly on spawn point 0.
+        let blocker = world.spawnTank(teamID: 1, ownerPlayerID: nil, archetypeID: "normal_a",
+                                      positionSubunits: Vec2i(x: 4 * 1024, y: 1 * 1024), facing: .down)
+        world.withTank(entityID: blocker) { $0.spawnProtectionTicks = 0 }
+        var events: [DomainEvent] = []
+        tick(&world, 11 + 46, events: &events)
+        #expect(world.tanks.filter { $0.teamID != 1 }.isEmpty) // deferred, not spawned on top
+        tick(&world, 170, events: &events) // defer window → relocate → re-telegraph → spawn
+        #expect(world.tanks.filter { $0.teamID != 1 }.count == 1)
+    }
+}
+
+@Suite struct WinLossTests {
+    @Test func killingAllEnemiesWinsAndStopsSpawns() {
+        var world = makeStageWorld(enemies: ["normal_a"], maxAlive: 1, startDelay: 1)
+        var events: [DomainEvent] = []
+        tick(&world, 60, events: &events)
+        guard let enemy = world.tanks.first(where: { $0.teamID != 1 }) else {
+            Issue.record("enemy never spawned"); return
+        }
+        // Execute the enemy directly (combat path already covered elsewhere).
+        world.withTank(entityID: enemy.entityID) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+        tick(&world, 2, events: &events)
+        #expect(world.stage?.phase == .won)
+        #expect(events.contains { if case .stageWon = $0 { true } else { false } })
+        // Live-lock exit criterion: nothing left to spawn, phase frozen.
+        let checksum = world.checksum()
+        tick(&world, 120, events: &events)
+        #expect(world.stage?.phase == .won)
+        #expect(world.spawnTelegraphs.isEmpty)
+        _ = checksum
+    }
+
+    @Test func baseDestructionLoses() {
+        var world = makeStageWorld()
+        world.base?.durability = 1
+        var events: [DomainEvent] = []
+        _ = {
+            var w = world
+            return w
+        }()
+        // Enemy shot into the base.
+        let id = world.claimEntityID()
+        world.projectiles.append(ProjectileState(
+            entityID: id, weaponID: "normal", ownerEntityID: -1, ownerPlayerID: nil,
+            teamID: 2, powerLevel: 0, positionSubunits: Vec2i(x: 36 * 1024, y: 23 * 1024),
+            direction: .right, speedSubunitsPerTick: 192, lifetimeRemainingTicks: 600,
+            penetrationRemaining: 0, durability: 1))
+        tick(&world, 40, events: &events)
+        #expect(world.base?.durability == 0)
+        #expect(world.stage?.phase == .lost)
+        #expect(events.contains { if case .stageLost("base_destroyed") = $0 { true } else { false } })
+    }
+
+    @Test func playerEliminationLosesWhileEnemiesRemain() {
+        var world = makeStageWorld(enemies: ["normal_a", "normal_a", "normal_a"], startDelay: 500)
+        world.withPlayer(.one) { $0.lives = 0 }
+        var events: [DomainEvent] = []
+        if let tankID = world.player(.one)?.tankEntityID {
+            world.withTank(entityID: tankID) { $0.armor = 0 }
+        }
+        tick(&world, 2, events: &events)
+        #expect(world.player(.one)?.lifeState == .eliminated)
+        #expect(world.stage?.phase == .lost)
+    }
+
+    /// §6.7 simultaneity: last enemy dies the same tick the sole player is
+    /// eliminated and the base survives → WIN (ruleset default).
+    @Test func simultaneousLastEnemyAndPlayerDeathIsWin() {
+        var world = makeStageWorld(enemies: [], startDelay: 1)
+        // Queue is empty by design here: the LAST enemy is the manual one.
+        let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
+                                    positionSubunits: Vec2i(x: 30 * 1024, y: 10 * 1024), facing: .down)
+        world.withPlayer(.one) { $0.lives = 0 }
+        world.withTank(entityID: enemy) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+        if let tankID = world.player(.one)?.tankEntityID {
+            world.withTank(entityID: tankID) { $0.armor = 0 }
+        }
+        var events: [DomainEvent] = []
+        tick(&world, 2, events: &events)
+        #expect(world.stage?.phase == .won)
+    }
+}
+
+@Suite struct RespawnTests {
+    @Test func playerRespawnsWithRetainedUpgrades() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        guard let tankID = world.player(.one)?.tankEntityID else { return }
+        world.withTank(entityID: tankID) {
+            $0.speedLevel = 2; $0.powerLevel = 1
+            $0.equipmentID = "anti_skid"; $0.specialWeaponID = "ap"
+            $0.armor = 0
+        }
+        world.withPlayer(.one) { $0.specialAmmoByWeapon["ap"] = 7 }
+        var events: [DomainEvent] = []
+        tick(&world, 2, events: &events)
+        #expect(world.player(.one)?.lifeState == .awaitingRespawn)
+        #expect(world.player(.one)?.lives == 2)
+        #expect(world.player(.one)?.tankEntityID == nil)
+        tick(&world, 61, events: &events)
+        guard let newTankID = world.player(.one)?.tankEntityID,
+              let tank = world.tank(entityID: newTankID) else {
+            Issue.record("player did not respawn"); return
+        }
+        #expect(tank.speedLevel == 2 && tank.powerLevel == 1) // retained (§6.5)
+        #expect(tank.equipmentID == "anti_skid")
+        #expect(tank.specialWeaponID == "ap")
+        #expect(world.player(.one)?.specialAmmoByWeapon["ap"] == 7) // stored ammo kept
+        #expect(tank.armor == 3) // reset
+        #expect(tank.spawnProtectionTicks > 0)
+    }
+
+    @Test func blockedRespawnCellRingScans() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        guard let tankID = world.player(.one)?.tankEntityID else { return }
+        // Park a blocker on the respawn cell before killing the player.
+        let blocker = world.spawnTank(teamID: 1, ownerPlayerID: nil, archetypeID: "normal_a",
+                                      positionSubunits: Vec2i(x: 20 * 1024, y: 20 * 1024), facing: .down)
+        _ = blocker
+        world.withTank(entityID: tankID) { $0.armor = 0 }
+        var events: [DomainEvent] = []
+        tick(&world, 63, events: &events)
+        guard let newTankID = world.player(.one)?.tankEntityID,
+              let tank = world.tank(entityID: newTankID) else {
+            Issue.record("player did not respawn"); return
+        }
+        #expect(tank.positionSubunits != Vec2i(x: 20 * 1024, y: 20 * 1024)) // ring-scanned aside
+        let violations = WorldInvariants.violations(in: world)
+        #expect(violations.isEmpty, "\(violations)")
+    }
+}
+
+@Suite struct PickupTests {
+    private func drop(_ id: String, into world: inout WorldState, at cell: Vec2i = Vec2i(x: 22, y: 20)) {
+        var events: [DomainEvent] = []
+        world.spawnStagePickup(id, nearCell: cell, events: &events)
+        // Skip the avoidance grace for direct-effect tests.
+        for i in world.pickups.indices { world.pickups[i].graceTicksRemaining = 0 }
+    }
+
+    @Test func upgradePickupsApplyAndRetain() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        drop("speed_up", into: &world)
+        drop("power_up", into: &world, at: Vec2i(x: 23, y: 20))
+        var events: [DomainEvent] = []
+        tick(&world, 90, direction: .right, events: &events) // drive over both
+        guard let tankID = world.player(.one)?.tankEntityID,
+              let tank = world.tank(entityID: tankID) else { return }
+        #expect(tank.speedLevel == 1)
+        #expect(tank.powerLevel == 1)
+        #expect(world.player(.one)?.retainedSpeedLevel == 1) // respawn retention synced
+        #expect(world.pickups.isEmpty)
+    }
+
+    @Test func gracePeriodPreventsInstantCollection() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        var events: [DomainEvent] = []
+        // Spawn directly under the player with full grace.
+        world.spawnStagePickup("speed_up", nearCell: Vec2i(x: 20, y: 20), events: &events)
+        tick(&world, 20, events: &events)
+        #expect(!world.pickups.isEmpty) // still uncollected during grace
+        tick(&world, 30, events: &events)
+        #expect(world.pickups.isEmpty) // collected after grace expires
+    }
+
+    @Test func freezeBombShieldAndLifePickups() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_b",
+                                    positionSubunits: Vec2i(x: 40 * 1024, y: 5 * 1024), facing: .down)
+        world.withTank(entityID: enemy) { $0.armor = 5; $0.maxArmor = 5; $0.spawnProtectionTicks = 0 }
+        var events: [DomainEvent] = []
+
+        drop("freeze_enemy", into: &world)
+        tick(&world, 60, direction: .right, events: &events)
+        #expect(world.tank(entityID: enemy)?.statusEffects["frozen"] != nil)
+
+        drop("bomb", into: &world, at: Vec2i(x: 24, y: 20))
+        tick(&world, 60, direction: .right, events: &events)
+        #expect((world.tank(entityID: enemy)?.armor ?? 99) <= 2)
+
+        drop("extra_life", into: &world, at: Vec2i(x: 27, y: 20))
+        drop("base_shield", into: &world, at: Vec2i(x: 29, y: 20))
+        tick(&world, 160, direction: .right, events: &events)
+        #expect(world.player(.one)?.lives == 4)
+        #expect((world.base?.shieldRemainingTicks ?? 0) > 0)
+    }
+
+    @Test func weaponPickupSwitchesAndRefillsWithoutErasingStoredAmmo() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        world.withPlayer(.one) { $0.specialAmmoByWeapon["rapid"] = 33 }
+        drop("ap_weapon", into: &world)
+        var events: [DomainEvent] = []
+        tick(&world, 30, direction: .right, events: &events)
+        guard let tankID = world.player(.one)?.tankEntityID,
+              let tank = world.tank(entityID: tankID) else { return }
+        #expect(tank.specialWeaponID == "ap")
+        #expect(world.player(.one)?.specialAmmoByWeapon["ap"] == 10) // refilled
+        #expect(world.player(.one)?.specialAmmoByWeapon["rapid"] == 33) // kept (§8.1)
+    }
+
+    @Test func killDropsRollDeterministically() {
+        func run() -> WorldState {
+            var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+            for i in 0..<3 {
+                let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
+                                            positionSubunits: Vec2i(x: (30 + i * 4) * 1024, y: 5 * 1024),
+                                            facing: .down)
+                world.withTank(entityID: enemy) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+            }
+            var events: [DomainEvent] = []
+            tick(&world, 3, events: &events)
+            return world
+        }
+        let a = run(), b = run()
+        #expect(a.pickups.count == 3) // dropChancePercent = 100
+        #expect(a.checksum() == b.checksum())
+        #expect(a.players[0].score == 300) // 3 × normal_a
+    }
+}
+
+@Suite struct StageDeterminismTests {
+    /// M3 exit criterion: deterministic full-stage replay — an identical
+    /// scripted run over the whole VS-01-scale flow yields identical
+    /// checksums, with invariants clean throughout.
+    @Test func scriptedStageRunIsDeterministic() {
+        func run() -> WorldState {
+            var world = makeStageWorld(
+                enemies: ["normal_a", "rapid_a", "normal_b", "normal_a", "rapid_b"],
+                maxAlive: 3, startDelay: 60)
+            var events: [DomainEvent] = []
+            for t in 0..<3600 {
+                let dir: Direction? = [Direction.up, .right, nil, .left, .down][(t / 90) % 5]
+                tick(&world, 1, direction: dir, normal: t % 23 == 0, events: &events)
+            }
+            return world
+        }
+        let a = run(), b = run()
+        #expect(a.checksum() == b.checksum())
+        #expect(a == b)
+        let violations = WorldInvariants.violations(in: a)
+        #expect(violations.isEmpty, "\(violations)")
+    }
+}

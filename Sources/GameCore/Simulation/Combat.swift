@@ -9,6 +9,7 @@ enum Combat {
     static func run(
         _ world: inout WorldState,
         firePressed: [PlayerID: (normal: Bool, special: Bool)],
+        aiFire: [Int: (normal: Bool, special: Bool)] = [:],
         movement: MovementRuleset,
         weapons: WeaponRuleset,
         events: inout [DomainEvent]
@@ -16,7 +17,7 @@ enum Combat {
         // 6–7. Fire requests, then spawns. Spawned projectiles do not
         // advance in step 8 of the same tick (§13.6 clarification).
         let spawnedThisTick = processFireRequests(
-            &world, firePressed: firePressed, weapons: weapons, events: &events)
+            &world, firePressed: firePressed, aiFire: aiFire, weapons: weapons, events: &events)
 
         // 8. Advance projectiles and continuous hazards.
         var segments: [Int: (from: Vec2i, to: Vec2i)] = [:]
@@ -72,8 +73,8 @@ enum Combat {
                               destroyedProjectiles: &destroyedProjectiles, events: &events)
         }
 
-        // 12. Deaths, cleanup, and active-count bookkeeping.
-        cleanup(&world, destroyedProjectiles: destroyedProjectiles, events: &events)
+        // 11–12. Pickups, deaths, cleanup, and active-count bookkeeping.
+        cleanup(&world, destroyedProjectiles: destroyedProjectiles, weapons: weapons, events: &events)
     }
 
     // MARK: - Steps 6–7: firing and spawning
@@ -81,13 +82,22 @@ enum Combat {
     private static func processFireRequests(
         _ world: inout WorldState,
         firePressed: [PlayerID: (normal: Bool, special: Bool)],
+        aiFire: [Int: (normal: Bool, special: Bool)],
         weapons: WeaponRuleset,
         events: inout [DomainEvent]
     ) -> Set<Int> {
         var spawned = Set<Int>()
         for index in world.tanks.indices {
             let tank = world.tanks[index]
-            guard let owner = tank.ownerPlayerID, let pressed = firePressed[owner] else { continue }
+            // External commands for player tanks, internal intents for AI.
+            let pressed: (normal: Bool, special: Bool)
+            if let owner = tank.ownerPlayerID {
+                guard let p = firePressed[owner] else { continue }
+                pressed = p
+            } else {
+                guard let p = aiFire[tank.entityID] else { continue }
+                pressed = p
+            }
             if pressed.normal, let weapon = weapons.weapon("normal") {
                 fire(&world, tankIndex: index, weapon: weapon, channel: .normal,
                      weapons: weapons, spawned: &spawned, events: &events)
@@ -898,18 +908,25 @@ enum Combat {
     }
 
     private static func cleanup(
-        _ world: inout WorldState, destroyedProjectiles: Set<Int>, events: inout [DomainEvent]
+        _ world: inout WorldState, destroyedProjectiles: Set<Int>,
+        weapons: WeaponRuleset, events: inout [DomainEvent]
     ) {
         world.projectiles.removeAll { destroyedProjectiles.contains($0.entityID) }
         for hazard in world.fireHazards where hazard.lifetimeRemainingTicks <= 0 {
             decrementActiveCount(&world, ownerEntityID: findFireOwner(world, hazard) ?? -1, weaponID: "fire")
         }
         world.fireHazards.removeAll { $0.lifetimeRemainingTicks <= 0 }
-        for tank in world.tanks where tank.armor <= 0 {
+
+        // 11. Pickup collection (after movement and damage, §9.3).
+        Stage.processPickups(&world, weapons: weapons, events: &events)
+
+        // 12. Deaths: score, drops, and player lifecycle, then removal.
+        let deadTanks = world.tanks.filter { $0.armor <= 0 }
+        for tank in deadTanks {
             events.append(.tankDestroyed(entityID: tank.entityID, position: tank.positionSubunits))
         }
-        let deadIDs = world.tanks.filter { $0.armor <= 0 }.map(\.entityID)
-        for id in deadIDs { world.removeTank(entityID: id) }
+        Stage.processDeaths(&world, deadTanks: deadTanks, events: &events)
+        for tank in deadTanks { world.removeTank(entityID: tank.entityID) }
     }
 
     private static func findFireOwner(_ world: WorldState, _ hazard: FireHazardState) -> Int? {

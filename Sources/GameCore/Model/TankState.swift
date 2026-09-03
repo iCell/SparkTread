@@ -21,6 +21,13 @@ public struct PlayerState: Codable, Equatable, Sendable {
     public var tankEntityID: Int?
     public var lifeState: LifeState
     public var specialAmmoByWeapon: [String: Int]
+    /// Ticks until respawn while `lifeState == .awaitingRespawn` (§6.5).
+    public var respawnCountdownTicks: Int
+    /// Upgrades retained across campaign respawns (§6.5 retention policy).
+    public var retainedSpeedLevel: Int
+    public var retainedPowerLevel: Int
+    public var retainedEquipmentID: String?
+    public var retainedSpecialWeaponID: String
 
     public init(playerID: PlayerID, active: Bool = true, lives: Int = 3, score: Int = 0,
                 tankEntityID: Int? = nil, lifeState: LifeState = .active,
@@ -32,6 +39,11 @@ public struct PlayerState: Codable, Equatable, Sendable {
         self.tankEntityID = tankEntityID
         self.lifeState = lifeState
         self.specialAmmoByWeapon = specialAmmoByWeapon
+        self.respawnCountdownTicks = 0
+        self.retainedSpeedLevel = 0
+        self.retainedPowerLevel = 0
+        self.retainedEquipmentID = nil
+        self.retainedSpecialWeaponID = "rapid"
     }
 }
 

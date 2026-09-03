@@ -16,4 +16,12 @@ public enum DomainEvent: Codable, Equatable, Sendable {
     case baseDamaged(damage: Int, remaining: Int)
     case baseShieldChanged(active: Bool)
     case explosion(position: Vec2i, radiusSubunits: Int)
+    case playerEliminated(playerID: PlayerID)
+    case pickupSpawned(entityID: Int, pickupID: String, position: Vec2i)
+    case pickupCollected(entityID: Int, pickupID: String, byTank: Int)
+    case equipmentChanged(entityID: Int, equipmentID: String)
+    case enemyWaveStarted(archetypeID: String, position: Vec2i)
+    case scoreChanged(delta: Int)
+    case stageWon
+    case stageLost(reason: String)
 }

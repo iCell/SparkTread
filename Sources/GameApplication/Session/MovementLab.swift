@@ -108,13 +108,18 @@ public struct MovementLabSession: Sendable {
         world.withTank(entityID: tankID) { $0.powerLevel = max(0, min(3, level)) }
     }
 
-    /// Respawns the player tank after lab destruction (lab convenience;
-    /// real lives/respawn rules land in M3).
+    /// Lab convenience only: instantly respawns the player when no stage is
+    /// active. Stage worlds use the real lives/respawn flow (§6.5).
     public mutating func debugRespawnPlayerIfNeeded() {
-        guard world.player(.one)?.tankEntityID == nil else { return }
+        guard world.stage == nil, world.player(.one)?.tankEntityID == nil else { return }
         let cell = SpatialUnits.subunitsPerCell
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3 * cell, y: 3 * cell), facing: .down)
+    }
+
+    /// Stage flow: restart rebuilds the world from the VS-01 fixture.
+    public mutating func restartStage() {
+        self = MovementLabSession(world: VS01Stage.makeWorld(), ruleset: ruleset)
     }
 
     @discardableResult

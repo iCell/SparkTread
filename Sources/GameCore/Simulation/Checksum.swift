@@ -49,6 +49,9 @@ extension WorldState {
             for (k, v) in p.specialAmmoByWeapon.sorted(by: { $0.key < $1.key }) {
                 c.mix(k); c.mix(v)
             }
+            c.mix(p.respawnCountdownTicks)
+            c.mix(p.retainedSpeedLevel); c.mix(p.retainedPowerLevel)
+            c.mix(p.retainedEquipmentID ?? ""); c.mix(p.retainedSpecialWeaponID)
         }
         for t in tanks { // already sorted by entityID
             c.mix(t.entityID)
@@ -104,6 +107,31 @@ extension WorldState {
             c.mix(base.teamID)
             c.mix(base.topLeftSubunits.x); c.mix(base.topLeftSubunits.y)
             c.mix(base.durability); c.mix(base.maxDurability); c.mix(base.shieldRemainingTicks)
+        } else {
+            c.mix(-1)
+        }
+        c.mix(pickups.count)
+        for p in pickups {
+            c.mix(p.entityID); c.mix(p.pickupID)
+            c.mix(p.positionSubunits.x); c.mix(p.positionSubunits.y)
+            c.mix(p.lifetimeRemainingTicks); c.mix(p.graceTicksRemaining)
+        }
+        c.mix(spawnTelegraphs.count)
+        for t in spawnTelegraphs {
+            c.mix(t.entityID); c.mix(t.archetypeID); c.mix(t.spawnPointIndex)
+            c.mix(t.positionSubunits.x); c.mix(t.positionSubunits.y)
+            c.mix(t.ticksRemaining); c.mix(t.deferTicks)
+        }
+        if let stage {
+            c.mix(stage.phase.rawValue)
+            c.mix(stage.spawnQueue.count)
+            for id in stage.spawnQueue { c.mix(id) }
+            c.mix(stage.maxAliveEnemies); c.mix(stage.enemyStartDelayTicks)
+            for p in stage.spawnPointsCells { c.mix(p.x); c.mix(p.y) }
+            c.mix(stage.nextSpawnPointIndex); c.mix(stage.telegraphTicks)
+            c.mix(stage.playerRespawnCell.x); c.mix(stage.playerRespawnCell.y)
+            for id in stage.dropTable { c.mix(id) }
+            c.mix(stage.dropChancePercent)
         } else {
             c.mix(-1)
         }

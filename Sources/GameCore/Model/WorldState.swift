@@ -13,7 +13,10 @@ public struct WorldState: Codable, Equatable, Sendable {
     public internal(set) var projectiles: [ProjectileState]
     public internal(set) var mines: [MineState]
     public internal(set) var fireHazards: [FireHazardState]
+    public internal(set) var pickups: [PickupState]
+    public internal(set) var spawnTelegraphs: [SpawnTelegraph]
     public var base: BaseState?
+    public var stage: StageState?
     public var rng: RNGStreams
     public var nextEntityID: Int
 
@@ -25,7 +28,10 @@ public struct WorldState: Codable, Equatable, Sendable {
         self.projectiles = []
         self.mines = []
         self.fireHazards = []
+        self.pickups = []
+        self.spawnTelegraphs = []
         self.base = nil
+        self.stage = nil
         self.rng = RNGStreams(seed: seed)
         self.nextEntityID = 1
     }

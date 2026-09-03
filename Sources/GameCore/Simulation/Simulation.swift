@@ -15,6 +15,12 @@ public enum Simulation {
     ) -> [DomainEvent] {
         var events: [DomainEvent] = []
 
+        // A decided stage freezes gameplay; restart builds a fresh world.
+        if let stage = world.stage, stage.phase != .playing {
+            world.tick += 1
+            return []
+        }
+
         // 1. Consume player commands: validate and map to held intents.
         var heldDirection: [PlayerID: Direction?] = [:]
         var firePressed: [PlayerID: (normal: Bool, special: Bool)] = [:]
@@ -50,23 +56,32 @@ public enum Simulation {
             world.base = base
         }
 
-        // 3. AI intents — no AI until M3.
-        // 4. Session requests — none handled yet.
+        // 3. AI intents from the pre-movement world query (EnemyBrain).
+        let aiFire = Stage.computeIntents(&world, ruleset: ruleset)
+
+        // 4. Respawn requests (player death lifecycle, §6.5).
+        Stage.processRespawns(&world, events: &events)
 
         // 5. Facing, alignment assistance, and movement (ascending entityID;
         // documented ID priority for tank-vs-tank resolution, §7.1).
         for index in world.tanks.indices {
             var tank = world.tanks[index]
+            if tank.statusEffects["frozen"] != nil { continue } // held in place
             let field = ObstacleField(world: world, excludingTank: tank.entityID)
             resolveTurnAndMovement(&tank, field: field, ruleset: ruleset, events: &events)
             world.tanks[index] = tank
         }
 
-        // 6–12. Combat (fire, spawning, advancement, collisions, deaths).
-        Combat.run(&world, firePressed: firePressed, movement: ruleset,
-                   weapons: weapons, events: &events)
+        // 6–12. Combat (fire, spawning, advancement, collisions, pickups,
+        // deaths — Stage handles pickups/deaths inside the combat pass).
+        Combat.run(&world, firePressed: firePressed, aiFire: aiFire,
+                   movement: ruleset, weapons: weapons, events: &events)
 
-        // 13–14. Director and objectives — M3.
+        // 13. EnemyDirector: telegraphs and finite spawns.
+        Stage.runDirector(&world, events: &events)
+
+        // 14. Objective/win/loss, after all damage and deaths (§6.7).
+        Stage.resolveObjective(&world, events: &events)
         // 15. Ordered domain events are the return value.
         // 16. The value-type WorldState IS the snapshot source.
         // 17. Checksum is computed by the caller's cadence via `checksum()`.

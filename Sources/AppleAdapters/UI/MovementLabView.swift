@@ -22,10 +22,33 @@ public final class MovementLabController {
     #endif
 
     public init() {
-        session = MovementLabSession()
+        // VS-01 is the app's playable stage; MOVEMENT_LAB=1 launches the
+        // free-play movement/combat lab world instead.
+        let useLab = ProcessInfo.processInfo.environment["MOVEMENT_LAB"] != nil
+        session = useLab ? MovementLabSession() : MovementLabSession(world: VS01Stage.makeWorld())
         #if canImport(GameController)
         physicalInput = PhysicalInputAdapter(store: input)
         #endif
+    }
+
+    /// Bumped whenever the world is rebuilt so the scene knows to rebuild
+    /// its static layers.
+    public private(set) var worldGeneration = 0
+
+    public func restart() {
+        session.restartStage()
+        worldGeneration += 1
+    }
+
+    public var stagePhase: StagePhase? { session.world.stage?.phase }
+    public var hud: (lives: Int, score: Int, enemiesLeft: Int, baseHP: Int, shield: Bool) {
+        let world = session.world
+        let player = world.player(.one)
+        let enemiesLeft = (world.stage?.spawnQueue.count ?? 0)
+            + world.spawnTelegraphs.count
+            + world.tanks.filter { $0.teamID != 1 }.count
+        return (player?.lives ?? 0, player?.score ?? 0, enemiesLeft,
+                world.base?.durability ?? 0, (world.base?.shieldRemainingTicks ?? 0) > 0)
     }
 
     /// Launch-env autopilot for automated capture and demos; player input
@@ -105,6 +128,9 @@ public struct MovementLabView: View {
     @State private var selectedWeapon = "rapid"
     @State private var powerLevel = 0
     @State private var showWeaponPanel = false
+    @State private var hudTick = 0
+
+    private let hudTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     public var body: some View {
         GeometryReader { geometry in
@@ -114,6 +140,8 @@ public struct MovementLabView: View {
                 joystickOverlay
                 fireButtons
                 weaponDebugPanel
+                stageHUD
+                resultOverlay
             }
         }
         .ignoresSafeArea()
@@ -121,6 +149,55 @@ public struct MovementLabView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear { controller.start() }
         .onDisappear { controller.stop() }
+        .onReceive(hudTimer) { _ in hudTick &+= 1 }
+    }
+
+    /// Provisional stage HUD (§12.2 subset): lives, enemies remaining, base
+    /// durability/shield, score. Safe-area-aware overlay on the arena.
+    @ViewBuilder private var stageHUD: some View {
+        if controller.stagePhase != nil {
+            let hud = controller.hud
+            HStack(spacing: 18) {
+                Label("\(hud.lives)", systemImage: "heart.fill").foregroundStyle(.red)
+                Label("\(hud.enemiesLeft)", systemImage: "shield.lefthalf.filled").foregroundStyle(.orange)
+                Label("\(hud.baseHP)\(hud.shield ? "🛡" : "")", systemImage: "house.fill")
+                    .foregroundStyle(hud.baseHP > 1 ? .green : .red)
+                Text("\(hud.score)").foregroundStyle(.yellow)
+            }
+            .id(hudTick)
+            .font(.system(size: 14, weight: .bold, design: .monospaced))
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(Capsule().fill(Color.black.opacity(0.55)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, 6)
+        }
+    }
+
+    /// Win/loss overlay with restart (stage flow, M3).
+    @ViewBuilder private var resultOverlay: some View {
+        if let phase = controller.stagePhase, phase != .playing {
+            let won = phase == .won
+            VStack(spacing: 16) {
+                Text(won ? "任务完成" : "基地失守")
+                    .font(.system(size: 34, weight: .heavy))
+                    .foregroundStyle(won ? Color.yellow : Color.red)
+                Text("得分 \(controller.hud.score)")
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                Button {
+                    controller.restart()
+                } label: {
+                    Text("重新开始")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 26).padding(.vertical, 10)
+                        .background(Capsule().fill(Color.white))
+                }
+            }
+            .id(hudTick)
+            .padding(36)
+            .background(RoundedRectangle(cornerRadius: 22).fill(Color.black.opacity(0.75)))
+        }
     }
 
     /// Normal + special fire, right thumb zone. Hold-to-fire semantics.
