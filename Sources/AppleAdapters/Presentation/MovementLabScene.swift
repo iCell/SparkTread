@@ -231,7 +231,14 @@ final class MovementLabScene: SKScene {
             if let existing = projectileNodes[p.entityID] {
                 node = existing
             } else {
-                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * 0.8)
+                // Presentation-only sizing: heavier shells read bigger on
+                // screen (owner tuning); collision extents are unchanged.
+                let renderScale: CGFloat = switch p.weaponID {
+                case "ap": 1.35
+                case "explosion": 1.5
+                default: 0.8
+                }
+                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * renderScale)
                 else { continue }
                 created.zPosition = 650
                 created.zRotation = -CGFloat(p.direction.rawValue) * .pi / 2
