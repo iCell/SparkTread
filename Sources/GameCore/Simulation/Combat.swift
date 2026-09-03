@@ -150,25 +150,45 @@ enum Combat {
             spawned.insert(id)
             events.append(.minePlaced(entityID: id, level: power, position: mineCenter))
         case .fire:
-            // Three flame patches marching forward; blocked cells stop the
-            // spread and water extinguishes it (fire-hazard-vs-terrain).
+            // A flame wall as wide as the tank (the two cross-axis cells the
+            // 2-cell footprint spans, symmetric about the tank's center
+            // line), marching three cells forward. Each column advances
+            // independently; walls stop it and water extinguishes it
+            // (fire-hazard-vs-terrain, §8.5).
             let filter: FireTeamFilter = .enemyOnly // campaign player default (§8.7)
-            for step in 1...3 {
-                let raw = center + tank.facing.vector * (footprint / 2 + cell / 2 + (step - 1) * cell)
-                let cx = raw.x / cell, cy = raw.y / cell
-                guard world.terrain.isInside(cellX: cx, cellY: cy) else { break }
-                let kind = world.terrain[cx, cy].kind
-                if kind == .brick || kind == .steel || kind == .base { break }
-                if kind == .water { break }
-                let patchCenter = Vec2i(x: cx * cell + cell / 2, y: cy * cell + cell / 2)
-                let id = world.claimEntityID()
-                world.fireHazards.append(FireHazardState(
-                    entityID: id, ownerPlayerID: tank.ownerPlayerID, teamID: tank.teamID,
-                    filter: filter, positionSubunits: patchCenter,
-                    lifetimeRemainingTicks: weapon.level(weapon.lifetimeTicks, power),
-                    damagePerTouch: weapon.level(weapon.tankDamage, power)))
-                spawned.insert(id)
+            let horizontal = tank.facing.vector.x != 0
+            let crossTopLeft = horizontal ? tank.positionSubunits.y : tank.positionSubunits.x
+            let crossCells = [crossTopLeft / cell, (crossTopLeft + footprint - 1) / cell]
+            var spawnedPatches = 0
+            for cross in Set(crossCells).sorted() {
+                for step in 1...3 {
+                    let along = (horizontal ? center.x : center.y)
+                        + (tank.facing.vector.x + tank.facing.vector.y) * (footprint / 2 + cell / 2 + (step - 1) * cell)
+                    let (cx, cy) = horizontal ? (along / cell, cross) : (cross, along / cell)
+                    guard world.terrain.isInside(cellX: cx, cellY: cy) else { break }
+                    let kind = world.terrain[cx, cy].kind
+                    if kind == .brick || kind == .steel || kind == .base || kind == .water { break }
+                    let patchCenter = Vec2i(x: cx * cell + cell / 2, y: cy * cell + cell / 2)
+                    let id = world.claimEntityID()
+                    world.fireHazards.append(FireHazardState(
+                        entityID: id, ownerPlayerID: tank.ownerPlayerID, teamID: tank.teamID,
+                        filter: filter, positionSubunits: patchCenter,
+                        lifetimeRemainingTicks: weapon.level(weapon.lifetimeTicks, power),
+                        damagePerTouch: weapon.level(weapon.tankDamage, power)))
+                    spawned.insert(id)
+                    spawnedPatches += 1
+                }
             }
+            guard spawnedPatches > 0 else {
+                // Muzzle flush against a wall/water: nothing to ignite.
+                events.append(.dryFire(entityID: tank.entityID, weaponID: weapon.id))
+                world.tanks[tankIndex] = tank
+                return
+            }
+            // Active-count bookkeeping is per PATCH (cleanup decrements one
+            // per expired patch), so account for what actually spawned
+            // (the shared +1 below completes the total).
+            tank.activeProjectileCounts[weapon.id, default: 0] += spawnedPatches - 1
         case .normal, .rapid, .ap, .explosion:
             let muzzle = center + tank.facing.vector * (footprint / 2)
             let id = world.claimEntityID()

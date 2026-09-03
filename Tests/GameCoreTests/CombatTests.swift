@@ -450,8 +450,24 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         giveSpecial(&world, "fire")
         var events: [DomainEvent] = []
         tickAll(&world, 1, special: true, events: &events)
-        // Wall at cell 6 blocks the second and third patch.
-        #expect(world.fireHazards.count == 1)
+        // Both columns spawn their first patch; the wall at cell 6 stops
+        // each column's second and third step.
+        #expect(world.fireHazards.count == 2)
+    }
+
+    /// Regression (owner-reported): the flame wall must be CENTERED on the
+    /// tank — one patch column per cell row the 2-cell footprint spans,
+    /// symmetric about the tank's center line, never snapped to one side.
+    @Test func fireWallIsCenteredOnTank() {
+        var world = makeCombatWorld() // tank at (3072,3072) facing right; center y = 4096
+        giveSpecial(&world, "fire")
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, special: true, events: &events)
+        #expect(world.fireHazards.count == 6) // 2 rows × 3 steps
+        let rows = Set(world.fireHazards.map(\.positionSubunits.y))
+        #expect(rows == [3584, 4608]) // cells y=3 and y=4, symmetric about 4096
+        let columns = Set(world.fireHazards.map(\.positionSubunits.x)).sorted()
+        #expect(columns == [5632, 6656, 7680]) // cells x=5,6,7 ahead of the tank
     }
 
     @Test func dryFireOnEmptyAmmo() {
