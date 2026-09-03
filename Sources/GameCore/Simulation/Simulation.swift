@@ -10,16 +10,19 @@ public enum Simulation {
     public static func step(
         _ world: inout WorldState,
         commands: [PlayerCommand],
-        ruleset: MovementRuleset = .provisional
+        ruleset: MovementRuleset = .provisional,
+        weapons: WeaponRuleset = .provisional
     ) -> [DomainEvent] {
         var events: [DomainEvent] = []
 
         // 1. Consume player commands: validate and map to held intents.
         var heldDirection: [PlayerID: Direction?] = [:]
+        var firePressed: [PlayerID: (normal: Bool, special: Bool)] = [:]
         for command in commands {
             guard command.targetTick == world.tick,
                   let player = world.player(command.playerID), player.active else { continue }
             heldDirection[command.playerID] = command.moveDirection
+            firePressed[command.playerID] = (command.normalFirePressed, command.specialFirePressed)
         }
         world.withTanksInEntityOrder { tank in
             if let owner = tank.ownerPlayerID {
@@ -34,45 +37,88 @@ public enum Simulation {
                 tank.bufferedDirectionRemainingTicks -= 1
                 if tank.bufferedDirectionRemainingTicks == 0 { tank.bufferedDirection = nil }
             }
+            for (channel, remaining) in tank.fireCooldowns.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+                tank.fireCooldowns[channel] = remaining > 1 ? remaining - 1 : nil
+            }
             for (status, remaining) in tank.statusEffects.sorted(by: { $0.key < $1.key }) {
                 tank.statusEffects[status] = remaining > 1 ? remaining - 1 : nil
             }
         }
+        if var base = world.base, base.shieldRemainingTicks > 0 {
+            base.shieldRemainingTicks -= 1
+            if base.shieldRemainingTicks == 0 { events.append(.baseShieldChanged(active: false)) }
+            world.base = base
+        }
 
-        // 3. AI intents — no AI in M1.
-        // 4. Session requests — none handled in M1.
+        // 3. AI intents — no AI until M3.
+        // 4. Session requests — none handled yet.
 
-        // 5. Facing, alignment assistance, and movement (ascending entityID).
+        // 5. Facing, alignment assistance, and movement (ascending entityID;
+        // documented ID priority for tank-vs-tank resolution, §7.1).
         for index in world.tanks.indices {
             var tank = world.tanks[index]
-            resolveTurnAndMovement(&tank, terrain: world.terrain, ruleset: ruleset, events: &events)
+            let field = ObstacleField(world: world, excludingTank: tank.entityID)
+            resolveTurnAndMovement(&tank, field: field, ruleset: ruleset, events: &events)
             world.tanks[index] = tank
         }
 
-        // 6–14. Fire, projectiles, collisions, pickups, deaths, director,
-        // objectives — M2/M3 milestones.
+        // 6–12. Combat (fire, spawning, advancement, collisions, deaths).
+        Combat.run(&world, firePressed: firePressed, movement: ruleset,
+                   weapons: weapons, events: &events)
 
+        // 13–14. Director and objectives — M3.
         // 15. Ordered domain events are the return value.
-        // 16. The value-type WorldState IS the snapshot source for M1.
+        // 16. The value-type WorldState IS the snapshot source.
         // 17. Checksum is computed by the caller's cadence via `checksum()`.
         world.tick += 1
         return events
     }
 
+    /// Everything solid for TANK movement: terrain plus other tanks and the
+    /// base (mines and fire hazards never block movement).
+    struct ObstacleField {
+        let terrain: TerrainGrid
+        let boxes: [(minX: Int, minY: Int, maxX: Int, maxY: Int)]
+
+        init(world: WorldState, excludingTank excluded: Int) {
+            terrain = world.terrain
+            var boxes: [(Int, Int, Int, Int)] = []
+            let footprint = SpatialUnits.standardTankFootprintSubunits
+            for other in world.tanks where other.entityID != excluded {
+                let p = other.positionSubunits
+                boxes.append((p.x, p.y, p.x + footprint, p.y + footprint))
+            }
+            if let base = world.base {
+                let p = base.topLeftSubunits
+                boxes.append((p.x, p.y, p.x + base.sizeSubunits, p.y + base.sizeSubunits))
+            }
+            self.boxes = boxes
+        }
+
+        func blocksTank(minX: Int, minY: Int, maxX: Int, maxY: Int) -> Bool {
+            if terrain.blocksTank(minX: minX, minY: minY, maxX: maxX, maxY: maxY) { return true }
+            for box in boxes
+            where minX < box.maxX && maxX > box.minX && minY < box.maxY && maxY > box.minY {
+                return true
+            }
+            return false
+        }
+    }
+
     // MARK: - Movement (step 5)
 
     private static func resolveTurnAndMovement(
-        _ tank: inout TankState, terrain: TerrainGrid,
+        _ tank: inout TankState, field: ObstacleField,
         ruleset: MovementRuleset, events: inout [DomainEvent]
     ) {
         // A held direction is the live turn candidate; otherwise a still-live
         // buffered direction keeps trying (§6.3 — a tap shortly before a
         // legal turn executes when alignment arrives).
         if let desired = tank.movementIntent, desired != tank.facing {
-            attemptTurn(&tank, to: desired, live: true, terrain: terrain, ruleset: ruleset, events: &events)
+            attemptTurn(&tank, to: desired, live: true, field: field, ruleset: ruleset, events: &events)
         } else if let buffered = tank.bufferedDirection, tank.bufferedDirectionRemainingTicks > 0,
                   buffered != tank.facing {
-            attemptTurn(&tank, to: buffered, live: false, terrain: terrain, ruleset: ruleset, events: &events)
+            attemptTurn(&tank, to: buffered, live: false, field: field, ruleset: ruleset, events: &events)
         }
 
         // Advance while a direction is held, or while a buffered turn is
@@ -89,7 +135,7 @@ public enum Simulation {
 
         let travelDirection = tank.facing
         let moved = sweptMove(&tank, direction: travelDirection, distance: wholeSubunits,
-                              terrain: terrain, ruleset: ruleset)
+                              field: field, ruleset: ruleset)
         if moved < wholeSubunits {
             // Blocked: drop the unused distance so pressing into a wall does
             // not bank speed (documented, deterministic).
@@ -107,7 +153,7 @@ public enum Simulation {
     ///    tank at a dead end can still face (and later shoot) the wall.
     /// 4. Otherwise: buffer the request and keep rolling toward alignment.
     private static func attemptTurn(
-        _ tank: inout TankState, to desired: Direction, live: Bool, terrain: TerrainGrid,
+        _ tank: inout TankState, to desired: Direction, live: Bool, field: ObstacleField,
         ruleset: MovementRuleset, events: inout [DomainEvent]
     ) {
         func turn() {
@@ -120,12 +166,12 @@ public enum Simulation {
             turn()
             return
         }
-        if snapAssistedVectorIsFree(&tank, to: desired, terrain: terrain, ruleset: ruleset) {
+        if snapAssistedVectorIsFree(&tank, to: desired, field: field, ruleset: ruleset) {
             turn()
             return
         }
         let canKeepRolling = probeIsFree(position: tank.positionSubunits, direction: tank.facing,
-                                         terrain: terrain, ruleset: ruleset)
+                                         field: field, ruleset: ruleset)
         if !canKeepRolling {
             turn()
             return
@@ -147,7 +193,7 @@ public enum Simulation {
     /// documented order: half-cell lane, then full-cell lane. Mutates the
     /// position only when returning true.
     private static func snapAssistedVectorIsFree(
-        _ tank: inout TankState, to desired: Direction, terrain: TerrainGrid,
+        _ tank: inout TankState, to desired: Direction, field: ObstacleField,
         ruleset: MovementRuleset
     ) -> Bool {
         let travelAxisIsX = (tank.facing == .left || tank.facing == .right)
@@ -171,10 +217,10 @@ public enum Simulation {
                     : (offset > 0 ? .down : .up)
                 var probe = tank
                 guard sweptMove(&probe, direction: nudgeDirection, distance: abs(offset),
-                                terrain: terrain, ruleset: ruleset) == abs(offset) else { continue }
+                                field: field, ruleset: ruleset) == abs(offset) else { continue }
             }
             guard probeIsFree(position: candidate, direction: desired,
-                              terrain: terrain, ruleset: ruleset,
+                              field: field, ruleset: ruleset,
                               distance: turnProbeDistance(ruleset)) else { continue }
             tank.positionSubunits = candidate
             return true
@@ -185,12 +231,12 @@ public enum Simulation {
     /// Whether `distance` subunits of travel in `direction` from `position`
     /// are free (swept box; the current occupancy is legal by invariant).
     private static func probeIsFree(
-        position: Vec2i, direction: Direction, terrain: TerrainGrid, ruleset: MovementRuleset,
+        position: Vec2i, direction: Direction, field: ObstacleField, ruleset: MovementRuleset,
         distance: Int = 1
     ) -> Bool {
         let target = position + direction.vector * distance
         let box = sweptBox(from: position, to: target, ruleset: ruleset)
-        return !terrain.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY)
+        return !field.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY)
     }
 
     /// A turn is only "collision-free" (§7.1) when the tank can actually
@@ -207,7 +253,7 @@ public enum Simulation {
     @discardableResult
     private static func sweptMove(
         _ tank: inout TankState, direction: Direction, distance: Int,
-        terrain: TerrainGrid, ruleset: MovementRuleset
+        field: ObstacleField, ruleset: MovementRuleset
     ) -> Int {
         precondition(distance >= 0)
         guard distance > 0 else { return 0 }
@@ -223,7 +269,7 @@ public enum Simulation {
             let mid = (lo + hi + 1) / 2
             let candidate = Vec2i(x: start.x + vector.x * mid, y: start.y + vector.y * mid)
             let box = sweptBox(from: start, to: candidate, ruleset: ruleset)
-            if terrain.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY) {
+            if field.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY) {
                 hi = mid - 1
             } else {
                 lo = mid

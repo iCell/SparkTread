@@ -9,6 +9,11 @@ import SwiftUI
 public final class MovementLabController {
     public private(set) var session: MovementLabSession
     public let input = HeldDirectionStore()
+    /// Fire button states, held by the UI overlay (adapter-side only).
+    public var normalFireHeld = false
+    public var specialFireHeld = false
+    /// Events since the scene last drained them (presentation feed).
+    private var pendingEvents: [DomainEvent] = []
     #if canImport(GameController)
     private var physicalInput: PhysicalInputAdapter?
     #endif
@@ -43,12 +48,40 @@ public final class MovementLabController {
         guard driver == nil else { return }
         let driver = DisplayLinkSimulationDriver { [weak self] in
             guard let self else { return }
-            let scripted = self.autodrive ? self.autodriveDirection(forTick: self.session.world.tick) : nil
-            self.session.advance(holding: self.input.held ?? scripted)
+            let tick = self.session.world.tick
+            let scripted = self.autodrive ? self.autodriveDirection(forTick: tick) : nil
+            let scriptedNormal = self.autodrive && tick % 45 < 2
+            let scriptedSpecial = self.autodrive && tick % 130 < 2
+            self.session.debugRespawnPlayerIfNeeded()
+            self.pendingEvents += self.session.advance(
+                holding: self.input.held ?? scripted,
+                normalFire: self.normalFireHeld || scriptedNormal,
+                specialFire: self.specialFireHeld || scriptedSpecial)
         }
         driver.start()
         self.driver = driver
         #endif
+    }
+
+    public func drainEvents() -> [DomainEvent] {
+        defer { pendingEvents.removeAll() }
+        return pendingEvents
+    }
+
+    // MARK: - Weapon debug panel
+
+    public let specialWeaponIDs = ["rapid", "fire", "ap", "explosion", "mine"]
+
+    public func selectWeapon(_ id: String) { session.debugSelectSpecialWeapon(id) }
+    public func setPower(_ level: Int) { session.debugSetPowerLevel(level) }
+
+    public var playerTank: TankState? {
+        session.world.player(.one)?.tankEntityID.flatMap { session.world.tank(entityID: $0) }
+    }
+
+    public var currentAmmo: Int {
+        guard let tank = playerTank else { return 0 }
+        return session.world.player(.one)?.specialAmmoByWeapon[tank.specialWeaponID] ?? 0
     }
 
     public func stop() {
@@ -69,12 +102,18 @@ public struct MovementLabView: View {
 
     public init() {}
 
+    @State private var selectedWeapon = "rapid"
+    @State private var powerLevel = 0
+    @State private var showWeaponPanel = false
+
     public var body: some View {
         GeometryReader { geometry in
             ZStack {
                 SpriteView(scene: liveScene(for: geometry.size))
                     .ignoresSafeArea()
                 joystickOverlay
+                fireButtons
+                weaponDebugPanel
             }
         }
         .ignoresSafeArea()
@@ -82,6 +121,70 @@ public struct MovementLabView: View {
         .persistentSystemOverlays(.hidden)
         .onAppear { controller.start() }
         .onDisappear { controller.stop() }
+    }
+
+    /// Normal + special fire, right thumb zone. Hold-to-fire semantics.
+    private var fireButtons: some View {
+        VStack(spacing: 14) {
+            fireButton(label: "特", color: .orange, held: { controller.specialFireHeld = $0 })
+            fireButton(label: "普", color: .cyan, held: { controller.normalFireHeld = $0 })
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, 28)
+        .padding(.bottom, 24)
+    }
+
+    private func fireButton(label: String, color: Color, held: @escaping (Bool) -> Void) -> some View {
+        Text(label)
+            .font(.system(size: 22, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 62, height: 62)
+            .background(Circle().fill(color.opacity(0.45)))
+            .overlay(Circle().strokeBorder(color.opacity(0.9), lineWidth: 2))
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in held(true) }
+                .onEnded { _ in held(false) })
+    }
+
+    /// Weapon debug panel (M2 deliverable): special-weapon selector and
+    /// power-level control, top-right, collapsible.
+    private var weaponDebugPanel: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            Button(showWeaponPanel ? "武器 ▲" : "武器 ▼") { showWeaponPanel.toggle() }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+            if showWeaponPanel {
+                VStack(alignment: .trailing, spacing: 4) {
+                    ForEach(controller.specialWeaponIDs, id: \.self) { id in
+                        Button(id) {
+                            selectedWeapon = id
+                            controller.selectWeapon(id)
+                        }
+                        .font(.system(size: 12, weight: selectedWeapon == id ? .bold : .regular))
+                        .foregroundStyle(selectedWeapon == id ? .yellow : .white)
+                        .padding(.horizontal, 10).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                    }
+                    HStack(spacing: 6) {
+                        ForEach(0..<4, id: \.self) { level in
+                            Button("P\(level)") {
+                                powerLevel = level
+                                controller.setPower(level)
+                            }
+                            .font(.system(size: 11, weight: powerLevel == level ? .bold : .regular))
+                            .foregroundStyle(powerLevel == level ? .yellow : .white)
+                            .padding(.horizontal, 7).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.black.opacity(0.45)))
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.trailing, 16)
+        .padding(.top, 8)
     }
 
     private func liveScene(for size: CGSize) -> MovementLabScene {

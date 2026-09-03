@@ -9,6 +9,11 @@ public struct WorldState: Codable, Equatable, Sendable {
     public internal(set) var players: [PlayerState]
     /// Sorted ascending by entityID; mutate through the accessors.
     public internal(set) var tanks: [TankState]
+    /// Combat entities, each sorted ascending by entityID (M2).
+    public internal(set) var projectiles: [ProjectileState]
+    public internal(set) var mines: [MineState]
+    public internal(set) var fireHazards: [FireHazardState]
+    public var base: BaseState?
     public var rng: RNGStreams
     public var nextEntityID: Int
 
@@ -17,6 +22,10 @@ public struct WorldState: Codable, Equatable, Sendable {
         self.terrain = terrain
         self.players = []
         self.tanks = []
+        self.projectiles = []
+        self.mines = []
+        self.fireHazards = []
+        self.base = nil
         self.rng = RNGStreams(seed: seed)
         self.nextEntityID = 1
     }
@@ -72,5 +81,17 @@ public struct WorldState: Codable, Equatable, Sendable {
 
     public mutating func withTanksInEntityOrder(_ body: (inout TankState) -> Void) {
         for i in tanks.indices { body(&tanks[i]) }
+    }
+
+    mutating func claimEntityID() -> Int {
+        defer { nextEntityID += 1 }
+        return nextEntityID
+    }
+
+    mutating func removeTank(entityID: Int) {
+        tanks.removeAll { $0.entityID == entityID }
+        for i in players.indices where players[i].tankEntityID == entityID {
+            players[i].tankEntityID = nil
+        }
     }
 }

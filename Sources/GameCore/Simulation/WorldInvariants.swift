@@ -64,6 +64,40 @@ public enum WorldInvariants {
             }
         }
 
+        // Combat entities (§18.2: active-projectile counts match entities;
+        // no destroyed entity remains addressable).
+        var projectilesByOwner: [Int: [String: Int]] = [:]
+        var previousProjectileID = Int.min
+        for p in world.projectiles {
+            if !seenEntityIDs.insert(p.entityID).inserted { issues.append("duplicate entity id \(p.entityID)") }
+            if p.entityID <= previousProjectileID { issues.append("projectiles out of order at \(p.entityID)") }
+            previousProjectileID = p.entityID
+            if p.speedSubunitsPerTick > SpatialUnits.maxPerTickDisplacementSubunits {
+                issues.append("projectile \(p.entityID) exceeds per-tick displacement cap")
+            }
+            projectilesByOwner[p.ownerEntityID, default: [:]][p.weaponID, default: 0] += 1
+        }
+        for m in world.mines {
+            if !seenEntityIDs.insert(m.entityID).inserted { issues.append("duplicate entity id \(m.entityID)") }
+            if !(0...3).contains(m.level) { issues.append("mine \(m.entityID) level \(m.level)") }
+            projectilesByOwner[m.ownerEntityID, default: [:]]["mine", default: 0] += 1
+        }
+        for h in world.fireHazards {
+            if !seenEntityIDs.insert(h.entityID).inserted { issues.append("duplicate entity id \(h.entityID)") }
+        }
+        for tank in world.tanks {
+            for (weapon, count) in tank.activeProjectileCounts.sorted(by: { $0.key < $1.key })
+            where weapon != "fire" { // hazards attribute by player, checked separately
+                let actual = projectilesByOwner[tank.entityID]?[weapon] ?? 0
+                if actual > count {
+                    issues.append("tank \(tank.entityID) \(weapon) count \(count) < live entities \(actual)")
+                }
+            }
+        }
+        if let base = world.base, base.durability < 0 || base.durability > base.maxDurability {
+            issues.append("base durability \(base.durability) outside 0...\(base.maxDurability)")
+        }
+
         for (index, cell) in world.terrain.cells.enumerated() {
             if cell.quadrantMask < 0 || cell.quadrantMask > 0b1111 {
                 issues.append("terrain cell \(index) invalid quadrant mask \(cell.quadrantMask)")

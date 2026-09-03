@@ -46,6 +46,14 @@ public enum MovementLabFixture {
         let cell = SpatialUnits.subunitsPerCell
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3 * cell, y: 3 * cell), facing: .down)
+
+        // M2 combat targets: stationary enemy dummies and the base.
+        for (archetype, x, y) in [("normal_a", 24, 8), ("normal_b", 34, 14), ("rapid_a", 13, 20)] {
+            world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: archetype,
+                            positionSubunits: Vec2i(x: x * cell, y: y * cell), facing: .down)
+        }
+        world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 23 * cell))
         return world
     }
 }
@@ -66,11 +74,47 @@ public struct MovementLabSession: Sendable {
         self.recording = ReplayRecording(seed: MovementLabFixture.seed, startChecksum: world.checksum())
     }
 
-    /// Advances one tick with the local player's held direction.
+    /// Advances one tick with the local player's held direction and fire
+    /// button states.
     @discardableResult
-    public mutating func advance(holding direction: Direction?) -> [DomainEvent] {
-        let command = PlayerCommand(playerID: .one, targetTick: world.tick, moveDirection: direction)
+    public mutating func advance(holding direction: Direction?,
+                                 normalFire: Bool = false,
+                                 specialFire: Bool = false) -> [DomainEvent] {
+        let command = PlayerCommand(playerID: .one, targetTick: world.tick,
+                                    moveDirection: direction,
+                                    normalFirePressed: normalFire,
+                                    specialFirePressed: specialFire)
         return advance(commands: [command])
+    }
+
+    // MARK: - Combat Lab debug panel hooks (development fixture only)
+
+    /// Weapon debug panel: switches the player's special weapon and tops up
+    /// its ammunition. Switching never erases stored ammunition (§8.1).
+    public mutating func debugSelectSpecialWeapon(_ weaponID: String, weapons: WeaponRuleset = .provisional) {
+        guard let weapon = weapons.weapon(weaponID), weapon.fireChannel == .special else { return }
+        if let tankID = world.player(.one)?.tankEntityID {
+            world.withTank(entityID: tankID) { $0.specialWeaponID = weaponID }
+        }
+        world.withPlayer(.one) {
+            let current = $0.specialAmmoByWeapon[weaponID, default: 0]
+            $0.specialAmmoByWeapon[weaponID] = max(current, weapon.refillAmount)
+        }
+    }
+
+    /// Weapon debug panel: adjusts the player tank's power level (0–3).
+    public mutating func debugSetPowerLevel(_ level: Int) {
+        guard let tankID = world.player(.one)?.tankEntityID else { return }
+        world.withTank(entityID: tankID) { $0.powerLevel = max(0, min(3, level)) }
+    }
+
+    /// Respawns the player tank after lab destruction (lab convenience;
+    /// real lives/respawn rules land in M3).
+    public mutating func debugRespawnPlayerIfNeeded() {
+        guard world.player(.one)?.tankEntityID == nil else { return }
+        let cell = SpatialUnits.subunitsPerCell
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 3 * cell, y: 3 * cell), facing: .down)
     }
 
     @discardableResult

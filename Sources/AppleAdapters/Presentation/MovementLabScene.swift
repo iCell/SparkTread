@@ -2,25 +2,32 @@ import SpriteKit
 import GameApplication
 import GameCore
 
-/// M1 Movement Lab renderer: draws the lab fixture with PixelProduction art
-/// and mirrors the authoritative world each frame. Render-only — the
+/// M1/M2 Combat Lab renderer: draws the lab fixture with PixelProduction
+/// art and mirrors the authoritative world each frame. Render-only — the
 /// simulation is advanced exclusively by the display-link driver
 /// (ADR-0007); this scene never steps, pauses, or gates ticks.
 final class MovementLabScene: SKScene {
     private let controller: MovementLabController
     private var art: PixelArt?
-    private var tankNode: PixelTankNode?
     private var debugLabel: SKLabelNode?
     private var collisionBox: SKShapeNode?
     private var liquidSprites: [(node: SKSpriteNode, kind: String, mask: Int)] = []
-    private var lastFacing: Direction = .down
-    private var travelledSubunits = 0
-    private var lastPosition: Vec2i?
-
     private var layout: ArenaLayout?
+
+    // Dynamic mirrors keyed by entity ID.
+    private var tankNodes: [Int: PixelTankNode] = [:]
+    private var tankFacings: [Int: Direction] = [:]
+    private var tankTravel: [Int: Int] = [:]
+    private var tankPositions: [Int: Vec2i] = [:]
+    private var projectileNodes: [Int: SKSpriteNode] = [:]
+    private var mineNodes: [Int: (node: SKSpriteNode, phase: MinePhase)] = [:]
+    private var hazardNodes: [Int: SKSpriteNode] = [:]
+    private var wallNodes: [Int: SKSpriteNode] = [:]
+    private var baseNode: PixelBaseNode?
+    private var transientEffects: [(node: PixelEffectNode, born: Int)] = []
+
     private var cellPoints: CGFloat = 0
-    private var originPoint: CGPoint = .zero
-    private var pointsPerSubunit: CGFloat = 0
+    private var artScale: CGFloat = 0
 
     init(size: CGSize, controller: MovementLabController) {
         self.controller = controller
@@ -34,20 +41,18 @@ final class MovementLabScene: SKScene {
 
     override func didMove(to view: SKView) {
         removeAllChildren()
-        liquidSprites.removeAll()
+        liquidSprites.removeAll(); tankNodes.removeAll(); projectileNodes.removeAll()
+        mineNodes.removeAll(); hazardNodes.removeAll(); wallNodes.removeAll()
+        transientEffects.removeAll(); baseNode = nil
         let world = controller.session.world
-        // Edge-to-edge uniform fit (ADR-0004): no reserved margins; the HUD
-        // overlays the arena and stays safe-area-aware.
         let layout = ArenaLayout(surface: size, arena: world.arena)
         self.layout = layout
         cellPoints = layout.cellPoints
-        originPoint = layout.origin
-        pointsPerSubunit = layout.pointsPerSubunit
+        artScale = cellPoints / 16
         do {
             let art = try PixelArt()
             self.art = art
             try buildTerrain(art, world: world)
-            try buildTank(art, world: world)
             buildDebugOverlay()
         } catch {
             let n = SKLabelNode(fontNamed: "Menlo-Bold")
@@ -58,15 +63,16 @@ final class MovementLabScene: SKScene {
         }
     }
 
-    /// World subunits (Y-down) → scene points (Y-up), via the shared layout.
-    private func scenePoint(_ p: Vec2i) -> CGPoint {
-        layout?.scenePoint(p) ?? .zero
+    private func scenePoint(_ p: Vec2i) -> CGPoint { layout?.scenePoint(p) ?? .zero }
+
+    private func centerPoint(_ topLeft: Vec2i, size sizeSubunits: Int) -> CGPoint {
+        scenePoint(Vec2i(x: topLeft.x + sizeSubunits / 2, y: topLeft.y + sizeSubunits / 2))
     }
+
+    // MARK: - Static terrain
 
     private func buildTerrain(_ art: PixelArt, world: WorldState) throws {
         let arena = world.arena
-        let artScale = cellPoints / 16
-
         for y in stride(from: 0, to: arena.cellsHigh, by: 3) {
             for x in stride(from: 0, to: arena.cellsWide, by: 3) {
                 let n = try art.sprite("px_ground_frontier_\((x / 3 + y / 3) % 9)", scale: artScale)
@@ -76,29 +82,25 @@ final class MovementLabScene: SKScene {
                 addChild(n)
             }
         }
-
-        func kindAt(_ x: Int, _ y: Int) -> TerrainKind? {
-            world.terrain.isInside(cellX: x, cellY: y) ? world.terrain[x, y].kind : nil
-        }
         for y in 0..<arena.cellsHigh {
             for x in 0..<arena.cellsWide {
-                let kind = world.terrain[x, y].kind
-                switch kind {
+                switch world.terrain[x, y].kind {
                 case .brick, .steel:
-                    let name = kind == .brick ? "brick" : "steel"
-                    var mask = 0
-                    for (bit, dx, dy) in [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0)]
-                    where kindAt(x + dx, y + dy) == kind { mask |= bit }
-                    let n = try art.sprite(String(format: "px_%@_joint_%02d_15", name, mask), scale: artScale)
+                    let n = SKSpriteNode()
+                    n.size = CGSize(width: cellPoints, height: cellPoints)
                     n.position = cellCenter(x: x, y: y)
                     n.zPosition = 100
                     addChild(n)
+                    wallNodes[y * arena.cellsWide + x] = n
+                    refreshWallTexture(art, world: world, cellX: x, cellY: y)
                 case .water, .ice:
-                    let name = kind == .water ? "water" : "ice"
+                    let name = world.terrain[x, y].kind == .water ? "water" : "ice"
                     var mask = 0
                     let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
                                    (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
-                    for (bit, dx, dy) in offsets where kindAt(x + dx, y + dy) == kind { mask |= bit }
+                    for (bit, dx, dy) in offsets
+                    where world.terrain.isInside(cellX: x + dx, cellY: y + dy)
+                        && world.terrain[x + dx, y + dy].kind == world.terrain[x, y].kind { mask |= bit }
                     for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
                     where mask & a == 0 || mask & b == 0 { mask &= ~diag }
                     let n = try art.sprite(String(format: "px_%@_%03d_0", name, mask), scale: artScale)
@@ -113,17 +115,42 @@ final class MovementLabScene: SKScene {
         }
     }
 
+    private func refreshWallTexture(_ art: PixelArt, world: WorldState, cellX: Int, cellY: Int) {
+        let key = cellY * world.arena.cellsWide + cellX
+        guard let node = wallNodes[key] else { return }
+        let cell = world.terrain[cellX, cellY]
+        guard cell.kind == .brick || cell.kind == .steel, cell.quadrantMask != 0 else {
+            node.removeFromParent()
+            wallNodes[key] = nil
+            return
+        }
+        let name = cell.kind == .brick ? "brick" : "steel"
+        var mask = 0
+        for (bit, dx, dy) in [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0)]
+        where world.terrain.isInside(cellX: cellX + dx, cellY: cellY + dy)
+            && world.terrain[cellX + dx, cellY + dy].kind == cell.kind { mask |= bit }
+        // Atlas remaining-mask ids use the delivery's quadrant numbering;
+        // full cells use 15, damaged cells their mask. Keep the old texture
+        // if a specific damage combination is missing from the atlas.
+        if let texture = try? art.texture(String(format: "px_%@_joint_%02d_%02d", name, mask, cell.quadrantMask)) {
+            node.texture = texture
+        }
+    }
+
     private func cellCenter(x: Int, y: Int, span: Int = 1) -> CGPoint {
         scenePoint(Vec2i(x: x * SpatialUnits.subunitsPerCell + span * SpatialUnits.subunitsPerCell / 2,
                          y: y * SpatialUnits.subunitsPerCell + span * SpatialUnits.subunitsPerCell / 2))
     }
 
-    private func buildTank(_ art: PixelArt, world: WorldState) throws {
-        let tank = try PixelTankNode(kind: "player", weapon: "normal", direction: 2,
-                                     pixelScale: cellPoints / 16 * 0.82, art: art)
-        tank.zPosition = 500
-        addChild(tank)
-        tankNode = tank
+    private func buildDebugOverlay() {
+        let label = SKLabelNode(fontNamed: "Menlo-Bold")
+        label.fontSize = 10
+        label.fontColor = SKColor(white: 1, alpha: 0.8)
+        label.horizontalAlignmentMode = .left
+        label.position = CGPoint(x: (layout?.origin.x ?? 0) + 8, y: size.height - 16)
+        label.zPosition = 9000
+        addChild(label)
+        debugLabel = label
 
         let box = SKShapeNode()
         box.strokeColor = SKColor(red: 1, green: 0.85, blue: 0.3, alpha: 0.9)
@@ -133,51 +160,237 @@ final class MovementLabScene: SKScene {
         collisionBox = box
     }
 
-    private func buildDebugOverlay() {
-        let label = SKLabelNode(fontNamed: "Menlo-Bold")
-        label.fontSize = 10
-        label.fontColor = SKColor(white: 1, alpha: 0.8)
-        label.horizontalAlignmentMode = .left
-        label.position = CGPoint(x: originPoint.x + 8, y: size.height - 16)
-        label.zPosition = 9000
-        addChild(label)
-        debugLabel = label
+    // MARK: - Per-frame mirror
+
+    override func update(_ currentTime: TimeInterval) {
+        guard let art else { return }
+        let world = controller.session.world
+        syncTanks(art, world: world)
+        syncProjectiles(art, world: world)
+        syncMines(art, world: world)
+        syncHazards(art, world: world)
+        syncBase(art, world: world)
+        processEvents(art, world: world)
+        animateLiquids(art, world: world)
+        updateDebugOverlay(world: world)
     }
 
-    /// Presentation update only: read the latest snapshot and mirror it.
-    override func update(_ currentTime: TimeInterval) {
-        guard let tankNode, let tank = controller.session.world.tanks.first else { return }
+    private func syncTanks(_ art: PixelArt, world: WorldState) {
         let footprint = SpatialUnits.standardTankFootprintSubunits
-        let center = Vec2i(x: tank.positionSubunits.x + footprint / 2,
-                           y: tank.positionSubunits.y + footprint / 2)
-        tankNode.position = scenePoint(center)
-
-        if tank.facing != lastFacing {
-            lastFacing = tank.facing
-            try? tankNode.setDirection(tank.facing.rawValue)
+        var seen = Set<Int>()
+        for tank in world.tanks {
+            seen.insert(tank.entityID)
+            let node: PixelTankNode
+            if let existing = tankNodes[tank.entityID] {
+                node = existing
+            } else {
+                let kind = tank.ownerPlayerID != nil ? "player" : "standard"
+                guard let created = try? PixelTankNode(
+                    kind: kind, weapon: "normal", direction: tank.facing.rawValue,
+                    pixelScale: artScale * 0.82, art: art) else { continue }
+                created.zPosition = 500
+                addChild(created)
+                tankNodes[tank.entityID] = created
+                tankFacings[tank.entityID] = tank.facing
+                node = created
+            }
+            node.position = centerPoint(tank.positionSubunits, size: footprint)
+            if tankFacings[tank.entityID] != tank.facing {
+                tankFacings[tank.entityID] = tank.facing
+                try? node.setDirection(tank.facing.rawValue)
+            }
+            if let last = tankPositions[tank.entityID] {
+                tankTravel[tank.entityID, default: 0] +=
+                    abs(tank.positionSubunits.x - last.x) + abs(tank.positionSubunits.y - last.y)
+            }
+            tankPositions[tank.entityID] = tank.positionSubunits
+            try? node.setTreadPhase(tankTravel[tank.entityID, default: 0] / 128)
         }
-        if let last = lastPosition {
-            travelledSubunits += abs(tank.positionSubunits.x - last.x) + abs(tank.positionSubunits.y - last.y)
+        for (id, node) in tankNodes where !seen.contains(id) {
+            node.removeFromParent()
+            tankNodes[id] = nil; tankFacings[id] = nil; tankTravel[id] = nil; tankPositions[id] = nil
         }
-        lastPosition = tank.positionSubunits
-        try? tankNode.setTreadPhase(travelledSubunits / 128)
 
-        if let box = collisionBox {
+        if let player = controller.playerTank, let box = collisionBox {
             let inset = controller.session.ruleset.collisionInsetSubunits
-            let a = scenePoint(Vec2i(x: tank.positionSubunits.x + inset, y: tank.positionSubunits.y + footprint - inset))
-            let width = CGFloat(footprint - 2 * inset) * pointsPerSubunit
+            let a = scenePoint(Vec2i(x: player.positionSubunits.x + inset,
+                                     y: player.positionSubunits.y + footprint - inset))
+            let width = CGFloat(footprint - 2 * inset) * (layout?.pointsPerSubunit ?? 0)
             box.path = CGPath(rect: CGRect(x: a.x, y: a.y, width: width, height: width), transform: nil)
+            box.isHidden = false
+        } else {
+            collisionBox?.isHidden = true
         }
+    }
 
-        let world = controller.session.world
+    private func syncProjectiles(_ art: PixelArt, world: WorldState) {
+        var seen = Set<Int>()
+        for p in world.projectiles {
+            seen.insert(p.entityID)
+            let node: SKSpriteNode
+            if let existing = projectileNodes[p.entityID] {
+                node = existing
+            } else {
+                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * 0.8)
+                else { continue }
+                created.zPosition = 650
+                created.zRotation = -CGFloat(p.direction.rawValue) * .pi / 2
+                addChild(created)
+                projectileNodes[p.entityID] = created
+                node = created
+            }
+            node.position = scenePoint(p.positionSubunits)
+        }
+        for (id, node) in projectileNodes where !seen.contains(id) {
+            node.removeFromParent()
+            projectileNodes[id] = nil
+        }
+    }
+
+    private func syncMines(_ art: PixelArt, world: WorldState) {
+        var seen = Set<Int>()
+        for mine in world.mines {
+            seen.insert(mine.entityID)
+            if let existing = mineNodes[mine.entityID] {
+                if existing.phase != mine.phase {
+                    existing.node.texture = try? art.texture(
+                        "px_mine_\(mine.level)_" + (mine.phase == .armed ? "armed" : "dormant"))
+                    mineNodes[mine.entityID] = (existing.node, mine.phase)
+                }
+            } else {
+                guard let node = try? art.sprite(
+                    "px_mine_\(mine.level)_" + (mine.phase == .armed ? "armed" : "dormant"),
+                    scale: artScale * 0.65) else { continue }
+                node.position = scenePoint(mine.positionSubunits)
+                node.zPosition = 600
+                addChild(node)
+                mineNodes[mine.entityID] = (node, mine.phase)
+            }
+        }
+        for (id, entry) in mineNodes where !seen.contains(id) {
+            entry.node.removeFromParent()
+            mineNodes[id] = nil
+        }
+    }
+
+    private func syncHazards(_ art: PixelArt, world: WorldState) {
+        var seen = Set<Int>()
+        let frames = art.manifest.effects["fire"] ?? []
+        for hazard in world.fireHazards {
+            seen.insert(hazard.entityID)
+            let node: SKSpriteNode
+            if let existing = hazardNodes[hazard.entityID] {
+                node = existing
+            } else {
+                guard let first = frames.first, let created = try? art.sprite(first, scale: artScale)
+                else { continue }
+                created.position = scenePoint(hazard.positionSubunits)
+                created.zPosition = 620
+                addChild(created)
+                hazardNodes[hazard.entityID] = created
+                node = created
+            }
+            if !frames.isEmpty {
+                let frame = (world.tick / 8 + hazard.entityID) % frames.count
+                node.texture = try? art.texture(frames[frame])
+            }
+        }
+        for (id, node) in hazardNodes where !seen.contains(id) {
+            node.removeFromParent()
+            hazardNodes[id] = nil
+        }
+    }
+
+    private func syncBase(_ art: PixelArt, world: WorldState) {
+        guard let base = world.base else { return }
+        if baseNode == nil {
+            baseNode = try? PixelBaseNode(pixelScale: artScale * 0.82, art: art)
+            if let baseNode {
+                baseNode.position = centerPoint(base.topLeftSubunits, size: base.sizeSubunits)
+                baseNode.zPosition = 400
+                addChild(baseNode)
+            }
+        }
+        // Damage quarters map to the four visual states.
+        let state = base.durability > 75 ? 0 : base.durability > 40 ? 1 : base.durability > 0 ? 2 : 3
+        try? baseNode?.update(
+            damageState: state,
+            shieldPhase: base.shieldRemainingTicks > 0 ? .active : .absent,
+            age: Double(world.tick) / 60)
+    }
+
+    /// Consumes domain events for transient presentation: explosions,
+    /// muzzle flashes, and terrain texture refreshes.
+    private func processEvents(_ art: PixelArt, world: WorldState) {
+        for event in controller.drainEvents() {
+            switch event {
+            case .terrainChanged(let cx, let cy, _):
+                refreshWallTexture(art, world: world, cellX: cx, cellY: cy)
+                for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)]
+                where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy) {
+                    refreshWallTexture(art, world: world, cellX: cx + dx, cellY: cy + dy)
+                }
+            case .explosion(let position, let radius):
+                if let fx = try? PixelEffectNode(kind: .groundExplosion,
+                                                 pixelScale: artScale * (radius > 1200 ? 1.2 : 0.85),
+                                                 art: art) {
+                    fx.position = scenePoint(position)
+                    fx.zPosition = 700
+                    addChild(fx)
+                    transientEffects.append((fx, world.tick))
+                }
+            case .tankDestroyed(_, let position):
+                if let fx = try? PixelEffectNode(kind: .tankExplosion, pixelScale: artScale, art: art) {
+                    fx.position = centerPoint(position, size: SpatialUnits.standardTankFootprintSubunits)
+                    fx.zPosition = 700
+                    addChild(fx)
+                    transientEffects.append((fx, world.tick))
+                }
+            case .weaponFired(let entityID, let weaponID, _, _):
+                guard weaponID != "mine", weaponID != "fire",
+                      let tankNode = tankNodes[entityID] else { break }
+                let effectName = weaponID == "normal" ? "muzzle" : weaponID
+                if let frames = art.manifest.effects[effectName], let first = frames.first,
+                   let flash = try? art.sprite(first, scale: artScale * 0.48) {
+                    flash.position = tankNode.muzzle(in: self)
+                    flash.zPosition = 660
+                    flash.zRotation = tankNode.zRotation
+                    addChild(flash)
+                    flash.run(.sequence([.wait(forDuration: 0.1), .removeFromParent()]))
+                }
+            default:
+                break
+            }
+        }
+        var kept: [(PixelEffectNode, Int)] = []
+        for (fx, born) in transientEffects {
+            let age = Double(world.tick - born) / 60
+            if age > fx.duration + 0.05 {
+                fx.stop()
+            } else {
+                try? fx.advance(to: age)
+                kept.append((fx, born))
+            }
+        }
+        transientEffects = kept
+    }
+
+    private func animateLiquids(_ art: PixelArt, world: WorldState) {
         let frame = (world.tick / 15) % 4
         for (node, kind, mask) in liquidSprites {
-            node.texture = try? art?.texture(String(format: "px_%@_%03d_%d", kind, mask, frame))
+            node.texture = try? art.texture(String(format: "px_%@_%03d_%d", kind, mask, frame))
+        }
+    }
+
+    private func updateDebugOverlay(world: WorldState) {
+        guard let tank = controller.playerTank else {
+            debugLabel?.text = "M2 COMBAT LAB  tick \(world.tick)  respawning…"
+            return
         }
         debugLabel?.text = String(
-            format: "M1 MOVEMENT LAB  tick %d  pos (%d,%d)  facing %@  buf %@  checksum %llx",
-            world.tick, tank.positionSubunits.x, tank.positionSubunits.y,
-            String(describing: tank.facing), tank.bufferedDirection.map { String(describing: $0) } ?? "-",
+            format: "M2 COMBAT LAB  tick %d  %@ ammo %d  pwr %d  proj %d  mines %d  base %d  checksum %llx",
+            world.tick, tank.specialWeaponID, controller.currentAmmo, tank.powerLevel,
+            world.projectiles.count, world.mines.count, world.base?.durability ?? 0,
             world.checksum())
     }
 }

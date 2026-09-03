@@ -77,6 +77,36 @@ extension WorldState {
             for (k, v) in t.activeProjectileCounts.sorted(by: { $0.key < $1.key }) { c.mix(k); c.mix(v) }
             c.mix(t.spawnProtectionTicks)
         }
+        c.mix(projectiles.count)
+        for p in projectiles { // sorted by entityID
+            c.mix(p.entityID); c.mix(p.weaponID); c.mix(p.ownerEntityID)
+            c.mix(p.ownerPlayerID?.rawValue); c.mix(p.teamID); c.mix(p.powerLevel)
+            c.mix(p.positionSubunits.x); c.mix(p.positionSubunits.y)
+            c.mix(p.direction.rawValue); c.mix(p.speedSubunitsPerTick)
+            c.mix(p.lifetimeRemainingTicks); c.mix(p.penetrationRemaining); c.mix(p.durability)
+        }
+        c.mix(mines.count)
+        for m in mines {
+            c.mix(m.entityID); c.mix(m.level); c.mix(m.ownerEntityID)
+            c.mix(m.ownerPlayerID?.rawValue); c.mix(m.teamID)
+            c.mix(m.positionSubunits.x); c.mix(m.positionSubunits.y)
+            c.mix(m.phase.rawValue); c.mix(m.phaseTicksRemaining)
+            c.mix(m.triggerRadiusSubunits); c.mix(m.onWater)
+        }
+        c.mix(fireHazards.count)
+        for h in fireHazards {
+            c.mix(h.entityID); c.mix(h.ownerPlayerID?.rawValue); c.mix(h.teamID)
+            c.mix(h.filter.rawValue)
+            c.mix(h.positionSubunits.x); c.mix(h.positionSubunits.y)
+            c.mix(h.lifetimeRemainingTicks); c.mix(h.damagePerTouch)
+        }
+        if let base {
+            c.mix(base.teamID)
+            c.mix(base.topLeftSubunits.x); c.mix(base.topLeftSubunits.y)
+            c.mix(base.durability); c.mix(base.maxDurability); c.mix(base.shieldRemainingTicks)
+        } else {
+            c.mix(-1)
+        }
         c.mix(rng.movement.state); c.mix(rng.movement.draws)
         c.mix(rng.spawn.state); c.mix(rng.spawn.draws)
         c.mix(rng.drops.state); c.mix(rng.drops.draws)
