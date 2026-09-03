@@ -1,0 +1,54 @@
+name: ProjectGoldenEagle
+options:
+  bundleIdPrefix: vip.icell
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  GoldenEagleKit:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+targets:
+  ProjectGoldenEagle:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/GoldenEagleApp
+      - path: Resources/Pixel
+        buildPhase: resources
+    dependencies:
+      - package: GoldenEagleKit
+        product: AppleAdapters
+    info:
+      path: Sources/GoldenEagleApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+schemes:
+  ProjectGoldenEagle:
+    build:
+      targets:
+        ProjectGoldenEagle: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - package: GoldenEagleKit/GameCoreTests
+        - package: GoldenEagleKit/GameApplicationTests
