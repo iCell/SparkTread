@@ -1,6 +1,5 @@
-name: ProjectGoldenEagle
+name: SparkTread
 options:
-  bundleIdPrefix: vip.icell
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -12,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
 targets:
-  ProjectGoldenEagle:
+  SparkTread:
     type: application
     platform: iOS
     sources:
@@ -37,13 +36,15 @@ targets:
           - UIInterfaceOrientationLandscapeRight
     settings:
       base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.icell.sparktread
         TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
 schemes:
-  ProjectGoldenEagle:
+  SparkTread:
     build:
       targets:
-        ProjectGoldenEagle: all
+        SparkTread: all
     run:
       config: Debug
     test:

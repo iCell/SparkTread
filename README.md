@@ -11,13 +11,13 @@ macOS. Design and planning documents live at the repository root and in
 | Xcode | 26.6 (17F113) |
 | Swift toolchain | 6.3 (language mode 6, `SWIFT_STRICT_CONCURRENCY=complete`) |
 | iOS deployment target | 17.0 |
-| Xcode scheme | `ProjectGoldenEagle` |
+| Xcode scheme | `SparkTread` |
 | CI simulator destination | `platform=iOS Simulator,name=iPhone 17` |
 | Minimum-supported-device floor | 390×844-point class (ADR-0004); legibility gates run on a physical floor-class iPhone |
 
 ## Project generation
 
-The Xcode project is generated — do not edit `ProjectGoldenEagle.xcodeproj`
+The Xcode project is generated — do not edit `SparkTread.xcodeproj`
 by hand; change `project.yml` and regenerate:
 
 ```sh
@@ -40,15 +40,15 @@ swift run content-validator Content
 # Individual steps:
 sh Scripts/check-architecture.sh
 swift test
-xcodebuild test -project ProjectGoldenEagle.xcodeproj -scheme ProjectGoldenEagle \
+xcodebuild test -project SparkTread.xcodeproj -scheme SparkTread \
     -destination 'platform=iOS Simulator,name=iPhone 17'
 
 # Run in the simulator:
-xcodebuild build -project ProjectGoldenEagle.xcodeproj -scheme ProjectGoldenEagle \
+xcodebuild build -project SparkTread.xcodeproj -scheme SparkTread \
     -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/DerivedData
 xcrun simctl boot "iPhone 17"
-xcrun simctl install "iPhone 17" .build/DerivedData/Build/Products/Debug-iphonesimulator/ProjectGoldenEagle.app
-xcrun simctl launch "iPhone 17" vip.icell.ProjectGoldenEagle
+xcrun simctl install "iPhone 17" .build/DerivedData/Build/Products/Debug-iphonesimulator/SparkTread.app
+xcrun simctl launch "iPhone 17" io.icell.sparktread
 ```
 
 ## Layering (§14, D-017)

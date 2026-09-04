@@ -10,7 +10,7 @@ swift run content-validator Content
 swift test
 xcodegen generate
 xcodebuild test \
-    -project ProjectGoldenEagle.xcodeproj \
-    -scheme ProjectGoldenEagle \
+    -project SparkTread.xcodeproj \
+    -scheme SparkTread \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
     -derivedDataPath .build/DerivedData
