@@ -107,7 +107,19 @@ final class TouchControlsUIView: UIView {
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let stickTouch, touches.contains(stickTouch) else { return }
         let point = stickTouch.location(in: self)
-        let dx = point.x - stickOrigin.x, dy = point.y - stickOrigin.y
+        var dx = point.x - stickOrigin.x, dy = point.y - stickOrigin.y
+        // Leashed origin: past the stick radius the origin follows the
+        // finger, so reversing direction responds immediately instead of
+        // requiring a drag back across the original touch-down point.
+        let magnitude = (dx * dx + dy * dy).squareRoot()
+        let leash: CGFloat = 36
+        if magnitude > leash {
+            let excess = magnitude - leash
+            stickOrigin.x += dx / magnitude * excess
+            stickOrigin.y += dy / magnitude * excess
+            dx = point.x - stickOrigin.x
+            dy = point.y - stickOrigin.y
+        }
         store?.updateFromAnalog(dx: dx, dy: dy, deadZone: 12)
         updateStickVisual(offset: CGPoint(x: dx, y: dy))
     }

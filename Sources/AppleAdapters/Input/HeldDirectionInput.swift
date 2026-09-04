@@ -35,7 +35,7 @@ public final class HeldDirectionStore {
             releaseAll()
             return
         }
-        let dominanceRatio = 1.25
+        let dominanceRatio = 1.15
         let candidate: Direction
         if abs(dx) > abs(dy) * dominanceRatio {
             candidate = dx > 0 ? .right : .left

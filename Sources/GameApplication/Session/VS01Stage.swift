@@ -43,11 +43,10 @@ public enum VS01Stage {
         brickRect(x: 16...19, y: 17...18)
         brickRect(x: 30...33, y: 19...20)
 
-        // Base nook at bottom-center with a protective brick ring (safe
-        // initial base wall): base cells (27–28, 23–24).
-        brickRect(x: 25...26, y: 21...24)
-        brickRect(x: 29...30, y: 21...24)
-        brickRect(x: 27...28, y: 21...21)
+        // Base flush against the bottom border wall (reference-heritage),
+        // with the classic three-sided brick ring: base cells (27–28, 24–25).
+        for y in 23...25 { brick(26, y); brick(29, y) }
+        brick(27, 23); brick(28, 23)
 
         // A small water pool and ice patch to seed terrain tactics.
         for y in 9...11 { for x in 12...15 { terrain[x, y] = TerrainCell(kind: .water) } }
@@ -57,12 +56,12 @@ public enum VS01Stage {
         world.addPlayer(PlayerState(playerID: .one))
         // No second local player or join path is exposed (§6.4).
 
-        let playerSpawnCell = Vec2i(x: 21, y: 23)
+        let playerSpawnCell = Vec2i(x: 21, y: 24)
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: playerSpawnCell.x * cell,
                                                 y: playerSpawnCell.y * cell),
                         facing: .up)
-        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 23 * cell))
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 24 * cell))
 
         // Finite composition (VS-01: primarily normal and rapid).
         let composition: [(String, Int)] = [
