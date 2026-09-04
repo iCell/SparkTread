@@ -65,7 +65,7 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
             WeaponDefinition(
                 id: "normal", family: .normal, fireChannel: .normal,
                 ammoCost: 0, refillAmount: 0, maxAmmo: 0,
-                cooldownTicks: [30, 26, 22, 18], maxActive: [1, 1, 2, 2],
+                cooldownTicks: [14, 12, 10, 8], maxActive: [2, 2, 3, 3],
                 initialSpeedSubunitsPerTick: [192, 192, 224, 224],
                 accelerationSubunitsPerTick2: [0, 0, 0, 0],
                 maxSpeedSubunitsPerTick: [192, 192, 224, 224],

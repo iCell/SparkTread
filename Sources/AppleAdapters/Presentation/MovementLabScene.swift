@@ -389,9 +389,17 @@ final class MovementLabScene: SKScene {
     private func syncBase(_ art: PixelArt, world: WorldState) {
         guard let base = world.base else { return }
         if baseNode == nil {
-            baseNode = try? PixelBaseNode(pixelScale: artScale * 0.82, art: art)
+            let pixelScale = artScale * 0.82
+            baseNode = try? PixelBaseNode(pixelScale: pixelScale, art: art)
             if let baseNode {
-                baseNode.position = centerPoint(base.topLeftSubunits, size: base.sizeSubunits)
+                // The base art's node origin is its GROUND anchor (source
+                // y=35 of 64; visual bottom edge at y=54). Place it so the
+                // art's bottom edge sits on the footprint's bottom cell
+                // edge — centered on the rect it would float (owner report).
+                let bottom = scenePoint(Vec2i(
+                    x: base.topLeftSubunits.x + base.sizeSubunits / 2,
+                    y: base.topLeftSubunits.y + base.sizeSubunits))
+                baseNode.position = CGPoint(x: bottom.x, y: bottom.y + (54 - 35) * pixelScale)
                 baseNode.zPosition = 400
                 addChild(baseNode)
             }

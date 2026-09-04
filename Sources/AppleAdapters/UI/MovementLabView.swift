@@ -120,8 +120,6 @@ public final class MovementLabController {
 public struct MovementLabView: View {
     @State private var controller = MovementLabController()
     @State private var scene: MovementLabScene?
-    @State private var stickOrigin: CGPoint?
-    @State private var stickOffset: CGSize = .zero
 
     public init() {}
 
@@ -137,8 +135,10 @@ public struct MovementLabView: View {
             ZStack {
                 SpriteView(scene: liveScene(for: geometry.size))
                     .ignoresSafeArea()
-                joystickOverlay
-                fireButtons
+                #if canImport(UIKit)
+                TouchControlsView(controller: controller)
+                    .ignoresSafeArea()
+                #endif
                 weaponDebugPanel
                 stageHUD
                 resultOverlay
@@ -200,29 +200,6 @@ public struct MovementLabView: View {
         }
     }
 
-    /// Normal + special fire, right thumb zone. Hold-to-fire semantics.
-    private var fireButtons: some View {
-        VStack(spacing: 14) {
-            fireButton(label: "特", color: .orange, held: { controller.specialFireHeld = $0 })
-            fireButton(label: "普", color: .cyan, held: { controller.normalFireHeld = $0 })
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 28)
-        .padding(.bottom, 24)
-    }
-
-    private func fireButton(label: String, color: Color, held: @escaping (Bool) -> Void) -> some View {
-        Text(label)
-            .font(.system(size: 22, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 62, height: 62)
-            .background(Circle().fill(color.opacity(0.45)))
-            .overlay(Circle().strokeBorder(color.opacity(0.9), lineWidth: 2))
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in held(true) }
-                .onEnded { _ in held(false) })
-    }
-
     /// Weapon debug panel (M2 deliverable): special-weapon selector and
     /// power-level control, top-right, collapsible.
     private var weaponDebugPanel: some View {
@@ -273,50 +250,5 @@ public struct MovementLabView: View {
             controller: controller)
         DispatchQueue.main.async { scene = created }
         return created
-    }
-
-    /// Floating virtual stick: appears where the finger lands, quantizes the
-    /// drag vector to four directions with hysteresis (adapter-side only).
-    private var joystickOverlay: some View {
-        GeometryReader { geometry in
-            ZStack {
-                if let origin = stickOrigin {
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.35), lineWidth: 2)
-                        .frame(width: 96, height: 96)
-                        .position(origin)
-                    Circle()
-                        .fill(Color.white.opacity(0.45))
-                        .frame(width: 44, height: 44)
-                        .position(x: origin.x + stickOffset.width.clamped(to: -34...34),
-                                  y: origin.y + stickOffset.height.clamped(to: -34...34))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if stickOrigin == nil { stickOrigin = value.startLocation }
-                        stickOffset = value.translation
-                        controller.input.updateFromAnalog(
-                            dx: value.translation.width,
-                            dy: value.translation.height,
-                            deadZone: 12)
-                    }
-                    .onEnded { _ in
-                        stickOrigin = nil
-                        stickOffset = .zero
-                        controller.input.releaseAll()
-                    }
-            )
-        }
-        .ignoresSafeArea()
-    }
-}
-
-private extension CGFloat {
-    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
