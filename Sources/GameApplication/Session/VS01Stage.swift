@@ -44,9 +44,11 @@ public enum VS01Stage {
         brickRect(x: 30...33, y: 19...20)
 
         // Base flush against the bottom border wall (reference-heritage),
-        // with the classic three-sided brick ring: base cells (27–28, 24–25).
-        for y in 23...25 { brick(26, y); brick(29, y) }
-        brick(27, 23); brick(28, 23)
+        // with a three-sided STEEL ring (owner request for the test build;
+        // enemies cannot chew through it with normal shells).
+        func steel(_ x: Int, _ y: Int) { terrain[x, y] = TerrainCell(kind: .steel) }
+        for y in 23...25 { steel(26, y); steel(29, y) }
+        steel(27, 23); steel(28, 23)
 
         // A small water pool and ice patch to seed terrain tactics.
         for y in 9...11 { for x in 12...15 { terrain[x, y] = TerrainCell(kind: .water) } }

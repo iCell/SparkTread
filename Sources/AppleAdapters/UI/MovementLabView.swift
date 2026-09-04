@@ -9,9 +9,12 @@ import SwiftUI
 public final class MovementLabController {
     public private(set) var session: MovementLabSession
     public let input = HeldDirectionStore()
-    /// Fire button states, held by the UI overlay (adapter-side only).
-    public var normalFireHeld = false
+    /// Fire input semantics (adapter-side only): the normal cannon is
+    /// EDGE-TRIGGERED — one shell per press, no autofire on hold — while the
+    /// special channel is hold-based (rapid's identity is sustained fire).
     public var specialFireHeld = false
+    private var normalFirePulse = false
+    public func pressNormalFire() { normalFirePulse = true }
     /// Events since the scene last drained them (presentation feed).
     private var pendingEvents: [DomainEvent] = []
     #if canImport(GameController)
@@ -76,9 +79,11 @@ public final class MovementLabController {
             let scriptedNormal = self.autodrive && tick % 45 < 2
             let scriptedSpecial = self.autodrive && tick % 130 < 2
             self.session.debugRespawnPlayerIfNeeded()
+            let normalPulse = self.normalFirePulse
+            self.normalFirePulse = false
             self.pendingEvents += self.session.advance(
                 holding: self.input.held ?? scripted,
-                normalFire: self.normalFireHeld || scriptedNormal,
+                normalFire: normalPulse || scriptedNormal,
                 specialFire: self.specialFireHeld || scriptedSpecial)
         }
         driver.start()

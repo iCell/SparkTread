@@ -172,7 +172,7 @@ struct TouchControlsView: UIViewRepresentable {
     func makeUIView(context: Context) -> TouchControlsUIView {
         let view = TouchControlsUIView(frame: .zero)
         view.store = controller.input
-        view.onNormalFire = { [weak controller] held in controller?.normalFireHeld = held }
+        view.onNormalFire = { [weak controller] pressed in if pressed { controller?.pressNormalFire() } }
         view.onSpecialFire = { [weak controller] held in controller?.specialFireHeld = held }
         return view
     }
