@@ -173,19 +173,27 @@ private func hold(_ world: inout WorldState, _ direction: Direction?, ticks: Int
         #expect(world.tanks[0].bufferedDirection == nil)
     }
 
-    @Test func bufferedTapExpiresOutsideWindow() {
+    /// With no junction within buffered travel, a perpendicular press turns
+    /// in place immediately (owner-reported: a tank beside an obstacle must
+    /// still be able to face it, e.g. to shoot the wall).
+    @Test func farFromJunctionPerpendicularPressTurnsInPlace() {
         var world = corridorWorld()
-        // 2,000 subunits above alignment: unreachable within the buffer window.
+        // 2,000 subunits above the opening: no junction within reach.
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3072, y: 11264 - 2000), facing: .down)
         hold(&world, .right, ticks: 1)
-        #expect(world.tanks[0].bufferedDirection == .right)
-        hold(&world, nil, ticks: 12)
-        #expect(world.tanks[0].facing == .down) // expired without turning
+        #expect(world.tanks[0].facing == .right) // faces the wall immediately
         #expect(world.tanks[0].bufferedDirection == nil)
-        #expect(world.tanks[0].bufferedDirectionRemainingTicks == 0)
-        // Rolled only while the buffer was pending, then stopped.
-        let rolled = world.tanks[0].positionSubunits.y - (11264 - 2000)
-        #expect(rolled <= 10 * 48 && rolled > 0)
+    }
+
+    /// Stationary beside a wall: pressing toward it turns the tank so the
+    /// wall can be shot; movement stays blocked.
+    @Test func stationaryTankCanFaceAdjacentWall() {
+        var world = corridorWorld()
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 3136, y: 3072), facing: .up) // flush right of wall face 5120? x=3136: box max 5120 flush
+        hold(&world, .right, ticks: 3)
+        #expect(world.tanks[0].facing == .right)
+        #expect(world.tanks[0].positionSubunits.x == 3136) // wedged, not moved
     }
 }

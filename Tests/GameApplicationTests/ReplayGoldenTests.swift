@@ -25,9 +25,9 @@ enum M1MovementGolden {
     static let tickCount = 1800
 
     /// Expected checksums at tick 60, 120, …, 1800.
-    /// Regenerated 2026-09-03 with M3: checksum surface extended to
-    /// pickups/telegraphs/stage and player respawn-retention fields. Same
-    /// input script; movement behavior unchanged.
+    /// Regenerated 2026-09-04: perpendicular turns with no junction within
+    /// buffered travel now turn in place (owner-reported wall-facing rule);
+    /// diverges from tick ~1260 where the script presses into a wall.
     static let expectedChecksums: [UInt64] = [
         8260975046611885119,
         5014849822761385582,
@@ -49,16 +49,16 @@ enum M1MovementGolden {
         17944007131741629981,
         11734796581883049922,
         7460740919157276571,
-        9061529408994678041,
-        3062689661668849333,
-        1643355299093154886,
-        14748872409205058049,
-        15909826365691057949,
-        7113856313919682351,
-        5227793739940515037,
-        14955763905154225724,
-        8663381327235187083,
-        11319265526741265975,
+        10009029722083869479,
+        11915497538133388478,
+        491660377429001610,
+        13360453837731950758,
+        16017945969468479954,
+        10348818979328173008,
+        16762123468418820470,
+        9551718003452074656,
+        18411883314456497476,
+        2318232783691235533,
     ]
 }
 

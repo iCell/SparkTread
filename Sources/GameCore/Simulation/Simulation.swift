@@ -185,9 +185,13 @@ public enum Simulation {
             turn()
             return
         }
+        // The vector is blocked here. Buffer-and-roll ONLY when a junction
+        // exists within buffered travel (the pre-turn assist case);
+        // otherwise turn in place immediately — a tank beside a wall must
+        // still be able to FACE that wall (owner-reported; reference feel).
         let canKeepRolling = probeIsFree(position: tank.positionSubunits, direction: tank.facing,
                                          field: field, ruleset: ruleset)
-        if !canKeepRolling {
+        if !canKeepRolling || !junctionWithinBufferTravel(tank, to: desired, field: field, ruleset: ruleset) {
             turn()
             return
         }
@@ -197,6 +201,41 @@ public enum Simulation {
             tank.bufferedDirection = desired
             tank.bufferedDirectionRemainingTicks = ruleset.turnBufferTicks
         }
+    }
+
+    /// Whether some lane within the tank's buffered travel distance ahead
+    /// would make the perpendicular turn legal — i.e., a junction is coming
+    /// up. Deterministic spatial lookahead; scans half-cell lanes reachable
+    /// through free path within `turnBufferTicks` of travel plus the assist
+    /// window.
+    private static func junctionWithinBufferTravel(
+        _ tank: TankState, to desired: Direction, field: ObstacleField, ruleset: MovementRuleset
+    ) -> Bool {
+        let lane = SpatialUnits.subunitsPerQuadrant
+        let perTick = ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+            / MovementRuleset.accumulatorUnitsPerSubunit
+        let reach = perTick * ruleset.turnBufferTicks + ruleset.alignmentAssistWindowSubunits
+        let travelAxisIsX = tank.facing.vector.x != 0
+        let coordinate = travelAxisIsX ? tank.positionSubunits.x : tank.positionSubunits.y
+        let sign = tank.facing.vector.x + tank.facing.vector.y // ±1
+        // First lane strictly ahead (the current lane was already rejected
+        // by the snap-assisted check).
+        var next = sign > 0
+            ? ((coordinate / lane) + 1) * lane
+            : (coordinate % lane == 0 ? coordinate - lane : (coordinate / lane) * lane)
+        while (next - coordinate) * sign <= reach && next >= 0 {
+            let distance = (next - coordinate) * sign
+            var candidate = tank.positionSubunits
+            if travelAxisIsX { candidate.x = next } else { candidate.y = next }
+            if probeIsFree(position: tank.positionSubunits, direction: tank.facing,
+                           field: field, ruleset: ruleset, distance: distance),
+               probeIsFree(position: candidate, direction: desired,
+                           field: field, ruleset: ruleset, distance: turnProbeDistance(ruleset)) {
+                return true
+            }
+            next += sign * lane
+        }
+        return false
     }
 
     /// Perpendicular-turn legality with lane alignment (reference-heritage
