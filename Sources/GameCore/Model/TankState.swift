@@ -73,6 +73,9 @@ public struct TankState: Codable, Equatable, Sendable {
     public var movementAccumulator: Int
     public var armor: Int
     public var maxArmor: Int
+    /// Damage shield carried by armored enemy tiers: absorbs non-explosive
+    /// hits point by point; explosion-class damage shatters it outright.
+    public var shieldHP: Int
     public var speedLevel: Int
     public var powerLevel: Int
     public var specialWeaponID: String
@@ -98,6 +101,7 @@ public struct TankState: Codable, Equatable, Sendable {
         self.movementAccumulator = 0
         self.armor = 3
         self.maxArmor = 8
+        self.shieldHP = 0
         self.speedLevel = 0
         self.powerLevel = 0
         self.specialWeaponID = "rapid"

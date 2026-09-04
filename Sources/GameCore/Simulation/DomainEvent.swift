@@ -9,6 +9,7 @@ public enum DomainEvent: Codable, Equatable, Sendable {
     case dryFire(entityID: Int, weaponID: String)
     case projectileDestroyed(entityID: Int, position: Vec2i)
     case tankDamaged(entityID: Int, damage: Int, sourceWeaponID: String)
+    case tankShieldHit(entityID: Int, remaining: Int)
     case tankDestroyed(entityID: Int, position: Vec2i)
     case minePlaced(entityID: Int, level: Int, position: Vec2i)
     case mineTriggered(entityID: Int, position: Vec2i)

@@ -69,6 +69,7 @@ extension WorldState {
             c.mix(t.movementAccumulator)
             c.mix(t.armor)
             c.mix(t.maxArmor)
+            c.mix(t.shieldHP)
             c.mix(t.speedLevel)
             c.mix(t.powerLevel)
             c.mix(t.specialWeaponID)

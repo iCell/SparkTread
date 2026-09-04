@@ -270,13 +270,16 @@ final class MovementLabScene: SKScene {
                 addChild(created)
                 tankNodes[tank.entityID] = created
                 tankFacings[tank.entityID] = tank.facing
+                applyFacingScale(created, art: art)
                 node = created
             }
             node.position = centerPoint(tank.positionSubunits, size: footprint)
             if tankFacings[tank.entityID] != tank.facing {
                 tankFacings[tank.entityID] = tank.facing
                 try? node.setDirection(tank.facing.rawValue)
+                applyFacingScale(node, art: art)
             }
+            syncShieldRing(node, art: art, shieldHP: tank.shieldHP, tick: world.tick)
             if let last = tankPositions[tank.entityID] {
                 tankTravel[tank.entityID, default: 0] +=
                     abs(tank.positionSubunits.x - last.x) + abs(tank.positionSubunits.y - last.y)
@@ -298,6 +301,44 @@ final class MovementLabScene: SKScene {
             box.isHidden = false
         } else {
             collisionBox?.isHidden = true
+        }
+    }
+
+    /// The delivery's 2.5D side views draw the tank body shorter than the
+    /// up/down views (e.g. player 30×26 up vs 30×22 right). Normalize the
+    /// perceived size with a per-facing uniform scale from the rig metadata
+    /// (owner-reported inconsistency); logical footprint is untouched.
+    private func applyFacingScale(_ node: PixelTankNode, art: PixelArt) {
+        let upKey = node.kind + "_up"
+        let currentKey = node.kind + "_" + PixelTankNode.directions[node.direction]
+        guard let up = art.manifest.rigs[upKey]?.bodyBounds,
+              let current = art.manifest.rigs[currentKey]?.bodyBounds,
+              current.count == 4, up.count == 4 else { return }
+        let upHeight = up[3] - up[1], currentHeight = current[3] - current[1]
+        guard currentHeight > 0 else { return }
+        let factor = min(1.3, max(1.0, upHeight / currentHeight))
+        node.setScale(CGFloat(factor))
+    }
+
+    /// Pulsing shield ring on tanks with shield hit points remaining.
+    private func syncShieldRing(_ node: PixelTankNode, art: PixelArt, shieldHP: Int, tick: Int) {
+        let name = "shield_ring"
+        if shieldHP > 0 {
+            let ring: SKSpriteNode
+            if let existing = node.childNode(withName: name) as? SKSpriteNode {
+                ring = existing
+            } else {
+                guard let created = try? art.sprite("px_status_shield_0", scale: artScale * 1.15)
+                else { return }
+                created.name = name
+                created.zPosition = 6
+                node.addChild(created)
+                ring = created
+            }
+            if let frame = try? art.texture("px_status_shield_\(tick / 10 % 4)") { ring.texture = frame }
+            ring.alpha = 0.7 + 0.25 * sin(Double(tick) / 9)
+        } else {
+            node.childNode(withName: name)?.removeFromParent()
         }
     }
 

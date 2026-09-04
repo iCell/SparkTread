@@ -479,6 +479,39 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(world.projectiles.isEmpty)
     }
 
+    /// Owner-directed resistance model: shields chip under normal fire but
+    /// shatter whole against explosion-class damage; armor only afterwards.
+    @Test func shieldChipsUnderNormalAndShattersUnderExplosion() {
+        var world = makeCombatWorld()
+        let enemy = spawnEnemy(&world, cellX: 9, cellY: 3)
+        world.withTank(entityID: enemy) { $0.shieldHP = 2; $0.armor = 4; $0.maxArmor = 4 }
+        var events: [DomainEvent] = []
+        // First normal shell: shield 2→1, armor untouched.
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 25, events: &events)
+        #expect(world.tank(entityID: enemy)?.shieldHP == 1)
+        #expect(world.tank(entityID: enemy)?.armor == 4)
+        #expect(events.contains { if case .tankShieldHit(enemy, 1) = $0 { true } else { false } })
+        // Second shell: shield gone; third finally damages armor.
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 25, events: &events)
+        #expect(world.tank(entityID: enemy)?.shieldHP == 0)
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 25, events: &events)
+        #expect(world.tank(entityID: enemy)?.armor == 3)
+
+        // Explosion vs a fresh 3-point shield: one blast shatters it whole.
+        var world2 = makeCombatWorld()
+        let enemy2 = spawnEnemy(&world2, cellX: 9, cellY: 3)
+        world2.withTank(entityID: enemy2) { $0.shieldHP = 3; $0.armor = 4; $0.maxArmor = 4 }
+        giveSpecial(&world2, "explosion")
+        events.removeAll()
+        tickAll(&world2, 1, special: true, events: &events)
+        tickAll(&world2, 60, events: &events)
+        #expect(world2.tank(entityID: enemy2)?.shieldHP == 0)
+        #expect(world2.tank(entityID: enemy2)?.armor == 4) // blast spent on the shield
+    }
+
     @Test func invincibleTankDeflectsExplosionAndProjectiles() {
         var world = makeCombatWorld()
         let enemy = spawnEnemy(&world, cellX: 9, cellY: 3)

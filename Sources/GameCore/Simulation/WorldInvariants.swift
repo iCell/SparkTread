@@ -25,6 +25,7 @@ public enum WorldInvariants {
             if let owner = tank.ownerPlayerID, world.player(owner) == nil {
                 issues.append("tank \(id) references missing player \(owner.rawValue)")
             }
+            if tank.shieldHP < 0 { issues.append("tank \(id) negative shield") }
             if tank.armor < 0 || tank.armor > tank.maxArmor {
                 issues.append("tank \(id) armor \(tank.armor) outside 0...\(tank.maxArmor)")
             }

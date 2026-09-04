@@ -234,11 +234,11 @@ enum Stage {
                 world.tanks[i].statusEffects["frozen"] = 480
             }
         case "bomb":
-            // Damages every active (non-telegraph) enemy.
+            // Damages every active (non-telegraph) enemy; shields shatter
+            // first (bomb is explosion-class).
             for i in world.tanks.indices where world.tanks[i].teamID != 1 {
-                world.tanks[i].armor -= 3
-                events.append(.tankDamaged(entityID: world.tanks[i].entityID, damage: 3,
-                                           sourceWeaponID: "bomb"))
+                Combat.applyTankDamage(&world, tankIndex: i, damage: 3,
+                                       sourceWeaponID: "bomb", events: &events)
             }
         case "extra_life": withPlayer { $0.lives += 1 }
         case "max_armor_ammo":
@@ -375,6 +375,7 @@ enum Stage {
                     world.withTank(entityID: id) {
                         $0.armor = attributes.armor
                         $0.maxArmor = attributes.armor
+                        $0.shieldHP = attributes.shieldHP
                         $0.speedLevel = attributes.speedLevel
                         $0.powerLevel = attributes.powerLevel
                         $0.spawnProtectionTicks = 30

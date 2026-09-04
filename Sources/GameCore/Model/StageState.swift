@@ -90,6 +90,8 @@ public enum EnemyArchetypes {
         public let speedLevel: Int
         public let powerLevel: Int
         public let score: Int
+        /// Damage shield for armored tiers (chip vs shatter rules in Combat).
+        public let shieldHP: Int
         /// 0–100: how strongly this archetype pressures the base over the player.
         public let baseFocusPercent: Int
     }
@@ -98,15 +100,15 @@ public enum EnemyArchetypes {
         let tier = archetypeID.split(separator: "_").last.map(String.init) ?? "a"
         let family = archetypeID.split(separator: "_").first.map(String.init) ?? "normal"
         let base: Attributes = switch tier {
-        case "b": Attributes(armor: 2, speedLevel: 0, powerLevel: 0, score: 200, baseFocusPercent: 55)
-        case "c": Attributes(armor: 3, speedLevel: 1, powerLevel: 1, score: 300, baseFocusPercent: 60)
-        case "d": Attributes(armor: 4, speedLevel: 2, powerLevel: 1, score: 400, baseFocusPercent: 65)
-        default: Attributes(armor: 1, speedLevel: 1, powerLevel: 0, score: 100, baseFocusPercent: 50)
+        case "b": Attributes(armor: 3, speedLevel: 0, powerLevel: 0, score: 200, shieldHP: 0, baseFocusPercent: 55)
+        case "c": Attributes(armor: 4, speedLevel: 1, powerLevel: 1, score: 300, shieldHP: 2, baseFocusPercent: 60)
+        case "d": Attributes(armor: 5, speedLevel: 2, powerLevel: 1, score: 400, shieldHP: 3, baseFocusPercent: 65)
+        default: Attributes(armor: 2, speedLevel: 1, powerLevel: 0, score: 100, shieldHP: 0, baseFocusPercent: 50)
         }
         // Rapid family hunts the player harder; normal family leans base.
         let bias = family == "rapid" ? -20 : 0
         return Attributes(armor: base.armor, speedLevel: base.speedLevel,
-                          powerLevel: base.powerLevel, score: base.score,
+                          powerLevel: base.powerLevel, score: base.score, shieldHP: base.shieldHP,
                           baseFocusPercent: max(0, min(100, base.baseFocusPercent + bias)))
     }
 }

@@ -347,6 +347,13 @@ enum Combat {
                     removeProjectile(&world, entityID: projectile.entityID, destroyed: &destroyed)
                     return
                 }
+                if weapon.family == .explosion {
+                    // Explosive shells deal ALL their damage through the
+                    // blast — no separate contact damage (no double-dipping).
+                    destroyProjectile(&projectile, at: startIndex, world: &world, weapon: weapon,
+                                      explosions: &explosions, destroyed: &destroyed, events: &events)
+                    return
+                }
                 applyTankDamage(&world, tankIndex: tankIndex,
                                 damage: weapon.level(weapon.tankDamage, projectile.powerLevel),
                                 sourceWeaponID: weapon.id, events: &events)
@@ -608,14 +615,27 @@ enum Combat {
         return piercedCount
     }
 
-    private static func applyTankDamage(
+    /// Shield-aware damage (owner-directed resistance model): a shield
+    /// absorbs non-explosive damage point by point; explosion-class sources
+    /// (explosion shells, mines, the bomb pickup) shatter the whole shield
+    /// in one blow. Armor is only touched once the shield is gone.
+    static func applyTankDamage(
         _ world: inout WorldState, tankIndex: Int, damage: Int,
         sourceWeaponID: String, events: inout [DomainEvent]
     ) {
         guard damage > 0 else { return }
+        let entityID = world.tanks[tankIndex].entityID
+        if world.tanks[tankIndex].shieldHP > 0 {
+            let shatters = ["explosion", "mine", "bomb"].contains(sourceWeaponID)
+            world.tanks[tankIndex].shieldHP = shatters
+                ? 0 : max(0, world.tanks[tankIndex].shieldHP - damage)
+            events.append(.tankShieldHit(entityID: entityID,
+                                         remaining: world.tanks[tankIndex].shieldHP))
+            return
+        }
         world.tanks[tankIndex].armor -= damage
-        events.append(.tankDamaged(entityID: world.tanks[tankIndex].entityID,
-                                   damage: damage, sourceWeaponID: sourceWeaponID))
+        events.append(.tankDamaged(entityID: entityID, damage: damage,
+                                   sourceWeaponID: sourceWeaponID))
     }
 
     private static func applyBaseHit(

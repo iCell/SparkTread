@@ -68,6 +68,7 @@ public enum VS01Stage {
         // Finite composition (VS-01: primarily normal and rapid).
         let composition: [(String, Int)] = [
             ("normal_a", 5), ("rapid_a", 3), ("normal_b", 4), ("rapid_b", 2),
+            ("normal_c", 2), // shielded armored tier for resistance testing
         ]
         var queue: [String] = []
         // Interleave archetypes deterministically for varied pressure.
