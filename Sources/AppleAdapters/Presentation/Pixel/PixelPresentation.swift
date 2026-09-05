@@ -54,11 +54,17 @@ enum PixelPickupPhase:String,CaseIterable {case spawning,idle,collecting,replaci
         frameNode=try art.sprite("px_pickup_frame_idle",scale:pixelScale);glyph=try art.sprite(item.texture,scale:pixelScale)
         super.init();name="pickup_"+item.key;addChild(group);group.addChild(frameNode);glyph.zPosition=1;group.addChild(glyph)
         if let value=item.displayNumber {
-            let label=SKLabelNode(fontNamed:"Menlo-Bold");label.text=String(value);label.fontSize=7*pixelScale;label.fontColor = .white;label.position.y = -11*pixelScale;label.zPosition=2;group.addChild(label)
+            // Reserve a separate caption row instead of printing over the cup.
+            glyph.setScale(0.83);glyph.position.y=3*pixelScale
+            let label=SKLabelNode(fontNamed:"Menlo-Bold");label.name="score_caption";label.text=String(value);label.fontSize=7*pixelScale;label.fontColor = .white;label.position.y = -14*pixelScale;label.zPosition=2;group.addChild(label)
         }
         try update(phase:.idle,age:0)
     }
     required init?(coder:NSCoder){fatalError("Use registered pickup")}
+    var scoreCaptionClearOfGlyph:Bool {
+        guard let caption=group.childNode(withName:"score_caption") else{return true}
+        return caption.frame.maxY < art.visibleRect(glyph,id:item.texture,in:group).minY
+    }
     func update(phase:PixelPickupPhase,age:Double) throws {
         guard age>=0,age.isFinite else{throw PixelArtError.missing("pickup age")}
         frameNode.texture=try art.texture("px_pickup_frame_"+phase.rawValue);group.alpha=1;group.setScale(1);group.position = .zero;isHidden=false
