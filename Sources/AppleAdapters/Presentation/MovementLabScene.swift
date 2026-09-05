@@ -11,7 +11,9 @@ final class MovementLabScene: SKScene {
     private var art: PixelArt?
     private var debugLabel: SKLabelNode?
     private var collisionBox: SKShapeNode?
-    private var liquidSprites: [(node: SKSpriteNode, kind: String, mask: Int)] = []
+    /// Liquid tiles keyed by cell index; re-tiled every frame from the
+    /// live terrain so melting ice heals edges automatically.
+    private var liquidNodes: [Int: (node: SKSpriteNode, kind: String)] = [:]
     private var layout: ArenaLayout?
 
     // Dynamic mirrors keyed by entity ID.
@@ -49,7 +51,7 @@ final class MovementLabScene: SKScene {
     private func rebuildWorldView() {
         builtGeneration = controller.worldGeneration
         removeAllChildren()
-        liquidSprites.removeAll(); tankNodes.removeAll(); projectileNodes.removeAll()
+        liquidNodes.removeAll(); tankNodes.removeAll(); projectileNodes.removeAll()
         mineNodes.removeAll(); hazardNodes.removeAll(); wallNodes.removeAll()
         pickupNodes.removeAll(); telegraphNodes.removeAll()
         tankFacings.removeAll(); tankTravel.removeAll(); tankPositions.removeAll()
@@ -105,19 +107,11 @@ final class MovementLabScene: SKScene {
                     refreshWallTexture(art, world: world, cellX: x, cellY: y)
                 case .water, .ice:
                     let name = world.terrain[x, y].kind == .water ? "water" : "ice"
-                    var mask = 0
-                    let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
-                                   (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
-                    for (bit, dx, dy) in offsets
-                    where world.terrain.isInside(cellX: x + dx, cellY: y + dy)
-                        && world.terrain[x + dx, y + dy].kind == world.terrain[x, y].kind { mask |= bit }
-                    for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
-                    where mask & a == 0 || mask & b == 0 { mask &= ~diag }
-                    let n = try art.sprite(String(format: "px_%@_%03d_0", name, mask), scale: artScale)
+                    let n = try art.sprite(String(format: "px_%@_000_0", name), scale: artScale)
                     n.position = cellCenter(x: x, y: y)
                     n.zPosition = 5
                     addChild(n)
-                    liquidSprites.append((n, name, mask))
+                    liquidNodes[y * arena.cellsWide + x] = (n, name)
                 case .ground, .foliage, .base:
                     break
                 }
@@ -487,8 +481,27 @@ final class MovementLabScene: SKScene {
 
     private func animateLiquids(_ art: PixelArt, world: WorldState) {
         let frame = (world.tick / 15) % 4
-        for (node, kind, mask) in liquidSprites {
-            node.texture = try? art.texture(String(format: "px_%@_%03d_%d", kind, mask, frame))
+        let width = world.arena.cellsWide
+        for (key, entry) in liquidNodes {
+            let cx = key % width, cy = key / width
+            let expected: TerrainKind = entry.kind == "water" ? .water : .ice
+            guard world.terrain.isInside(cellX: cx, cellY: cy),
+                  world.terrain[cx, cy].kind == expected else {
+                entry.node.removeFromParent() // melted/removed (fire on ice)
+                liquidNodes[key] = nil
+                continue
+            }
+            var mask = 0
+            let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
+                           (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
+            for (bit, dx, dy) in offsets
+            where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy)
+                && world.terrain[cx + dx, cy + dy].kind == expected { mask |= bit }
+            for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
+            where mask & a == 0 || mask & b == 0 { mask &= ~diag }
+            if let texture = try? art.texture(String(format: "px_%@_%03d_%d", entry.kind, mask, frame)) {
+                entry.node.texture = texture
+            }
         }
     }
 

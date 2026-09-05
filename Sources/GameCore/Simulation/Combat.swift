@@ -934,6 +934,14 @@ enum Combat {
         world.projectiles.removeAll { destroyedProjectiles.contains($0.entityID) }
         for hazard in world.fireHazards where hazard.lifetimeRemainingTicks <= 0 {
             decrementActiveCount(&world, ownerEntityID: findFireOwner(world, hazard) ?? -1, weaponID: "fire")
+            // A flame that burns out on ice melts the cell to plain ground
+            // (owner rule): terrain change lands with the same-tick event.
+            let cell = SpatialUnits.subunitsPerCell
+            let cx = hazard.positionSubunits.x / cell, cy = hazard.positionSubunits.y / cell
+            if world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .ice {
+                world.terrain[cx, cy] = TerrainCell(kind: .ground)
+                events.append(.terrainChanged(cellX: cx, cellY: cy, quadrantMask: 0))
+            }
         }
         world.fireHazards.removeAll { $0.lifetimeRemainingTicks <= 0 }
 

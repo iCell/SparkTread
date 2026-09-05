@@ -470,6 +470,25 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(columns == [5632, 6656, 7680]) // cells x=5,6,7 ahead of the tank
     }
 
+    /// Owner rule: a flame that burns out on ice melts the cell to ground.
+    @Test func fireMeltsIceToGroundWhenBurnedOut() {
+        var world = makeCombatWorld { w in
+            for x in 5...7 { for y in 3...4 { w.terrain[x, y] = TerrainCell(kind: .ice) } }
+        }
+        giveSpecial(&world, "fire")
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, special: true, events: &events)
+        #expect(world.fireHazards.count == 6) // flames sit ON ice (unlike water)
+        #expect(world.terrain[5, 3].kind == .ice) // still ice while burning
+        tickAll(&world, 245, events: &events) // lifetime 240 elapses
+        #expect(world.fireHazards.isEmpty)
+        // Every flamed ice cell melted; unflamed ice (x=7 wasn't reached? steps cover 5,6,7) —
+        for x in 5...7 { for y in 3...4 {
+            #expect(world.terrain[x, y].kind == .ground, "cell (\(x),\(y)) did not melt")
+        } }
+        #expect(events.contains { if case .terrainChanged(5, 3, 0) = $0 { true } else { false } })
+    }
+
     @Test func dryFireOnEmptyAmmo() {
         var world = makeCombatWorld()
         giveSpecial(&world, "rapid", ammo: 0)
