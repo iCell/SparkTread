@@ -1,0 +1,3 @@
+[submodule "Vendor/SparkTreadPixel"]
+	path = Vendor/SparkTreadPixel
+	url = git@github.com:iCell/SparkTreadPixel.git

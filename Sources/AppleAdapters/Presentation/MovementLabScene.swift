@@ -265,19 +265,17 @@ final class MovementLabScene: SKScene {
                 }
                 guard let created = try? PixelTankNode(
                     kind: kind, weapon: weapon, direction: tank.facing.rawValue,
-                    pixelScale: artScale * 0.82, art: art) else { continue }
+                    pixelScale: artScale, art: art) else { continue }
                 created.zPosition = 500
                 addChild(created)
                 tankNodes[tank.entityID] = created
                 tankFacings[tank.entityID] = tank.facing
-                applyFacingScale(created, art: art)
                 node = created
             }
             node.position = centerPoint(tank.positionSubunits, size: footprint)
             if tankFacings[tank.entityID] != tank.facing {
                 tankFacings[tank.entityID] = tank.facing
                 try? node.setDirection(tank.facing.rawValue)
-                applyFacingScale(node, art: art)
             }
             syncShieldRing(node, art: art, shieldHP: tank.shieldHP, tick: world.tick)
             if let last = tankPositions[tank.entityID] {
@@ -302,22 +300,6 @@ final class MovementLabScene: SKScene {
         } else {
             collisionBox?.isHidden = true
         }
-    }
-
-    /// The delivery's 2.5D side views draw the tank body shorter than the
-    /// up/down views (e.g. player 30×26 up vs 30×22 right). Normalize the
-    /// perceived size with a per-facing uniform scale from the rig metadata
-    /// (owner-reported inconsistency); logical footprint is untouched.
-    private func applyFacingScale(_ node: PixelTankNode, art: PixelArt) {
-        let upKey = node.kind + "_up"
-        let currentKey = node.kind + "_" + PixelTankNode.directions[node.direction]
-        guard let up = art.manifest.rigs[upKey]?.bodyBounds,
-              let current = art.manifest.rigs[currentKey]?.bodyBounds,
-              current.count == 4, up.count == 4 else { return }
-        let upHeight = up[3] - up[1], currentHeight = current[3] - current[1]
-        guard currentHeight > 0 else { return }
-        let factor = min(1.3, max(1.0, upHeight / currentHeight))
-        node.setScale(CGFloat(factor))
     }
 
     /// Pulsing shield ring on tanks with shield hit points remaining.
@@ -350,14 +332,8 @@ final class MovementLabScene: SKScene {
             if let existing = projectileNodes[p.entityID] {
                 node = existing
             } else {
-                // Presentation-only sizing: heavier shells read bigger on
-                // screen (owner tuning); collision extents are unchanged.
-                let renderScale: CGFloat = switch p.weaponID {
-                case "ap": 1.35
-                case "explosion": 1.5
-                default: 0.8
-                }
-                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * renderScale)
+                // Revised art carries the per-weapon sizing; uniform scale.
+                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * 0.8)
                 else { continue }
                 created.zPosition = 650
                 created.zRotation = -CGFloat(p.direction.rawValue) * .pi / 2
@@ -430,7 +406,7 @@ final class MovementLabScene: SKScene {
     private func syncBase(_ art: PixelArt, world: WorldState) {
         guard let base = world.base else { return }
         if baseNode == nil {
-            let pixelScale = artScale * 0.82
+            let pixelScale = artScale
             baseNode = try? PixelBaseNode(pixelScale: pixelScale, art: art)
             if let baseNode {
                 // The base art's node origin is its GROUND anchor (source

@@ -63,12 +63,15 @@ xcrun simctl launch "iPhone 17" io.icell.sparktread
 
 `Scripts/check-architecture.sh` enforces the forbidden-dependency rules.
 
-## Pixel art delivery (PixelProduction)
+## Pixel art delivery (SparkTreadPixel submodule)
 
-`Resources/Pixel/` holds the PixelProduction delivery exactly per its
-integration contract: the 17 `.atlas` folders, `pixel_assets.json`, and the
-runtime adapters in `Sources/AppleAdapters/Presentation/Pixel/`
-(`PixelArt.swift`, `PixelPresentation.swift` — presentation only, no rules).
+The art lives in the `Vendor/SparkTreadPixel` git submodule
+(github.com/iCell/SparkTreadPixel) — clone with `--recursive` or run
+`git submodule update --init`. The app target references the submodule's
+17 `.atlas` folders and `pixel_assets.json` directly; the runtime adapters
+in `Sources/AppleAdapters/Presentation/Pixel/` are synced copies of the
+submodule's `Runtime/` (diff before upgrading). The app icon also comes
+from the submodule (copied into the asset catalog).
 Reference docs live in `docs/pixel/`. The app root is the M1
 `MovementLabView` (touch joystick, keyboard arrows/WASD, controller D-pad);
 launch env `MOVEMENT_LAB_AUTODRIVE=1` runs a scripted demo drive. The
