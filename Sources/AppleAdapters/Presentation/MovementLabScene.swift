@@ -272,6 +272,7 @@ final class MovementLabScene: SKScene {
                 try? node.setDirection(tank.facing.rawValue)
             }
             syncShieldRing(node, art: art, shieldHP: tank.shieldHP, tick: world.tick)
+            syncThreatMarker(node, art: art, tank: tank, tick: world.tick)
             if let last = tankPositions[tank.entityID] {
                 tankTravel[tank.entityID, default: 0] +=
                     abs(tank.positionSubunits.x - last.x) + abs(tank.positionSubunits.y - last.y)
@@ -316,6 +317,45 @@ final class MovementLabScene: SKScene {
         } else {
             node.childNode(withName: name)?.removeFromParent()
         }
+    }
+
+    /// Danger telegraph (§10.6): AP / Explosion / Fire / Mine enemies must
+    /// be recognizable as threats before they fire. A weapon-tinted danger
+    /// glyph floats above them, brightening when their weapon is off
+    /// cooldown (about to fire).
+    private func syncThreatMarker(_ node: PixelTankNode, art: PixelArt, tank: TankState, tick: Int) {
+        let name = "threat_marker"
+        let family = tank.ownerPlayerID == nil
+            ? String(tank.archetypeID.split(separator: "_").first ?? "") : ""
+        let dangerous = ["ap", "explosion", "fire", "mine"].contains(family)
+        guard dangerous else {
+            node.childNode(withName: name)?.removeFromParent()
+            return
+        }
+        let marker: SKSpriteNode
+        if let existing = node.childNode(withName: name) as? SKSpriteNode {
+            marker = existing
+        } else {
+            guard let created = try? art.sprite("px_status_danger_0", scale: artScale * 0.7) else { return }
+            created.name = name
+            created.zPosition = 8
+            created.position.y = CGFloat(SpatialUnits.standardTankFootprintSubunits) / 2
+                * (layout?.pointsPerSubunit ?? 0) + 6
+            let tint: SKColor = switch family {
+            case "ap": .systemPurple
+            case "explosion": .systemOrange
+            case "fire": .systemRed
+            default: .systemYellow // mine
+            }
+            created.color = tint
+            created.colorBlendFactor = 0.6
+            node.addChild(created)
+            marker = created
+        }
+        if let frame = try? art.texture("px_status_danger_\(tick / 8 % 5)") { marker.texture = frame }
+        // Bright when the family weapon is ready to fire; dim otherwise.
+        let ready = (tank.fireCooldowns[.normal] ?? 0) == 0 && (tank.fireCooldowns[.special] ?? 0) == 0
+        marker.alpha = ready ? 1.0 : 0.4
     }
 
     private func syncProjectiles(_ art: PixelArt, world: WorldState) {

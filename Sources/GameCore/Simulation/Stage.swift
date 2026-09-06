@@ -3,6 +3,11 @@
 /// EnemyDirector spawning (step 13), and win/loss resolution (step 14).
 /// Deterministic: ascending entity order, named RNG streams only.
 enum Stage {
+    /// The weapon family an enemy archetype fights with (its own family).
+    static func enemyFamily(_ archetypeID: String) -> String {
+        String(archetypeID.split(separator: "_").first ?? "normal")
+    }
+
     // MARK: - Step 3: EnemyBrain
 
     /// Emits internal TankIntents for enemy tanks (ADR-0002: never through
@@ -106,7 +111,27 @@ enum Stage {
                     shouldFire = true
                 }
             }
-            if shouldFire { fire[tank.entityID] = (normal: true, special: false) }
+            // Each family fights with its own weapon (§8, §10.6). Normal
+            // uses the free normal channel; the rest use the special channel
+            // carrying their family weapon. Mine layers drop mines on a
+            // throttled roll while driving (reference 20% cadence, §9.1) and
+            // still take basic shots when aligned.
+            let family = enemyFamily(tank.archetypeID)
+            var pressNormal = false, pressSpecial = false
+            switch family {
+            case "normal":
+                pressNormal = shouldFire
+            case "mine":
+                pressNormal = shouldFire
+                if (world.tick + tank.entityID * 7) % 24 == 0 && world.rng.ai.next(upperBound: 5) == 0 {
+                    pressSpecial = true // lay a mine (§9.1)
+                }
+            default: // rapid, fire, ap, explosion
+                pressSpecial = shouldFire
+            }
+            if pressNormal || pressSpecial {
+                fire[tank.entityID] = (normal: pressNormal, special: pressSpecial)
+            }
             world.tanks[index] = tank
         }
         return fire
@@ -379,6 +404,7 @@ enum Stage {
                         $0.equipmentID = attributes.equipmentID
                         $0.speedLevel = attributes.speedLevel
                         $0.powerLevel = attributes.powerLevel
+                        $0.specialWeaponID = enemyFamily(telegraph.archetypeID)
                         $0.spawnProtectionTicks = 30
                     }
                     events.append(.tankSpawned(entityID: id, position: telegraph.positionSubunits,

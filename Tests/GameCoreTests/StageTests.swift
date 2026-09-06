@@ -93,6 +93,76 @@ private func tick(_ world: inout WorldState, _ n: Int,
     }
 }
 
+@Suite struct EnemyFamilyFireTests {
+    /// Each family fires its own weapon: an aligned AP enemy launches AP
+    /// shells, an explosion enemy launches explosion shells, a fire enemy
+    /// lays flame — not everyone spraying normal rounds.
+    private func fireWorld(archetype: String, playerAhead: Bool = true) -> WorldState {
+        var terrain = TerrainGrid(arena: .universal)
+        let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
+        for x in 0..<w { terrain[x, 0] = TerrainCell(kind: .steel); terrain[x, h - 1] = TerrainCell(kind: .steel) }
+        for y in 0..<h { terrain[0, y] = TerrainCell(kind: .steel); terrain[w - 1, y] = TerrainCell(kind: .steel) }
+        var world = WorldState(terrain: terrain, seed: 3)
+        world.addPlayer(PlayerState(playerID: .one))
+        // Player to the LEFT of the enemy, same row, so a left-facing enemy aligns.
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 6 * 1024, y: 10 * 1024), facing: .right)
+        let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: archetype,
+                                    positionSubunits: Vec2i(x: 20 * 1024, y: 10 * 1024), facing: .left)
+        world.withTank(entityID: enemy) {
+            $0.spawnProtectionTicks = 0
+            $0.specialWeaponID = Stage.enemyFamily(archetype)
+        }
+        world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 2 * 1024, y: 22 * 1024))
+        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 1, enemyStartDelayTicks: 999999,
+                                 spawnPointsCells: [Vec2i(x: 4, y: 1)],
+                                 playerRespawnCell: Vec2i(x: 6, y: 10), dropTable: [])
+        return world
+    }
+
+    private func run(_ world: inout WorldState, _ n: Int) {
+        for _ in 0..<n { Simulation.step(&world, commands: [PlayerCommand(playerID: .one, targetTick: world.tick)]) }
+    }
+
+    @Test func apEnemyLaunchesAPShells() {
+        var world = fireWorld(archetype: "ap_a")
+        run(&world, 20)
+        #expect(world.projectiles.contains { $0.weaponID == "ap" && $0.teamID == 2 })
+    }
+
+    @Test func explosionEnemyLaunchesExplosionShells() {
+        var world = fireWorld(archetype: "explosion_a")
+        run(&world, 20)
+        #expect(world.projectiles.contains { $0.weaponID == "explosion" && $0.teamID == 2 })
+    }
+
+    @Test func fireEnemyLaysFlameThatDamagesPlayerNotItself() {
+        var world = fireWorld(archetype: "fire_a")
+        // Move the player adjacent so it stands in the flame lane.
+        world.withTank(entityID: 1) { $0.positionSubunits = Vec2i(x: 18 * 1024, y: 10 * 1024) }
+        run(&world, 40)
+        #expect(world.fireHazards.contains { $0.teamID == 2 })
+        // The enemy (team 2) is never hurt by its own team-2 flame.
+        let enemy = world.tanks.first { $0.teamID == 2 }
+        #expect(enemy != nil)
+    }
+
+    @Test func normalEnemyStillUsesNormalChannel() {
+        var world = fireWorld(archetype: "normal_c")
+        run(&world, 20)
+        #expect(world.projectiles.contains { $0.weaponID == "normal" && $0.teamID == 2 })
+    }
+
+    @Test func mineEnemyLaysMinesWhileDriving() {
+        var world = fireWorld(archetype: "mine_a")
+        world.withTank(entityID: 2) { $0.movementIntent = .down } // give it somewhere to go
+        run(&world, 200)
+        #expect(!world.mines.isEmpty)
+        #expect(world.mines.allSatisfy { $0.teamID == 2 })
+    }
+}
+
 @Suite struct EnemyDirectorTests {
     @Test func directorSpawnsFiniteCountsWithTelegraphAndCap() {
         var world = makeStageWorld(enemies: ["normal_a", "rapid_a", "normal_b"], maxAlive: 2)
