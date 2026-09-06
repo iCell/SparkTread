@@ -143,7 +143,9 @@ public enum Simulation {
             || (tank.bufferedDirection != nil && tank.bufferedDirectionRemainingTicks > 0)
         guard moving else { return }
 
-        tank.movementAccumulator += ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+        tank.movementAccumulator += tank.ownerPlayerID != nil
+            ? ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+            : ruleset.enemyAccumulatorIncrement(speedLevel: tank.speedLevel)
         let wholeSubunits = tank.movementAccumulator / MovementRuleset.accumulatorUnitsPerSubunit
         tank.movementAccumulator %= MovementRuleset.accumulatorUnitsPerSubunit
         guard wholeSubunits > 0 else { return }
@@ -212,7 +214,9 @@ public enum Simulation {
         _ tank: TankState, to desired: Direction, field: ObstacleField, ruleset: MovementRuleset
     ) -> Bool {
         let lane = SpatialUnits.subunitsPerQuadrant
-        let perTick = ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+        let perTick = (tank.ownerPlayerID != nil
+            ? ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+            : ruleset.enemyAccumulatorIncrement(speedLevel: tank.speedLevel))
             / MovementRuleset.accumulatorUnitsPerSubunit
         let reach = perTick * ruleset.turnBufferTicks + ruleset.alignmentAssistWindowSubunits
         let travelAxisIsX = tank.facing.vector.x != 0

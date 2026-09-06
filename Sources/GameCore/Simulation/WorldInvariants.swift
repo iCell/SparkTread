@@ -29,7 +29,8 @@ public enum WorldInvariants {
             if tank.armor < 0 || tank.armor > tank.maxArmor {
                 issues.append("tank \(id) armor \(tank.armor) outside 0...\(tank.maxArmor)")
             }
-            if !(0...3).contains(tank.speedLevel) { issues.append("tank \(id) speed level \(tank.speedLevel)") }
+            let speedRange = tank.ownerPlayerID != nil ? 0...3 : -4...4 // §15.3
+            if !speedRange.contains(tank.speedLevel) { issues.append("tank \(id) speed level \(tank.speedLevel)") }
             if !(0...3).contains(tank.powerLevel) { issues.append("tank \(id) power level \(tank.powerLevel)") }
             if tank.bufferedDirectionRemainingTicks < 0 {
                 issues.append("tank \(id) negative buffer ticks")

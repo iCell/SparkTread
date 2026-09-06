@@ -87,6 +87,7 @@ public struct StageState: Codable, Equatable, Sendable {
 public enum EnemyArchetypes {
     public struct Attributes: Sendable {
         public let armor: Int
+        /// Enemy speed level -4…4 (reference curve; 0 = 0.6× player base).
         public let speedLevel: Int
         public let powerLevel: Int
         public let score: Int
@@ -94,22 +95,59 @@ public enum EnemyArchetypes {
         public let shieldHP: Int
         /// 0–100: how strongly this archetype pressures the base over the player.
         public let baseFocusPercent: Int
+        /// Equipment variant (mine/traversal interactions, §8.6).
+        public let equipmentID: String?
     }
 
+    /// The reference-recovered per-slot table (GAME_MECHANICS_SPEC §8.2):
+    /// each weapon family has a distinct property identity — Normal is
+    /// 1-armor teaching fodder, Rapid is fragile but the fastest thing on
+    /// the field, AP is a 5–6-armor near-stationary fortress, and so on.
+    /// (armor, enemy speed level -4…4, power level, equipment, score).
+    /// Scores are provisional (the reference reward-class semantics are
+    /// unverified); shields are a modern addition on the AP heavies.
+    private static let referenceTable: [String: (Int, Int, Int, String?, Int)] = [
+        "normal_a": (1, -1, 0, nil, 100),
+        "normal_b": (1, -1, 1, "amphi_tank", 150),
+        "normal_c": (1, 0, 1, nil, 200),
+        "normal_d": (1, 0, 2, "shield_of_moon", 250),
+        "rapid_a": (1, 1, 0, nil, 200),
+        "rapid_b": (1, 1, 1, "anti_skid", 250),
+        "rapid_c": (2, 2, 2, nil, 300),
+        "rapid_d": (2, 2, 3, "memory_of_sea", 350),
+        "fire_a": (2, -1, 0, nil, 300),
+        "fire_b": (2, -1, 1, nil, 350),
+        "fire_c": (3, 0, 2, nil, 400),
+        "fire_d": (3, 0, 3, "shield_of_moon", 450),
+        "ap_a": (5, -4, 0, nil, 400),
+        "ap_b": (5, -3, 1, nil, 450),
+        "ap_c": (6, -4, 1, nil, 500),
+        "ap_d": (6, -3, 2, "amphi_tank", 550),
+        "explosion_a": (3, -1, 0, nil, 300),
+        "explosion_b": (3, -1, 1, "amphi_tank", 350),
+        "explosion_c": (4, -2, 2, nil, 400),
+        "explosion_d": (4, -2, 3, "anti_skid", 450),
+        "mine_a": (2, -1, 0, nil, 200),
+        "mine_b": (2, -1, 1, "anti_skid", 250),
+        "mine_c": (2, 0, 1, nil, 300),
+        "mine_d": (2, 0, 2, "memory_of_sea", 350),
+    ]
+
     public static func attributes(for archetypeID: String) -> Attributes {
-        let tier = archetypeID.split(separator: "_").last.map(String.init) ?? "a"
         let family = archetypeID.split(separator: "_").first.map(String.init) ?? "normal"
-        let base: Attributes = switch tier {
-        case "b": Attributes(armor: 3, speedLevel: 0, powerLevel: 0, score: 200, shieldHP: 0, baseFocusPercent: 55)
-        case "c": Attributes(armor: 4, speedLevel: 1, powerLevel: 1, score: 300, shieldHP: 2, baseFocusPercent: 60)
-        case "d": Attributes(armor: 5, speedLevel: 2, powerLevel: 1, score: 400, shieldHP: 3, baseFocusPercent: 65)
-        default: Attributes(armor: 2, speedLevel: 1, powerLevel: 0, score: 100, shieldHP: 0, baseFocusPercent: 50)
+        let row = referenceTable[archetypeID] ?? (1, -1, 0, nil, 100)
+        // Modern addition (owner shield rule): the AP fortresses carry the
+        // damage shields — the archetype that teaches "switch to explosives".
+        let shield = archetypeID == "ap_c" ? 2 : archetypeID == "ap_d" ? 3 : 0
+        // Rapid family hunts the player; AP/explosion lean into the base.
+        let baseFocus = switch family {
+        case "rapid": 30
+        case "ap", "explosion": 70
+        default: 50
         }
-        // Rapid family hunts the player harder; normal family leans base.
-        let bias = family == "rapid" ? -20 : 0
-        return Attributes(armor: base.armor, speedLevel: base.speedLevel,
-                          powerLevel: base.powerLevel, score: base.score, shieldHP: base.shieldHP,
-                          baseFocusPercent: max(0, min(100, base.baseFocusPercent + bias)))
+        return Attributes(armor: row.0, speedLevel: row.1, powerLevel: row.2,
+                          score: row.4, shieldHP: shield, baseFocusPercent: baseFocus,
+                          equipmentID: row.3)
     }
 }
 

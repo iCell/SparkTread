@@ -9,8 +9,12 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
     /// Reference-derived: ~45 reference pixels/s × 64 subunits (ADR-0001).
     public var baseSpeedSubunitsPerSecond: Int
 
-    /// Speed multipliers per level, in permille (§7.2: 1.000/1.260/1.588/2.000).
+    /// Player speed multipliers per level, in permille (§7.2).
     public var speedMultipliersPermille: [Int]
+
+    /// Enemy speed multipliers for levels -4…4, in permille (reference table,
+    /// GAME_MECHANICS_SPEC §8.3; level 0 is 0.6× the player base, NOT 1.0×).
+    public var enemySpeedMultipliersPermille: [Int]
 
     /// How long a pre-pressed turn stays buffered (§6.3).
     public var turnBufferTicks: Int
@@ -27,11 +31,13 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
 
     public init(baseSpeedSubunitsPerSecond: Int = 2880,
                 speedMultipliersPermille: [Int] = [1000, 1260, 1588, 2000],
+                enemySpeedMultipliersPermille: [Int] = [150, 216, 300, 432, 600, 864, 1200, 1728, 2400],
                 turnBufferTicks: Int = 10,
                 alignmentAssistWindowSubunits: Int = 256,
                 collisionInsetSubunits: Int = 64) {
         self.baseSpeedSubunitsPerSecond = baseSpeedSubunitsPerSecond
         self.speedMultipliersPermille = speedMultipliersPermille
+        self.enemySpeedMultipliersPermille = enemySpeedMultipliersPermille
         self.turnBufferTicks = turnBufferTicks
         self.alignmentAssistWindowSubunits = alignmentAssistWindowSubunits
         self.collisionInsetSubunits = collisionInsetSubunits
@@ -45,6 +51,12 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
     public func accumulatorIncrement(speedLevel: Int) -> Int {
         let clamped = max(0, min(speedMultipliersPermille.count - 1, speedLevel))
         return baseSpeedSubunitsPerSecond * speedMultipliersPermille[clamped]
+    }
+
+    /// AI tanks use the reference enemy speed curve (levels -4…4).
+    public func enemyAccumulatorIncrement(speedLevel: Int) -> Int {
+        let index = max(0, min(enemySpeedMultipliersPermille.count - 1, speedLevel + 4))
+        return baseSpeedSubunitsPerSecond * enemySpeedMultipliersPermille[index]
     }
 
     public static let accumulatorUnitsPerSubunit = 1000 * ticksPerSecond

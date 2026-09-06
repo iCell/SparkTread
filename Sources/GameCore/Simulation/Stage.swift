@@ -376,6 +376,7 @@ enum Stage {
                         $0.armor = attributes.armor
                         $0.maxArmor = attributes.armor
                         $0.shieldHP = attributes.shieldHP
+                        $0.equipmentID = attributes.equipmentID
                         $0.speedLevel = attributes.speedLevel
                         $0.powerLevel = attributes.powerLevel
                         $0.spawnProtectionTicks = 30

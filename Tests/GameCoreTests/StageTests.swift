@@ -37,6 +37,62 @@ private func tick(_ world: inout WorldState, _ n: Int,
     }
 }
 
+@Suite struct EnemyArchetypeTests {
+    /// The reference-recovered table (GAME_MECHANICS_SPEC §8.2) gives each
+    /// family a distinct identity: AP heavies are near-immobile fortresses,
+    /// Rapids the fastest, Normals fragile teaching fodder.
+    @Test func familiesHaveDistinctReferenceIdentities() {
+        let normalA = EnemyArchetypes.attributes(for: "normal_a")
+        #expect(normalA.armor == 1 && normalA.speedLevel == -1)
+
+        let apC = EnemyArchetypes.attributes(for: "ap_c")
+        #expect(apC.armor == 6) // fortress
+        #expect(apC.speedLevel == -4) // slowest possible
+        #expect(apC.shieldHP == 2) // AP heavies carry the shield
+
+        let rapidD = EnemyArchetypes.attributes(for: "rapid_d")
+        #expect(rapidD.speedLevel == 2) // fastest tier
+        #expect(rapidD.equipmentID == "memory_of_sea")
+        #expect(rapidD.baseFocusPercent == 30) // hunts the player
+
+        let apA = EnemyArchetypes.attributes(for: "ap_a")
+        #expect(apA.baseFocusPercent == 70) // sieges the base
+    }
+
+    /// Enemy speed level 0 is 0.6× the player base, and the curve spans
+    /// -4…4 (reference §8.3); AP fortresses really are slow.
+    @Test func enemySpeedCurveMatchesReference() {
+        let ruleset = MovementRuleset.provisional
+        let apSpeed = ruleset.enemyAccumulatorIncrement(speedLevel: -4)
+        let rapidSpeed = ruleset.enemyAccumulatorIncrement(speedLevel: 2)
+        let playerBase = ruleset.accumulatorIncrement(speedLevel: 0)
+        #expect(apSpeed < playerBase / 5) // 0.15× vs 1.0×
+        #expect(rapidSpeed > playerBase) // 1.2× — outruns the player
+    }
+
+    /// AP fortresses crawl; rapids sprint — same tick budget, very different
+    /// distance covered.
+    @Test func fortressMovesFarSlowerThanSprinter() {
+        func distance(archetype: String) -> Int {
+            var terrain = TerrainGrid(arena: .universal)
+            var world = WorldState(terrain: terrain, seed: 5)
+            let attr = EnemyArchetypes.attributes(for: archetype)
+            let id = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: archetype,
+                                     positionSubunits: Vec2i(x: 5000, y: 5000), facing: .right)
+            world.withTank(entityID: id) { $0.spawnProtectionTicks = 0; $0.speedLevel = attr.speedLevel }
+            // No stage → drive it manually by forcing intent each tick.
+            for _ in 0..<120 {
+                world.withTank(entityID: id) { $0.movementIntent = .right }
+                Simulation.step(&world, commands: [])
+            }
+            return world.tank(entityID: id)!.positionSubunits.x - 5000
+        }
+        let fortress = distance(archetype: "ap_c")   // speed -4
+        let sprinter = distance(archetype: "rapid_c") // speed 2
+        #expect(sprinter > fortress * 4)
+    }
+}
+
 @Suite struct EnemyDirectorTests {
     @Test func directorSpawnsFiniteCountsWithTelegraphAndCap() {
         var world = makeStageWorld(enemies: ["normal_a", "rapid_a", "normal_b"], maxAlive: 2)

@@ -66,9 +66,11 @@ public enum VS01Stage {
         world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 24 * cell))
 
         // Finite composition (VS-01: primarily normal and rapid).
+        // A cross-section of the roster so each family's identity reads on
+        // the field: fast fragile rapids, tanky slow APs, mid explosions.
         let composition: [(String, Int)] = [
-            ("normal_a", 5), ("rapid_a", 3), ("normal_b", 4), ("rapid_b", 2),
-            ("normal_c", 2), // shielded armored tier for resistance testing
+            ("normal_a", 4), ("normal_b", 2), ("rapid_a", 3), ("rapid_c", 1),
+            ("ap_a", 2), ("ap_c", 1), ("explosion_a", 2), ("mine_a", 1),
         ]
         var queue: [String] = []
         // Interleave archetypes deterministically for varied pressure.
