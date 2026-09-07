@@ -1,8 +1,9 @@
 #!/bin/sh
 # M0 architecture check (§14.1, D-017): detects forbidden dependencies.
 # - GameCore imports nothing (not even Foundation).
-# - GameApplication imports only GameCore (plus Foundation/Testing helpers later
-#   would require an ADR; today it is GameCore only).
+# - GameApplication may import GameCore and Foundation (content-loading use
+#   cases live here, §14 — JSON decoding needs Foundation), but never a
+#   presentation/platform framework (SpriteKit/SwiftUI/UIKit/GameController…).
 # Run from the repository root: sh Scripts/check-architecture.sh
 set -eu
 
@@ -17,9 +18,10 @@ fi
 
 app_imports=$(grep -rhE '^[[:space:]]*(@[A-Za-z_() ]+[[:space:]]+)?import[[:space:]]' Sources/GameApplication --include='*.swift' \
     | sed -E 's/^[[:space:]]*(@[A-Za-z_() ]+[[:space:]]+)?import[[:space:]]+//' | sort -u || true)
-bad_app=$(echo "$app_imports" | grep -vE '^(GameCore)?$' || true)
+# Allowed: GameCore, Foundation. Forbidden: any presentation/platform module.
+bad_app=$(echo "$app_imports" | grep -vE '^(GameCore|Foundation)?$' || true)
 if [ -n "$bad_app" ]; then
-    echo "FORBIDDEN: Sources/GameApplication may only import GameCore; found:"
+    echo "FORBIDDEN: Sources/GameApplication may only import GameCore or Foundation; found:"
     echo "$bad_app"
     fail=1
 fi

@@ -20,6 +20,8 @@ targets:
         buildPhase: resources
       - path: Vendor/SparkTreadPixel/Metadata/pixel_assets.json
         buildPhase: resources
+      - path: Content/stages
+        buildPhase: resources
     dependencies:
       - package: GoldenEagleKit
         product: AppleAdapters

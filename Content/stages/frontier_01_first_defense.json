@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "frontier_01_first_defense",
+  "displayNameKey": "stage.vs01.name",
+  "themeID": "frontier",
+  "arenaSpecID": "universal",
+  "seed": "6220368498519528019",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "brick",
+        "rects": [
+          [6, 6, 9, 7], [16, 6, 21, 7], [28, 6, 33, 7], [40, 8, 43, 9], [48, 6, 51, 7],
+          [10, 12, 13, 13], [22, 12, 27, 13], [36, 14, 39, 15], [46, 12, 49, 13],
+          [4, 17, 7, 18], [16, 17, 19, 18], [30, 19, 33, 20]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [[26, 24, 26, 25], [29, 24, 29, 25]]
+      },
+      {
+        "kind": "brick",
+        "cells": [[26, 23], [27, 23], [28, 23], [29, 23]]
+      },
+      { "kind": "water", "rects": [[12, 9, 15, 11]] },
+      { "kind": "ice", "rects": [[42, 19, 45, 21]] }
+    ]
+  },
+  "baseSpawn": [27, 24],
+  "playerSpawnsByID": { "1": [21, 24] },
+  "enemyComposition": [
+    { "archetype": "normal_a", "count": 4 },
+    { "archetype": "normal_b", "count": 2 },
+    { "archetype": "rapid_a", "count": 3 },
+    { "archetype": "rapid_c", "count": 1 },
+    { "archetype": "ap_a", "count": 2 },
+    { "archetype": "ap_c", "count": 1 },
+    { "archetype": "explosion_a", "count": 2 },
+    { "archetype": "mine_a", "count": 1 }
+  ],
+  "enemySpawns": [[4, 1], [27, 1], [50, 1]],
+  "maxAliveEnemies": 4,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [{ "id": "power_up", "cell": [14, 16] }],
+  "dropTable": ["speed_up", "power_up", "armor_up", "ammo_crate", "base_shield", "invincibility", "rapid_weapon", "bomb"],
+  "dropChancePercent": 45
+}

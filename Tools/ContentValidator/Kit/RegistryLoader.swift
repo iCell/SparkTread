@@ -60,6 +60,33 @@ public enum RegistryLoader {
                 file: "Schemas/id_registry.json", field: "-",
                 message: "missing; the stable-ID registry is required (GE-020)")]
         }
-        return validateRegistry(at: registry)
+        var issues = validateRegistry(at: registry)
+        issues.append(contentsOf: validateStages(in: root))
+        return issues
+    }
+
+    /// Validates every stage JSON under `Content/stages` (§15.3) through the
+    /// GameApplication StageValidator.
+    public static func validateStages(in root: URL) -> [ContentIssue] {
+        let dir = root.appendingPathComponent("stages")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil) else { return [] }
+        var issues: [ContentIssue] = []
+        for url in entries.filter({ $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let file = "stages/" + url.lastPathComponent
+            guard let data = try? Data(contentsOf: url) else {
+                issues.append(ContentIssue(file: file, field: "-", message: "cannot read file"))
+                continue
+            }
+            do {
+                let def = try StageLoader.decode(data)
+                for message in StageValidator.validate(def) {
+                    issues.append(ContentIssue(file: file, field: def.id.isEmpty ? "-" : def.id, message: message))
+                }
+            } catch {
+                issues.append(ContentIssue(file: file, field: "-", message: "invalid stage JSON: \(error)"))
+            }
+        }
+        return issues
     }
 }
