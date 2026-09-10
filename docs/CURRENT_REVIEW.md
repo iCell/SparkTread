@@ -657,6 +657,40 @@ Owner: "把前 5 项给做完吧" and, for the maps, "按照原来地图，但�
   retry from checkpoint, completion, restart), every shipped stage
   validated/built/numbered, replay format 4 boundary.
 
+## M4 item 2 — screen flow (2026-09-10 late evening)
+
+Plan §12.1 "Title → Campaign / Stage Select → Stage Intro → Gameplay →
+Pause (overlay) → Stage Results → Next Stage / Retry / Exit", provisional
+text treatment (no Phase 1 art):
+
+- `AppRootView` renders `AppFlowModel` (pure state: title, campaign
+  select, playing; stage unlock = first or predecessor completed;
+  suggested stage = first not completed; completed stages recorded per
+  app run until the checkpoint save lands). Title: 开始战役 / 训练场.
+  Campaign select: one card per stage (number/subtitle from the id,
+  已通关 / 可进入 / 未解锁, suggested card highlighted), 返回. The game screen
+  gets an exit callback (返回标题 on the pause overlay, on a loss and after
+  the campaign completes). Launch environment: `SPARKTREAD_AUTOSTART=1`
+  skips the title into the campaign (the render smoke test uses it),
+  `MOVEMENT_LAB=1` into the lab.
+- Pause is an explicit controller state (ADR-0007): `pause()` stops the
+  clock and closes the input gate, `resume()` restarts with a fresh
+  clock; activations do not lift a pause. Losing the active state
+  MID-PLAY becomes a player-visible pause (the overlay waits for 继续);
+  during an intro, outro or results it just suspends and resumes as
+  before. The pause/back action (§6.3) is keyboard Escape/P and the
+  gamepad Menu button (provisional bindings) plus a HUD button; the
+  press is an edge outside the activity gate (the same key resumes) and
+  is polled by the view's flow timer, not the tick. Overlay: 继续 /
+  重新开始本关 / 返回标题.
+- Tests (279 / 70): `AppFlowModelTests`, `PauseBindingTests`,
+  `PauseLifecycleTests` (clock stopped, input refused, activation keeps
+  the pause, inactivity mid-play pauses, intro just suspends, restart
+  clears the pause).
+- Not in this item: settings, input-selection screen, accessibility
+  options (M4 "settings, accessibility baseline, controller support" is
+  the owner's item 6).
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -679,5 +713,5 @@ Do not interpret green tests as product completion:
   A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
   icons; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
-  is in progress: item 1 (campaign progression) landed (ADR-0013
-  proposed), items 2–5 follow.
+  is in progress: items 1 (campaign progression, ADR-0013 proposed) and
+  2 (screen flow) landed; items 3–5 follow.

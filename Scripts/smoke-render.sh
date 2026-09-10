@@ -154,7 +154,7 @@ $SIMCTL boot "$device" > /dev/null 2>&1 || true
 $SIMCTL bootstatus "$device" -b > /dev/null 2>&1 || { echo "smoke-render: simulator did not boot"; exit 1; }
 $SIMCTL install "$device" "$app" || { echo "smoke-render: install failed"; exit 1; }
 status=0
-check stage "" 5 || status=1          # startup + 3.1 s intro, then retries up to 9 s more
+check stage SPARKTREAD_AUTOSTART 5 || status=1  # past the title, startup + 3.1 s intro, then retries up to 9 s more
 check lab MOVEMENT_LAB 2 || status=1  # no intro
 $SIMCTL terminate "$device" io.icell.sparktread > /dev/null 2>&1 || true
 exit $status

@@ -189,6 +189,7 @@ public final class MovementLabController {
     }
 
     private func replaceSession(_ next: MovementLabSession) {
+        isPaused = false
         pendingEvents.removeAll()
         audio.resetForNewWorld()
         session = next
@@ -312,6 +313,47 @@ public final class MovementLabController {
 
     /// View gone: same as a suspension.
     public func stop() { suspend() }
+
+    // MARK: - Pause (plan §12.1 "Pause (overlay)", ADR-0007: an explicit
+    // application-layer state, never a side effect of view state)
+
+    /// The game is paused by the player or by an interruption during
+    /// play: the clock is stopped and stays stopped through activations
+    /// until `resume()`.
+    public private(set) var isPaused = false
+
+    /// Pauses a running game (no-op while already paused or not running).
+    public func pause() {
+        guard isRunning, !isPaused else { return }
+        isPaused = true
+        suspend()
+    }
+
+    /// Resumes from the pause overlay with a fresh clock.
+    public func resume() {
+        guard isPaused else { return }
+        isPaused = false
+        start()
+    }
+
+    /// Toggle for the pause/back action.
+    public func togglePause() { isPaused ? resume() : pause() }
+
+    /// §17.5: losing the active state pauses immediately; mid-play it
+    /// becomes a PLAYER-visible pause (the overlay waits for "继续"), while
+    /// an intro, outro or results screen simply resumes on return.
+    public func applicationDidBecomeInactive() {
+        let midPlay = isRunning && flow.allowsSimulation && stagePhase == .playing
+        suspend()
+        if midPlay { isPaused = true }
+    }
+
+    /// Returning to the active state resumes the clock unless the game is
+    /// paused (then the overlay's "继续" does).
+    public func applicationDidBecomeActive() {
+        guard !isPaused else { return }
+        start()
+    }
 
     /// ONE input-admission policy (R11-02): input is accepted only while
     /// the clock runs AND the flow is in play. Every transition releases
@@ -528,11 +570,24 @@ enum HUDLabels {
 /// `MOVEMENT_LAB=1`: SpriteKit full-map presentation,
 /// touch controls, hardware keyboard and controller, provisional HUD.
 public struct MovementLabView: View {
-    @State private var controller = MovementLabController()
+    @State private var controller: MovementLabController
     @State private var scene: MovementLabScene?
     @Environment(\.scenePhase) private var scenePhase
+    /// Leave the game screen (pause overlay "返回标题", results "返回标题").
+    private let onExit: (() -> Void)?
 
-    public init() {}
+    /// The app's default: the bundled campaign (or the lab with
+    /// MOVEMENT_LAB=1), no exit.
+    public init() {
+        _controller = State(initialValue: MovementLabController())
+        onExit = nil
+    }
+
+    /// A game screen for a controller the root created (title flow).
+    public init(controller: MovementLabController, onExit: (() -> Void)? = nil) {
+        _controller = State(initialValue: controller)
+        self.onExit = onExit
+    }
 
     @State private var selectedWeapon = "rapid"
     @State private var powerLevel = 0
@@ -566,31 +621,97 @@ public struct MovementLabView: View {
                 #if canImport(UIKit)
                 // The reference shows no controls over its card or results;
                 // the simulation does not step there either (ADR-0011).
-                if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase) {
+                if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused {
                     TouchControlsView(controller: controller)
                         .ignoresSafeArea()
                 }
                 #endif
                 if controller.isLab { weaponDebugPanel }
                 stageHUD
+                if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused { pauseButton }
                 stageFlowOverlay(size: geometry.size)
+                if paused { pauseOverlay }
             }
             .onChange(of: geometry.size) { _, size in scene?.surfaceDidChange(to: size) }
-            .onReceive(flowTimer) { _ in syncFlow() }
+            .onReceive(flowTimer) { _ in
+                syncFlow()
+                // The pause/back action is polled here, outside the tick: a
+                // paused game has no ticks to consume it.
+                if controller.input.consumePauseRequest(), controller.isPaused || controller.flow.allowsSimulation {
+                    controller.togglePause()
+                }
+                if paused != controller.isPaused { paused = controller.isPaused }
+                scene?.isPaused = scenePhase != .active || controller.isPaused
+            }
         }
         .ignoresSafeArea()
         .background(Color.black)
         .persistentSystemOverlays(.hidden)
         .deferringBottomSystemGestures() // ADR-0004 §1
-        .onAppear { if scenePhase == .active { controller.start() } }
+        .onAppear { if scenePhase == .active { controller.applicationDidBecomeActive() } }
         .onDisappear { controller.stop() }
         .onChange(of: scenePhase) { _, phase in
-            scene?.isPaused = phase != .active // parks SKActions while inactive
-            // §17.5: losing the active state pauses immediately; returning
-            // resumes with a fresh clock (no tick burst).
-            if phase == .active { controller.start() } else { controller.suspend() }
+            // §17.5: losing the active state pauses immediately (mid-play as
+            // a player-visible pause); returning resumes with a fresh clock
+            // (no tick burst) unless the pause overlay is up.
+            if phase == .active { controller.applicationDidBecomeActive() } else { controller.applicationDidBecomeInactive() }
+            paused = controller.isPaused
+            scene?.isPaused = phase != .active || controller.isPaused // parks SKActions
         }
         .onReceive(hudTimer) { _ in hudTick &+= 1 }
+    }
+
+    /// Mirrors `controller.isPaused` into view state (SwiftUI does not
+    /// observe the controller).
+    @State private var paused = false
+
+    private var pauseButton: some View {
+        Button {
+            controller.pause()
+            paused = controller.isPaused
+        } label: {
+            Image(systemName: "pause.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(10)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.trailing, 14)
+        .padding(.top, 6)
+    }
+
+    /// Pause overlay (plan §12.1): resume, restart the stage, exit.
+    private var pauseOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+            VStack(spacing: 14) {
+                Text("暂停")
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(Color.yellow)
+                menuButton("继续") { controller.resume(); paused = false }
+                if controller.stagePhase != nil {
+                    menuButton("重新开始本关") { controller.restart(); controller.resume(); paused = false }
+                }
+                if let onExit {
+                    menuButton("返回标题") { controller.stop(); onExit() }
+                }
+            }
+            .padding(28)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.95)))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(red: 0.93, green: 0.72, blue: 0.2), lineWidth: 3))
+        }
+    }
+
+    private func menuButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.black)
+                .frame(minWidth: 200)
+                .padding(.vertical, 10)
+                .background(Capsule().fill(Color.white))
+        }
     }
 
     /// Provisional stage HUD (§12.2): player panel (lives, armor, weapon and
@@ -817,26 +938,12 @@ public struct MovementLabView: View {
                     Text("战役完成")
                         .font(.system(size: compact ? 15 : 17, weight: .heavy))
                         .foregroundStyle(Color.yellow)
-                    Button {
-                        controller.restartCampaign()
-                    } label: {
-                        Text("再来一局")
-                            .font(.system(size: compact ? 15 : 17, weight: .bold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 18).padding(.vertical, compact ? 6 : 8)
-                            .background(Capsule().fill(Color.white))
-                    }
+                    footerButton("再来一局", compact: compact) { controller.restartCampaign() }
+                    if let onExit { footerButton("返回标题", compact: compact) { controller.stop(); onExit() } }
                 }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
-                    Button {
-                        controller.restart()
-                    } label: {
-                        Text("重新开始")
-                            .font(.system(size: compact ? 15 : 17, weight: .bold))
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 18).padding(.vertical, compact ? 6 : 8)
-                            .background(Capsule().fill(Color.white))
-                    }
+                    footerButton("重新开始", compact: compact) { controller.restart() }
+                    if let onExit { footerButton("返回标题", compact: compact) { controller.stop(); onExit() } }
                 }
             }
             .padding(.horizontal, 14)
@@ -846,6 +953,16 @@ public struct MovementLabView: View {
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.94)))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.93, green: 0.72, blue: 0.2), lineWidth: 3))
         .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+    }
+
+    private func footerButton(_ title: String, compact: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: compact ? 15 : 17, weight: .bold))
+                .foregroundStyle(.black)
+                .padding(.horizontal, 16).padding(.vertical, compact ? 6 : 8)
+                .background(Capsule().fill(Color.white))
+        }
     }
 
     /// One category of a table row: the tank icon (or its label while the

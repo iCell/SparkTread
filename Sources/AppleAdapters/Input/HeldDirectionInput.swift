@@ -48,6 +48,10 @@ public final class HeldDirectionStore {
 
     /// Uptime of the last `releaseAll`; callbacks queued before it are stale.
     public private(set) var lastResetUptime: TimeInterval = 0
+    /// An unconsumed pause/back press (§6.3 "pause/back"). NOT behind the
+    /// activity gate: the same press resumes a paused game, when the gate
+    /// is closed. Consumed by the view's flow timer, not the tick.
+    private var pendingPause = false
 
     public init() {}
 
@@ -139,6 +143,15 @@ public final class HeldDirectionStore {
         return !pendingNormalPulses.isEmpty
     }
 
+    /// A pause/back press edge (keyboard Escape/P, gamepad menu, the HUD
+    /// button): one toggle per consume however many sources pressed.
+    public func requestPause() { pendingPause = true }
+
+    public func consumePauseRequest() -> Bool {
+        defer { pendingPause = false }
+        return pendingPause
+    }
+
     public func pressSpecialFire(from source: InputSource = .default) {
         guard isAcceptingInput else { return }
         specialHolders.insert(source)
@@ -183,20 +196,26 @@ public enum PhysicalBindings {
         case move(Direction)
         case normalFire
         case specialFire
+        /// Pause/back (§6.3): an edge that toggles the pause overlay.
+        case pause
     }
 
     /// Keyboard: arrows/WASD move, J/U normal fire, K/I special fire (the
-    /// reference defaults, provisional). Keys are their own sources.
+    /// reference defaults, provisional), Escape/P pause. Keys are their
+    /// own sources.
     public static let keyboard: [String: Action] = [
         "Up": .move(.up), "Right": .move(.right), "Down": .move(.down), "Left": .move(.left),
         "W": .move(.up), "D": .move(.right), "S": .move(.down), "A": .move(.left),
         "J": .normalFire, "U": .normalFire,
         "K": .specialFire, "I": .specialFire,
+        "Escape": .pause, "P": .pause,
     ]
 
-    /// Gamepad: A normal fire, B and X special fire, each its own control.
+    /// Gamepad: A normal fire, B and X special fire, Menu pause — each its
+    /// own control.
     public static let controllerButtons: [String: Action] = [
         "buttonA": .normalFire, "buttonB": .specialFire, "buttonX": .specialFire,
+        "buttonMenu": .pause,
     ]
 
     /// Applies a digital action to the store for one source.
@@ -210,6 +229,8 @@ public enum PhysicalBindings {
             pressed ? store.pressNormalFire(from: source) : store.releaseNormalFire(from: source)
         case .specialFire:
             pressed ? store.pressSpecialFire(from: source) : store.releaseSpecialFire(from: source)
+        case .pause:
+            if pressed { store.requestPause() }
         }
     }
 
@@ -282,6 +303,7 @@ public final class PhysicalInputAdapter {
             .upArrow: "Up", .rightArrow: "Right", .downArrow: "Down", .leftArrow: "Left",
             .keyW: "W", .keyD: "D", .keyS: "S", .keyA: "A",
             .keyJ: "J", .keyU: "U", .keyK: "K", .keyI: "I",
+            .escape: "Escape", .keyP: "P",
         ]
         let store = self.store, generations = self.generations
         keyboard.keyboardInput?.keyChangedHandler = { _, _, keyCode, pressed in
@@ -305,6 +327,7 @@ public final class PhysicalInputAdapter {
         }
         let buttons: [(String, GCControllerButtonInput)] = [
             ("buttonA", pad.buttonA), ("buttonB", pad.buttonB), ("buttonX", pad.buttonX),
+            ("buttonMenu", pad.buttonMenu),
         ]
         for (control, button) in buttons {
             guard let action = PhysicalBindings.controllerButtons[control] else { continue }
