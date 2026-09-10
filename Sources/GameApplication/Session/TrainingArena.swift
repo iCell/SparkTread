@@ -1,8 +1,8 @@
 import GameCore
 
 /// The Training Arena (plan §5.2; owner direction 2026-09-10 late evening):
-/// every terrain kind and wall state, every enemy archetype driving and
-/// firing its family weapon, a pickup spawner, an invulnerable base, a
+/// every terrain kind and wall state, one enemy per weapon family driving
+/// and firing its family weapon, a pickup spawner, an invulnerable base, a
 /// player with practically unlimited lives, and enemies that respawn the
 /// moment they die. The arena is a stage world (the enemy brain and the
 /// player lifecycle need one) whose objective can never resolve; its
@@ -30,9 +30,10 @@ public enum TrainingArenaFixture {
         "score_200", "score_500", "score_1000", "score_2000",
     ]
 
-    /// Every enemy archetype (six families × four tiers), in the §8.2 order.
-    public static let enemyArchetypes: [String] = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
-        .flatMap { family in ["a", "b", "c", "d"].map { "\(family)_\($0)" } }
+    /// One enemy per weapon family (owner 2026-09-10: "一种类型的坦克一个就可以了"),
+    /// the A tier of each; the other tiers of a family differ in armour,
+    /// speed, power and equipment (§8.2) and can be swapped in here.
+    public static let enemyArchetypes: [String] = ["normal", "rapid", "fire", "ap", "explosion", "mine"].map { "\($0)_a" }
 
     public static func makeWorld() -> WorldState {
         let arena = ArenaSpecification.universal
@@ -86,13 +87,12 @@ public enum TrainingArenaFixture {
                         positionSubunits: Vec2i(x: playerSpawnCell.x * cell, y: playerSpawnCell.y * cell), facing: .up)
         world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 23 * cell),
                                durability: baseDurability, maxDurability: baseDurability)
-        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 40, enemyStartDelayTicks: 0,
+        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 12, enemyStartDelayTicks: 0,
                                  spawnPointsCells: enemySpawnCells, telegraphTicks: 45,
                                  playerRespawnCell: playerSpawnCell, dropTable: [], dropChancePercent: 0)
-        // The parade: all 24 archetypes on two open rows, facing down.
+        // The parade: one tank per family on the open row, facing down.
         for (i, archetype) in enemyArchetypes.enumerated() {
-            let column = i % 12, row = i / 12
-            spawnEnemy(&world, archetype: archetype, at: Vec2i(x: 15 + column * 2, y: row == 0 ? 6 : 9))
+            spawnEnemy(&world, archetype: archetype, at: Vec2i(x: 16 + i * 4, y: 7))
         }
         world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
         return world

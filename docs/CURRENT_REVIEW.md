@@ -788,6 +788,13 @@ Owner (verbatim): "训练场应该有各种地形，所有类型的坦克，所�
   golden are untouched (the arena is a separate fixture).
 - Tests: `TrainingArenaTests` (contents, enemies drive and fire several
   families, respawn/repair/lives, pickup spawner, the flag).
+- Owner, on the device (verbatim): "一种类型的坦克一个就可以了；另外带红圈的坦克是什么，
+  红圈位置也不对啊". Applied: the parade is one tank per weapon family (the
+  A tiers; 6 tanks); the "red circle" is the §10.6 danger telegraph of
+  the AP/Explosion/Fire/Mine families (a dashed ring with a warning
+  triangle, tinted per family, bright when ready to fire) — it was
+  drawn floating above the tank at 0.7 scale, which read as a misplaced
+  circle; it now encircles the tank on its ground pivot at full scale.
 
 ## Remaining gaps / follow-up review
 

@@ -638,8 +638,10 @@ final class MovementLabScene: SKScene {
     }
 
     /// Danger telegraph (§10.6): AP / Explosion / Fire / Mine enemies must
-    /// be recognizable as threats before they fire. A weapon-tinted danger
-    /// glyph floats above them, brightening when their weapon is off
+    /// be recognizable as threats before they fire. The glyph is a dashed
+    /// ring with a warning triangle above it, drawn AROUND the tank on its
+    /// ground pivot (owner 2026-09-10: the floating placement read as a
+    /// misplaced circle), weapon-tinted, brightening when the weapon is off
     /// cooldown (about to fire).
     private func syncThreatMarker(_ node: PixelTankNode, art: PixelArt, tank: TankState, tick: Int) {
         let name = "threat_marker"
@@ -654,11 +656,10 @@ final class MovementLabScene: SKScene {
         if let existing = node.childNode(withName: name) as? SKSpriteNode {
             marker = existing
         } else {
-            guard let created = try? art.sprite("px_status_danger_0", scale: artScale * 0.7) else { return }
+            guard let created = try? art.sprite("px_status_danger_0", scale: artScale) else { return }
             created.name = name
             created.zPosition = 8
-            created.position.y = CGFloat(SpatialUnits.standardTankFootprintSubunits) / 2
-                * (layout?.pointsPerSubunit ?? 0) + 6
+            created.position = .zero // the ring encircles the footprint; the triangle sits above
             let tint: SKColor = switch family {
             case "ap": .systemPurple
             case "explosion": .systemOrange

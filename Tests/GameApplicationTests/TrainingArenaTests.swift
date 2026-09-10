@@ -22,7 +22,9 @@ import GameCore
         #expect(brickMasks.count >= 8 && brickMasks.contains(0b1111))
         #expect(steelMasks.count >= 4 && steelMasks.contains(0b1111))
         let enemies = world.tanks.filter { $0.ownerPlayerID == nil }
-        #expect(Set(enemies.map(\.archetypeID)) == Set(TrainingArenaFixture.enemyArchetypes) && enemies.count == 24)
+        #expect(Set(enemies.map(\.archetypeID)) == Set(TrainingArenaFixture.enemyArchetypes) && enemies.count == 6)
+        #expect(Set(enemies.map { String($0.archetypeID.split(separator: "_").first!) })
+                == ["normal", "rapid", "fire", "ap", "explosion", "mine"]) // one per family
         for enemy in enemies {
             let attributes = EnemyArchetypes.attributes(for: enemy.archetypeID)
             #expect(enemy.armor == attributes.armor && enemy.equipmentID == attributes.equipmentID)
@@ -43,24 +45,24 @@ import GameCore
         for _ in 0..<900 { events += session.advance(holding: nil) }
         let enemyShots = events.compactMap { e -> String? in
             if case .weaponFired(_, nil, let weaponID, _, _, _) = e { return weaponID }; return nil }
-        #expect(enemyShots.count > 20)
-        #expect(Set(enemyShots).count >= 3) // several families fired
+        #expect(enemyShots.count > 5)
+        #expect(Set(enemyShots).count >= 2) // more than one family fired
         let moved = session.world.tanks.filter { $0.ownerPlayerID == nil && $0.movementIntent != nil }
-        #expect(moved.count > 6)
+        #expect(moved.count >= 3)
         #expect(session.world.stage?.phase == .playing)
         #expect(WorldInvariants.violations(in: session.world).isEmpty)
     }
 
     @Test func aDestroyedEnemyReturnsAtOnceAndTheBaseAndLivesAreToppedUp() throws {
         var session = MovementLabSession.trainingArena()
-        let victim = try #require(session.world.tanks.first { $0.archetypeID == "ap_d" })
+        let victim = try #require(session.world.tanks.first { $0.archetypeID == "ap_a" })
         session.debugDestroyTank(victim.entityID)
         let events = session.advance(holding: nil)
         #expect(events.contains { if case .tankDestroyed(victim.entityID, nil, _) = $0 { true } else { false } })
-        let survivors = session.world.tanks.filter { $0.archetypeID == "ap_d" }
+        let survivors = session.world.tanks.filter { $0.archetypeID == "ap_a" }
         #expect(survivors.count == 1 && survivors[0].entityID != victim.entityID)
-        #expect(survivors[0].armor == EnemyArchetypes.attributes(for: "ap_d").armor)
-        #expect(session.world.tanks.filter { $0.ownerPlayerID == nil }.count == 24)
+        #expect(survivors[0].armor == EnemyArchetypes.attributes(for: "ap_a").armor)
+        #expect(session.world.tanks.filter { $0.ownerPlayerID == nil }.count == 6)
         // Base damage and lost lives are restored by the next tick.
         session = .trainingArena()
         let tank = try #require(session.world.player(.one)?.tankEntityID)
