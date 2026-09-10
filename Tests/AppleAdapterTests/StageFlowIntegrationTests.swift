@@ -208,6 +208,10 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
     /// simulation's reason.
     @Test func outcomeTitlesAreTruthful() {
         #expect(HUDLabels.outcomeTitle(won: true, lossReason: nil) == "任务完成")
+        #expect(HUDLabels.outcomeSubtitle(won: true, lossReason: nil) == "敌军全部歼灭")
+        #expect(HUDLabels.outcomeSubtitle(won: false, lossReason: "base_destroyed") == "基地被摧毁")
+        #expect(HUDLabels.outcomeSubtitle(won: false, lossReason: "player_eliminated") == "所有坦克损失")
+        #expect(HUDLabels.outcomeSubtitle(won: false, lossReason: "unknown").isEmpty)
         #expect(HUDLabels.outcomeTitle(won: false, lossReason: "base_destroyed") == "基地失守")
         #expect(HUDLabels.outcomeTitle(won: false, lossReason: "player_eliminated") == "全军覆没")
         #expect(HUDLabels.outcomeTitle(won: false, lossReason: nil) == "任务失败")

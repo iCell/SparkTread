@@ -49,8 +49,8 @@ import Testing
             ticks += 1
             #expect(ticks < 2000)
         }
-        // delay 100 + text 21 + hold 145 + fade 30 + panel-in 30 + panel-hold 110.
-        #expect(ticks == 436)
+        // delay 48 + stamp 24 + hold 84 + curtain 42 + card pop 21 + panel-hold 110.
+        #expect(ticks == 329)
         #expect(cues.prefix(2) == [.outcomeText, .fade])
         // No tally rows: the panel still lists its total line.
         #expect(cues.filter { if case .panelRow = $0 { return true }; return false }.count == 1)
@@ -105,6 +105,31 @@ import Testing
         #expect(flow.panelRowsVisible == archetypes + 1)
         #expect(holdTicks - lastRowTick >= flow.durations.panelSettle)
         #expect(holdTicks >= flow.durations.panelHold)
+    }
+
+    /// Designed outro (2026-09-10): the cover advances from the arena edges
+    /// to the centre during `outroFade`, monotonically, and stays fully
+    /// closed for the results; the playfield is open before that.
+    @Test func theOutroCoverClosesMonotonicallyAndStaysClosed() {
+        var flow = StageFlow(arenaCellsWide: 56, arenaCellsHigh: 27)
+        while flow.phase != .playing { flow.advance() }
+        #expect(flow.coverStep == nil && !flow.isCovered)
+        flow.beginOutro(won: false, lossReason: "base_destroyed")
+        while flow.phase != .outroFade {
+            #expect(flow.coverStep == nil && !flow.isCovered)
+            flow.advance()
+        }
+        var last = -1
+        while flow.phase == .outroFade {
+            let step = try! #require(flow.coverStep)
+            #expect(step >= last && step <= flow.revealSteps)
+            last = step
+            #expect(!flow.isCovered)
+            flow.advance()
+        }
+        #expect(flow.coverStep == flow.revealSteps && flow.isCovered && flow.phase == .panelIn)
+        for _ in 0..<600 { flow.advance() }
+        #expect(flow.phase == .finished && flow.coverStep == flow.revealSteps && flow.isCovered)
     }
 
     /// ADR-0012: the reward line follows the total line by `rewardDelay`

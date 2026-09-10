@@ -22,6 +22,10 @@ final class MovementLabScene: SKScene {
     /// (reference reveal, ADR-0011). Empty for worlds that open in play.
     private var curtainTiles: [(cell: Vec2i, node: SKSpriteNode)] = []
     private var curtainStep: Int?? = .some(nil)
+    /// Outro cover: the same tiles, dropped from the arena edges toward the
+    /// centre as `StageFlow.coverStep` grows (a closing box iris).
+    private var coverTiles: [(cell: Vec2i, node: SKSpriteNode)] = []
+    private var coverStep: Int?? = .some(nil)
     private var collisionBox: SKShapeNode?
     /// Liquid tiles keyed by cell index; re-tiled every frame from the
     /// live terrain so melting ice heals edges automatically.
@@ -106,6 +110,7 @@ final class MovementLabScene: SKScene {
         transientEffects.removeAll(); scorchNodes.removeAll(); baseNode = nil; baseFlash = nil
         debugLabel = nil; collisionBox = nil
         curtainTiles.removeAll(); curtainStep = .some(nil)
+        coverTiles.removeAll(); coverStep = .some(nil)
         let world = controller.session.world
         wasShielded = (world.base?.shieldRemainingTicks ?? 0) > 0
         shieldActivatedTick = nil
@@ -312,6 +317,7 @@ final class MovementLabScene: SKScene {
         syncTelegraphs(art, world: world)
         syncBase(art, world: world)
         syncCurtain(world: world)
+        syncCover(world: world)
         processEvents(art, world: world)
         animateLiquids(art, world: world)
         updateDebugOverlay(world: world)
@@ -320,8 +326,13 @@ final class MovementLabScene: SKScene {
     // MARK: - Intro curtain
 
     private func buildCurtain(layout: ArenaLayout, world: WorldState) {
+        curtainTiles = makeTiles(layout: layout, world: world, name: "curtain")
+    }
+
+    private func makeTiles(layout: ArenaLayout, world: WorldState, name: String) -> [(cell: Vec2i, node: SKSpriteNode)] {
         let cell = SpatialUnits.subunitsPerCell
         let arena = world.arena
+        var tiles: [(cell: Vec2i, node: SKSpriteNode)] = []
         for y in 0..<arena.cellsHigh {
             for x in 0..<arena.cellsWide {
                 let rect = layout.sceneRect(topLeft: Vec2i(x: x * cell, y: y * cell),
@@ -329,10 +340,35 @@ final class MovementLabScene: SKScene {
                 let tile = SKSpriteNode(color: .black, size: CGSize(width: rect.width + 0.5, height: rect.height + 0.5))
                 tile.position = CGPoint(x: rect.midX, y: rect.midY)
                 tile.zPosition = 850
-                tile.name = "curtain"
+                tile.name = name
                 addChild(tile)
-                curtainTiles.append((Vec2i(x: x, y: y), tile))
+                tiles.append((Vec2i(x: x, y: y), tile))
             }
+        }
+        return tiles
+    }
+
+    /// Outro cover (designed transition, 2026-09-10): tiles drop from the
+    /// arena edges inward — a cell is covered once its normalised distance
+    /// from the centre (the larger of the x and y fractions) reaches
+    /// `1 - coverStep / revealSteps`; everything is covered at the last step.
+    private func syncCover(world: WorldState) {
+        let step = controller.flow.coverStep
+        guard coverStep != .some(step) else { return }
+        coverStep = .some(step)
+        guard let step else {
+            for (_, node) in coverTiles { node.removeFromParent() }
+            coverTiles.removeAll()
+            return
+        }
+        if coverTiles.isEmpty, let layout { coverTiles = makeTiles(layout: layout, world: world, name: "cover") }
+        let steps = max(1, controller.flow.revealSteps)
+        let threshold = 1 - Double(step) / Double(steps)
+        let centerX = Double(world.arena.cellsWide - 1) / 2, centerY = Double(world.arena.cellsHigh - 1) / 2
+        for (cell, node) in coverTiles {
+            let dx = abs(Double(cell.x) - centerX) / (centerX + 0.5)
+            let dy = abs(Double(cell.y) - centerY) / (centerY + 0.5)
+            node.isHidden = max(dx, dy) < threshold
         }
     }
 

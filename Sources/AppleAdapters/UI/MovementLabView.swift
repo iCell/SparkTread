@@ -391,6 +391,16 @@ enum HUDLabels {
         }
     }
 
+    /// One line under the stamped outcome title: why the stage ended.
+    static func outcomeSubtitle(won: Bool, lossReason: String?) -> String {
+        guard !won else { return "敌军全部歼灭" }
+        return switch lossReason {
+        case "base_destroyed": "基地被摧毁"
+        case "player_eliminated": "所有坦克损失"
+        default: ""
+        }
+    }
+
     /// Results-panel row label for an enemy archetype id.
     static func archetype(_ id: String) -> String {
         let family = id.split(separator: "_").first.map(String.init) ?? id
@@ -431,6 +441,10 @@ public struct MovementLabView: View {
     /// Results-table tank icons by reward category, composed once from the
     /// scene's art (ADR-0012; the reference shows a tank per category).
     @State private var tankIcons: [Int: CGImage] = [:]
+    /// Outcome impact: flash opacity (fades after the stamp) and the shake
+    /// trigger (each increment runs one shake, losses only).
+    @State private var outcomeFlash: Double = 0
+    @State private var outcomeShake: CGFloat = 0
 
     private let hudTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     private let flowTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -480,7 +494,7 @@ public struct MovementLabView: View {
     /// (enemies remaining, base durability/shield, score). Safe-area aware;
     /// two compact rows so nothing is clipped on the 390-point floor.
     @ViewBuilder private var stageHUD: some View {
-        if controller.stagePhase != nil, !Self.isIntro(flowPhase) {
+        if controller.stagePhase != nil, !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase) {
             let hud = controller.hud
             VStack(spacing: 4) {
                 HStack(spacing: 14) {
@@ -534,12 +548,20 @@ public struct MovementLabView: View {
         let animation: Animation? = switch phase {
         case .card: .easeOut(duration: 1.0)      // title slides in
         case .titleOut: .easeIn(duration: 0.4)   // title flips away
-        case .outroText: .easeOut(duration: 0.35)
-        case .outroFade: .easeInOut(duration: 0.5)
-        case .panelIn: .easeOut(duration: 0.5)
+        case .outroText: .spring(response: 0.35, dampingFraction: 0.55) // title stamps in
+        case .outroFade: .easeInOut(duration: 0.6)                       // title glides to the top
+        case .panelIn: .spring(response: 0.4, dampingFraction: 0.72)     // card pops in
         default: nil
         }
         if let animation { withAnimation(animation) { flowPhase = phase } } else { flowPhase = phase }
+        if phase == .outroText {
+            // Impact: a screen flash that fades, and a shake on a loss.
+            outcomeFlash = controller.flow.outcome == .won ? 0.55 : 0.7
+            withAnimation(.easeOut(duration: 0.45)) { outcomeFlash = 0 }
+            if controller.flow.outcome != .won {
+                withAnimation(.easeOut(duration: 0.5)) { outcomeShake += 1 }
+            }
+        }
         if Self.isDimmed(phase), tankIcons.isEmpty, let art = scene?.loadedArt {
             var icons: [Int: CGImage] = [:]
             for category in 0..<KillTally.tableRows * 2 {
@@ -572,26 +594,45 @@ public struct MovementLabView: View {
                     removal: .modifier(active: FlipAway(progress: 1), identity: FlipAway(progress: 0))))
             }
             if Self.isDimmed(flowPhase) {
+                // The scene's cover tiles close over the arena; this dims the
+                // margins and the HUD area so the card owns the screen.
                 Color.black.opacity(0.82).ignoresSafeArea()
+            }
+            if outcomeFlash > 0 {
+                (controller.flow.outcome == .won ? Color.white : Color.red)
+                    .opacity(outcomeFlash)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
             }
             if controller.flow.showsOutcomeText, flowPhase != .outroDelay {
                 let won = controller.flow.outcome == .won
-                Text(HUDLabels.outcomeTitle(won: won, lossReason: controller.flow.lossReason))
-                    .font(.system(size: 34, weight: .heavy))
-                    .foregroundStyle(won ? Color.yellow : Color.red)
-                    .shadow(color: .black, radius: 0, x: 2, y: 2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.top, size.height * 0.14)
-                    .transition(.offset(y: size.height * 0.36)) // rises from the centre
+                let centred = flowPhase == .outroText || flowPhase == .outroHold
+                VStack(spacing: 6) {
+                    Text(HUDLabels.outcomeTitle(won: won, lossReason: controller.flow.lossReason))
+                        .font(.system(size: 52, weight: .black))
+                        .foregroundStyle(won ? Color.yellow : Color.red)
+                        .shadow(color: .black, radius: 0, x: 3, y: 3)
+                        .shadow(color: (won ? Color.yellow : Color.red).opacity(centred ? 0.6 : 0), radius: 18)
+                    if centred {
+                        Text(HUDLabels.outcomeSubtitle(won: won, lossReason: controller.flow.lossReason))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black, radius: 0, x: 2, y: 2)
+                            .transition(.opacity)
+                    }
+                }
+                .scaleEffect(centred ? 1 : 0.6)
+                .modifier(OutcomeShake(phase: outcomeShake))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: centred ? .center : .top)
+                .padding(.top, centred ? 0 : size.height * 0.04)
+                .transition(.scale(scale: 2.6).combined(with: .opacity)) // stamps in
             }
             if flowPhase != .outroFade, Self.isDimmed(flowPhase) {
-                // Below the outcome title, on the left (reference: title at
-                // 11–17 % of the height, panel from 26 % down).
+                // Centred below the title (owner: "起码得居中").
                 resultsPanel(size: size)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.leading, size.width * 0.07)
-                    .padding(.top, size.height * 0.23)
-                    .transition(.move(edge: .leading))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.top, size.height * 0.1)
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
         }
         .allowsHitTesting(StageFlowPresentationPolicy.resultsInteractive(phase: flowPhase))
@@ -606,7 +647,7 @@ public struct MovementLabView: View {
     /// to a variable tally; the table is now the reference's fixed shape).
     private func resultsPanel(size: CGSize) -> some View {
         let tally = controller.tally
-        let width = min(size.width * 0.42, 380)
+        let width = min(size.width * 0.46, 420)
         let compact = size.height < 420
         let rowFont = Font.system(size: compact ? 15 : 17, weight: .bold, design: .monospaced)
         let iconScale: CGFloat = compact ? 1.0 : 1.25
@@ -619,7 +660,7 @@ public struct MovementLabView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, compact ? 6 : 9)
                 if controller.flow.showsReward {
-                    Text("Reward +\(controller.clearBonus.reward)")
+                    Text(verbatim: "Reward +\(String(controller.clearBonus.reward))")
                         .font(.system(size: compact ? 18 : 21, weight: .heavy, design: .monospaced))
                         .foregroundStyle(Color.yellow)
                         .shadow(color: .black, radius: 0, x: 1, y: 1)
@@ -636,10 +677,12 @@ public struct MovementLabView: View {
                         categoryCell(2 * row, count: counts.left, scale: iconScale, visible: row < panelRows)
                         categoryCell(2 * row + 1, count: counts.right, scale: iconScale, visible: row < panelRows)
                         Spacer(minLength: 8)
-                        Text("×\(row + 1) =").foregroundStyle(Color(red: 0.35, green: 0.95, blue: 0.55))
-                        Text(row < panelRows ? "\(tally.rowSubtotal(row))" : "")
+                        Text(verbatim: "×\(row + 1) =").foregroundStyle(Color(red: 0.35, green: 0.95, blue: 0.55))
+                        // Fixed digit columns (owner: "不同数字的时候也是能够对齐的"):
+                        // right-aligned, plain digits, no grouping separators.
+                        Text(verbatim: row < panelRows ? String(tally.rowSubtotal(row)) : "")
                             .foregroundStyle(.white)
-                            .frame(width: compact ? 34 : 40, alignment: .trailing)
+                            .frame(width: compact ? 44 : 52, alignment: .trailing)
                     }
                     .font(rowFont)
                     .frame(height: 26 * iconScale + 4)
@@ -654,14 +697,15 @@ public struct MovementLabView: View {
                     .font(.system(size: compact ? 18 : 21, weight: .heavy))
                     .foregroundStyle(Color(red: 0.93, green: 0.72, blue: 0.2))
                 Spacer()
-                Text(panelRows > KillTally.tableRows ? "\(tally.weightedTotal)" : "")
+                Text(verbatim: panelRows > KillTally.tableRows ? String(tally.weightedTotal) : "")
                     .font(.system(size: compact ? 26 : 30, weight: .heavy, design: .monospaced))
                     .foregroundStyle(Color.yellow)
+                    .frame(width: compact ? 80 : 96, alignment: .trailing)
             }
             .padding(.horizontal, 14)
             .padding(.top, compact ? 4 : 6)
             HStack {
-                Text("得分 \(controller.hud.score)")
+                Text(verbatim: "得分 \(String(controller.hud.score))")
                     .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                 Spacer()
@@ -698,9 +742,10 @@ public struct MovementLabView: View {
             } else {
                 Text(HUDLabels.rewardCategory(category)).foregroundStyle(.white)
             }
-            Text(visible ? "\(count)" : "")
+            Text(verbatim: visible ? String(count) : "")
                 .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
-                .frame(width: 24, alignment: .trailing)
+                .frame(width: 36, alignment: .trailing) // three digits
+
         }
     }
 
@@ -784,6 +829,22 @@ enum StageFlowPresentationPolicy {
 
     static func restartAvailable(phase: StageFlow.Phase, outcome: StagePhase?) -> Bool {
         phase == .finished && outcome == .lost
+    }
+}
+
+/// Loss impact: a decaying horizontal shake, one cycle per trigger
+/// increment (animatable through `phase`).
+private struct OutcomeShake: GeometryEffect {
+    var phase: CGFloat
+    var animatableData: CGFloat {
+        get { phase }
+        set { phase = newValue }
+    }
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let t = phase - phase.rounded(.down)         // 0…1 within the current cycle
+        let amplitude = 10 * (1 - t)
+        let dx = sin(t * .pi * 7) * amplitude
+        return ProjectionTransform(CGAffineTransform(translationX: dx, y: 0))
     }
 }
 

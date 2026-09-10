@@ -222,3 +222,16 @@ results passage) is unchanged.
 - Follow-ups: sprite icons in the results rows (the reference shows tank
   icons), a stage-clear reward rule, and a title screen — none are in this
   ADR.
+
+## Amendment 2026-09-10 (late evening): the outro is a designed transition
+
+The owner asked for a better stage-end transition for every outcome
+("可以设计一个好一些的转场") and a centred results page. The intro keeps the
+measured reference timeline above; the outro no longer copies the
+reference's rise/darken/slide: it freezes 0.8 s, stamps the outcome title
+into the centre with a flash (and a shake on a loss) over a one-line
+reason, holds 1.4 s, closes the playfield under a box-iris curtain from
+the edges to the centre while the title glides to the top (0.7 s), and
+pops the results card in at the centre (0.35 s). The tally, reward and
+automatic continue are unchanged (ADR-0012). `docs/CURRENT_REVIEW.md`
+"Designed outro" records the details.

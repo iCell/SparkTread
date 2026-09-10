@@ -137,7 +137,7 @@ decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
 `Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
 architecture check, content validator, `Scripts/check-audio.sh` selftest
 and check (18 synthesized files match the generator, 8 excerpts match the
-manifest and the re-run extractor), `swift test` 260 tests / 64 suites,
+manifest and the re-run extractor), `swift test` 261 tests / 64 suites,
 xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
 selftest and the smoke render itself; `git diff --check` is clean. This
 paragraph is the one current count; the handoff repeats it with the same
@@ -602,6 +602,34 @@ no double payment, loss pays nothing, checksum/invariants, legacy decode),
 `StageContentTests` (stage number required, tier selection),
 `StageFlowIntegrationTests` (HUD payout pacing, five tally ticks, reset
 with the world). Claude-only: PI was unavailable (usage limit).
+
+## Designed outro and the centred results card (owner feedback 2026-09-10 late evening)
+
+Owner, on the device with the first icon panel (verbatim): "结束了不管是全军覆没还是
+胜利了或者输了，可以设计一个好一些的转场。转场完了播放类似这样的总结页面，但这个起码得居中，并确保
+不同数字的时候也是能够对齐的". Applied:
+
+- The outro is now a DESIGNED transition (the intro keeps the reference's
+  measured timings): 0.8 s freeze while the decisive effect plays out; the
+  outcome title stamps into the centre (scale 2.6 → 1 spring) with a
+  screen flash (white on a win, red on a loss) and, on a loss, a decaying
+  shake, over a one-line reason ("敌军全部歼灭" / "基地被摧毁" / "所有坦克损失");
+  1.4 s hold; 0.7 s in which the title glides to the top at 60 % size
+  while the scene drops black tiles over the arena from the edges to the
+  centre (`StageFlow.coverStep`, a closing box iris — the reverse of the
+  intro's growing cross); then the results card pops in centred (scale
+  0.85 → 1 spring) and the tally runs as before. The HUD hides once the
+  curtain is down; the card carries the score. `StageFlow.Durations`:
+  outroDelay 48, outroText 24, outroHold 84, outroFade 42, panelIn 21.
+- The card is centred (46 % of the width, at most 420 pt), and every
+  number sits in a fixed right-aligned monospaced column with plain
+  digits (no grouping separators): counts three digits, subtotals four,
+  the total five — different values keep the columns aligned.
+- Tests: `StageFlowTests` (outro length 329 ticks; the cover advances
+  monotonically during the fade and stays closed), `OutcomeTitleTests`
+  (subtitles). The sequence was captured frame by frame in the simulator
+  on a loss; a won stage's reward rise was not captured (no automated
+  win) — owner check on the device.
 
 ## Remaining gaps / follow-up review
 

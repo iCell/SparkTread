@@ -150,8 +150,9 @@ environments or caches.
 
 ## Next steps
 
-1. Owner: look at the redesigned results panel on the device (compact
-   card, tank icons, reward text over the title) and the stage-end
+1. Owner: look at the designed outro on the device (stamped title with
+   flash/shake, closing curtain, centred results card with tank icons;
+   the reward text rises over the card title on a win) and the stage-end
    passage on both outcomes. Decided already: invincibility stays 10 s;
    ADR-0012 accepted (brackets by delegation, no MaxHits/MaxCombos,
    icons). Every stage JSON needs `stageNumber`; the HUD score is paced

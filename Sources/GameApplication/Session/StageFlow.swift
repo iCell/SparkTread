@@ -1,8 +1,13 @@
 import GameCore
 
 /// The stage's presentation timeline around the simulation: an intro card,
-/// the playfield reveal, play, then the outcome text and the results panel
-/// (reference transitions measured 2026-09-10, ADR-0011). Tick-driven at
+/// the playfield reveal, play, then the outcome text and the results panel.
+/// The intro follows the reference's measured transitions (ADR-0011); the
+/// outro is a designed transition since the owner's 2026-09-10 late-evening
+/// feedback ("可以设计一个好一些的转场"): freeze, the outcome title stamps into
+/// the centre, the playfield closes under a shrinking curtain while the
+/// title glides to the top, then the results card pops in centred.
+/// Tick-driven at
 /// the simulation rate so the controller advances it in lockstep with the
 /// clock; the simulation steps only while `allowsSimulation`. A pure value:
 /// no timers, no presentation types — the scene and view read phase and
@@ -17,14 +22,16 @@ public struct StageFlow: Equatable, Sendable {
         /// The title flips away over the visible playfield.
         case titleOut
         case playing
-        /// Outcome known, world frozen, nothing shown yet.
+        /// Outcome known, world frozen, the decisive effect plays out.
         case outroDelay
-        /// The outcome text rises from the centre to the top.
+        /// The outcome title stamps into the centre (flash; shake on a loss).
         case outroText
+        /// The title holds at the centre.
         case outroHold
-        /// The playfield darkens.
+        /// The curtain closes over the playfield from the edges to the
+        /// centre (`coverStep`) while the title glides to the top.
         case outroFade
-        /// The results panel slides in from the left.
+        /// The results card pops in at the centre.
         case panelIn
         /// Results readable; tally rows count up.
         case panelHold
@@ -45,19 +52,19 @@ public struct StageFlow: Equatable, Sendable {
         case reward
     }
 
-    /// Phase lengths in ticks (60 Hz). Reference timings: card 2.3 s,
-    /// reveal 0.45 s, title-out 0.4 s; outcome text 1.7 s after the decisive
-    /// event, rising for 0.35 s, holding 2.4 s; 0.5 s fade, 0.5 s panel
-    /// slide, then the tally.
+    /// Phase lengths in ticks (60 Hz). Intro (reference timings): card
+    /// 2.3 s, reveal 0.45 s, title-out 0.4 s. Outro (designed): 0.8 s
+    /// freeze, 0.4 s stamp, 1.4 s hold, 0.7 s curtain close, 0.35 s card
+    /// pop, then the tally.
     public struct Durations: Equatable, Sendable {
         public var card = 138
         public var reveal = 26
         public var titleOut = 24
-        public var outroDelay = 100
-        public var outroText = 21
-        public var outroHold = 145
-        public var outroFade = 30
-        public var panelIn = 30
+        public var outroDelay = 48
+        public var outroText = 24
+        public var outroHold = 84
+        public var outroFade = 42
+        public var panelIn = 21
         public var panelHold = 110
         /// Ticks between tally rows during `panelHold`.
         public var panelRowInterval = 12
@@ -145,6 +152,20 @@ public struct StageFlow: Equatable, Sendable {
         guard let length = duration(of: phase), length > 0 else { return 1 }
         return min(1, Double(ticksInPhase) / Double(length))
     }
+
+    /// Outro curtain progress: nil while the playfield is open, then the
+    /// number of steps (0…`revealSteps`) the cover has advanced from the
+    /// arena edges toward the centre; `revealSteps` once fully closed.
+    public var coverStep: Int? {
+        switch phase {
+        case .outroFade: min(revealSteps, Int(progress * Double(revealSteps + 1)))
+        case .panelIn, .panelHold, .finished: revealSteps
+        default: nil
+        }
+    }
+
+    /// The curtain is fully down: the results own the screen.
+    public var isCovered: Bool { phase == .panelIn || phase == .panelHold || phase == .finished }
 
     /// Cells within this many strips of the arena centre are visible: nil
     /// while the card covers everything, `revealSteps` once fully open.
