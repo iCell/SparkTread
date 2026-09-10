@@ -9,7 +9,8 @@
 5. `GAME_MECHANICS_SPEC.md`：原版机制证据和恢复数据。
 6. `RESEARCH_SUMMARY.md`：原版反向分析摘要。
 7. `STAGE_52_METADATA.csv`：52 个候选参考关卡元数据。
-8. `AI_REVIEW_PROMPT.md`：交给其他 AI 模型审查规划时使用。
+8. `docs/CURRENT_REVIEW.md`：当前实现审查（2026-09-09 Claude/PI 联合评审）、验证证据与未完成项。
+9. `docs/agent_handoffs/2026-09-09-joint-review.md`：联合评审交接：已完成、验证命令、地雷区、下一步。
 
 ## 权威顺序
 
@@ -32,6 +33,17 @@
 - `docs/decisions/ADR-0004-arena-rendering-and-device-floor.md`：全屏渲染；设备基线 390 点级别。
 - `docs/decisions/ADR-0005-allied-base-damage-by-difficulty.md`：己方火力对基地按难度生效——Casual 免疫，Standard/Veteran 开启。
 
+- `docs/decisions/ADR-0006-legibility-gate-pixel-scale.md`：像素素材可读性验收。
+- `docs/decisions/ADR-0007-simulation-clock-driver.md`：独立显示时钟驱动固定步模拟。
+- `docs/decisions/ADR-0008-a0-satisfied-by-pixelproduction.md`：PixelProduction 交付满足 A0 风格锁定。
+- `docs/decisions/ADR-0009-universal-arena-56x27.md`：V1 竞技场固定为 56×27 格。
+
+## 提议中的 ADR（待所有者接受，尚不具备权威）
+
+- `docs/decisions/ADR-0010-owner-combat-rules-and-fort-ring.md`：特殊弹药耗尽回退普通弹、基地护盾加固堡垒环与占用格策略、隐藏宝物揭示条件、地雷可见性。
+- `docs/decisions/ADR-0011-reference-sfx-and-stage-transitions.md`：参照原作测量重合成的音效集（8363 Hz 零阶保持渲染）、事件映射与履带引擎触发、关卡过场时间线（开场卡片/十字揭幕/任务完成/战斗成绩）。
+- `Tools/reference_measure/README.md`：参照原作录像的测量流程与脚本（不含媒体），复现 ADR-0011 / CURRENT_REVIEW 中的音效与过场数据。
+
 ## 当前固定摘要
 
 - Swift + SpriteKit + SwiftUI；
@@ -42,8 +54,8 @@
 - V1 仅单人；
 - 后续两人在线合作；
 - 一套现代游戏规则；
-- 柔和现代机械玩具街机风；
-- 当前素材工作只列清单，不进行新生成（A0 风格锁定母版需单独记录授权）；
+- 当前运行素材为 `Vendor/SparkTreadPixel` 的像素交付，A0 已满足（ADR-0008）；
+- `Assets/Design` 和 `styleboards` 为历史设计参考，不是当前运行图集；新增素材生成仍需单独授权；
 - 1 格 = 1024 子单位；`PlayerCommand` 为唯一外部输入契约；
 - 权威状态可完整序列化并支持快速重模拟；
 - 设备基线 390 点级别；竞技场全屏渲染。

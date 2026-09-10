@@ -55,7 +55,10 @@ xcrun simctl launch "iPhone 17" io.icell.sparktread
 
 - `Sources/GameCore/` — authoritative rules and state; imports nothing (not
   even Foundation).
-- `Sources/GameApplication/` — workflows and use cases; imports only GameCore.
+- `Sources/GameApplication/` — workflows and use cases; imports GameCore, plus
+  Foundation only at the content-loading boundary (JSON decoding in
+  `StageLoader`); never a presentation or platform module. This is exactly
+  what `Scripts/check-architecture.sh` enforces.
 - `Sources/AppleAdapters/` — SwiftUI, SpriteKit, input, audio, persistence,
   platform; depends inward.
 - `Sources/GoldenEagleApp/` — app entry target (generated project); wires the
@@ -72,7 +75,12 @@ The art lives in the `Vendor/SparkTreadPixel` git submodule
 in `Sources/AppleAdapters/Presentation/Pixel/` are synced copies of the
 submodule's `Runtime/` (diff before upgrading). The app icon also comes
 from the submodule (copied into the asset catalog).
-Reference docs live in `docs/pixel/`. The app root is the M1
-`MovementLabView` (touch joystick, keyboard arrows/WASD, controller D-pad);
-launch env `MOVEMENT_LAB_AUTODRIVE=1` runs a scripted demo drive. The
+Reference docs live in `docs/pixel/`. The app root is
+`MovementLabView`: the playable VS-01 stage by default, or the free-play
+lab with `MOVEMENT_LAB=1` (debug overlay and weapon cheat panel exist only
+there). Input: touch stick + two fire buttons; keyboard arrows/WASD to move,
+J/U normal fire, K/I special fire; controller D-pad, A normal, B/X special.
+Launch env `MOVEMENT_LAB_AUTODRIVE=1` runs a scripted demo drive.
+Review state and open decisions: `docs/CURRENT_REVIEW.md`,
+`docs/decisions/ADR-0010-…` and `ADR-0011-…` (proposed). The
 delivery's own preview renders remain in the source package's `Previews/`.

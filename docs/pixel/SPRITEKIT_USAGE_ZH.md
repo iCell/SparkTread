@@ -1,5 +1,7 @@
 # 新像素图集：SpriteKit 接入与制作契约
 
+当前交付的完整接入契约以 `Vendor/SparkTreadPixel/Docs/SPRITEKIT_USAGE_ZH.md` 为准；升级子模块时同时核对本文与运行时副本。本文的验证环境说明是素材交付时的历史记录，不是当前应用的验证结论。
+
 本文件只适用于 `PixelProduction`。不要把上一级旧 `ST3` 接入说明、纹理尺寸或图集名称套到这里。运行时代码是美术表现适配器，不实现原版游戏规则。权威规则与美术分离，延续项目 architecture 约束。
 
 ## 1. 文件与依赖
@@ -47,7 +49,7 @@ let art = try PixelArt() // Xcode 主 bundle 模式
 // 本地工具用 PixelArt(root: pixelProductionURL)
 let tank = try PixelTankNode(
     kind: "player", weapon: "normal", direction: 0,
-    pixelScale: cellSize / 16 * 0.82, art: art
+    pixelScale: cellSize / 16, art: art
 )
 scene.addChild(tank)
 tank.position = worldPresentationPosition
@@ -63,12 +65,12 @@ let shotOrigin = tank.muzzle(in: scene)
 - `direction`：`0=上、1=右、2=下、3=左`。
 - 5 类车体×6 武器=30 个组合，每个组合有四朝向。普通玩家和普通敌军使用不同炮塔。
 - 分层：装备底座 0 → 两侧履带 1 → 车体 2 → 炮塔 3 → 月牙/彩圈模块 4。
-- 四方向切换纹理，**不旋转带阴影的完整车体**。炮塔挂点相对于车体是 `(0,-3)` 源图像素，已在代码转换。
+- 四方向切换纹理，**不旋转带阴影的完整车体**。炮塔挂点读取每个 `rig.mountOffset`，不得硬编码 `(0,-3)`。
 - 履带为 4 相位的内部橡胶明暗滚动，透明外缘不移动。它不是整条履带平移，也不是 4 张重新生成的车体。建议用行驶距离选择相位；停车保持相位。
 - 后坐力只移动炮塔；左右履带与车体不受后坐力影响。连发炮可从 `muzzleCount` 获取两个挂点。
 - `setEquipment` 在改变朝向时重新绑定对应方向附件；装备状态反馈仍由调用方的玩法事件驱动。
 - `turrets[*].rearDeploy` 是雷后置投放候选挂点，不是炮口；需要按相同坐标公式转换。不要用炮口位置生成地雷。
-- 主图 `0.82` 是小比例测试值，不是最终平衡规格。小屏可见尺寸未达旧门槛，不能硬编码为已验收产品常量。
+- 当前车体 `bodyBounds=(16,22,48,48)`，逻辑宽度 32px；统一使用 `pixelScale = cellSize / 16`，不得再叠加旧的 `0.82` 缩放。真机可读性仍需独立验收。
 
 所有敌车当前共用同一视觉车体目标框，四档仍有顶盖/护板差异；高倍率目录可见，手机实战的档位辨识尚待验证。不得为表现方便改变四档权威碰撞体。
 

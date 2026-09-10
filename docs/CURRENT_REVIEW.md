@@ -1,0 +1,548 @@
+# Current implementation review
+
+Date: 2026-09-09. Two independent agents (PI: gpt-6-astra, Claude: Fable
+5.1) cross-reviewed the tree in seven written rounds; PI verified findings
+with compiled check programs, Claude applied every change both agreed on.
+This document is the state after that pass (seven rounds, closed in round
+7). It is not a claim of product completion, physical-device acceptance, or
+audio-content acceptance.
+
+## Scope and authority
+
+This is a one-stage development prototype (VS-01), not a completed V1
+campaign. Accepted ADRs override the product plan; reference-game behavior
+and older SVG/styleboard assets do not override those decisions. Runtime art
+is the `Vendor/SparkTreadPixel` submodule; no new artwork was generated.
+ADR-0010 is PROPOSED: it records owner-requested rules that were previously
+implicit and needs the owner's acceptance before it carries authority.
+
+## Corrections made in the joint review
+
+Core (GameCore):
+
+- Projectile contacts of a tick resolve from one global time-ordered queue
+  (world contacts and projectile-versus-projectile, exact rational times,
+  category/ID tie order). Crossing shots that pass at different times no
+  longer cancel; an interception earlier in the tick prevents a later base
+  hit in the same tick. Blasts still resolve after the queue (documented
+  approximation in `Combat`).
+- Negative-direction shots (left/up) meet walls at the same distance as
+  their mirrors (entered-quadrant sampling).
+- Penetrating shells (AP) damage each distinct tank once
+  (`ProjectileState.hitTankIDs`) and keep their remaining travel; surviving
+  contacts emit `projectileHit`, never a false destruction; mines disarmed
+  by shots emit `mineRemoved`.
+- Enemy flame patches release their active-count slot on the emitter
+  (`FireHazardState.ownerEntityID`); expiry by lifetime releases slots;
+  flame volleys are admitted whole or refused (dry-fire + cooldown);
+  active counts are checked for exact equality by `WorldInvariants`.
+- Every dry-fire path applies the channel cooldown (held special against an
+  illegal placement dry-fires at cadence, not per tick).
+- Protection policy centralized: spawn protection and invincibility deflect
+  projectiles, blasts, flames and the bomb alike; dead tanks and a base at
+  zero take nothing and emit nothing.
+- Flames burn the base: one contact patch per column on the structure,
+  once per fire-damage interval, through the ADR-0005 allied flag and the
+  shield; the column stops at the base.
+- Fort ring (base shield): occupied cells (tank/mine/pickup) are never
+  rebuilt — no entombment; damaged steel hardens whole; expiry restores from
+  a per-activation record (`BaseState.fortRingRestore`; steel/water
+  preservation via `PickupRuleset.fortRingRestoresRecordedKinds`, default
+  on since the owner's decision B of 2026-09-10; off = rebuild as brick).
+- Hidden treasures reveal only when the covering cell can hold a pickup;
+  the record survives a failed placement.
+- Score pickups award points; `max_armor_ammo` fills the current special to
+  its cap (distinct from `ammo_crate`).
+- `PickupRuleset` (lifetime, grace, armor-up, invincibility floor/refresh/
+  extend, base shield extend/floor, freeze, bomb damage) replaces hard-coded
+  constants with identical tuning constants; validated at the loading
+  boundary (`StageLoader`) and by sessions; timer sums saturate. One
+  behavioural difference is deliberate and documented on the rule: a
+  longer running invincibility timer is no longer shortened to 600 ticks by
+  a pickup. The reference 25-second rule is available as
+  `.referenceInvincibility`, NOT applied.
+- Domain events carry owner identity, positions (anchors documented on
+  `DomainEvent`), facing, and structured impact kinds; `baseDamaged.allied`
+  distinguishes own fire (ADR-0005).
+
+Application / adapters:
+
+- `ReplayRecording` v2 embeds the initial world and all three rulesets;
+  playback validates, before stepping: format; every embedded ruleset
+  (`MovementRuleset`, `WeaponRuleset`, `PickupRuleset`) against documented
+  value domains, each field range-checked before the arithmetic that
+  depends on it; the world's structure (bounded arena, matching terrain
+  storage) and invariants (positions inside the arena, timers/counts/armor
+  inside their domains, signed bounds compared directly, incremented
+  counters admitted with headroom);
+  the start checksum; command envelopes (none before the initial tick, no
+  duplicate tick — envelopes are mapped by tick, chronological storage is
+  not required); the tick count (0…10 h) and its sum with the initial tick.
+  Invalid data within those checks is a `ReplayError`; the maintained tests
+  cover emptied weapon arrays, invalid pickup rules, negative initial tick,
+  mismatched terrain storage, duplicate envelopes, extreme integers in the
+  movement inset, a tank position, the projectile extent, the arena size,
+  Int.min slide momentum, Int.max spawn cursors / telegraph index / tick /
+  next entity id. Debug mutations rebase the recording. A VS-01 session started at a
+  nonzero tick replays through encode/decode.
+- `TickAccumulator` (ADR-0007): raw gaps longer than six ticks (with a
+  floating-point tolerance valid at any uptime) are dropped as stalls
+  (implicit pause, no burst); fractional remainders carry; duplicate,
+  backward and non-finite timestamps never move the accepted baseline.
+- Application lifecycle: `MovementLabController.start/suspend/stop` driven
+  by `scenePhase`; a controller is constructed INACTIVE (audio and haptics
+  suspended, input refused) until the view reports the active phase;
+  suspension is a complete barrier — audio and haptics suspended, held
+  inputs released, new presses refused, queued presentation events
+  discarded; `start` advances the input reset watermark so a physical
+  callback observed while inactive is dropped even when delivered after
+  resume; bottom system gestures deferred (ADR-0004).
+- Input: `HeldDirectionStore` accounts per source — each key, each CONTROL
+  of each controller (object identity, not an enumeration index), touch —
+  for directions AND fire (normal edge per source, special hold); key repeat
+  keeps its priority slot; keyboard J/U normal, K/I special (reference
+  defaults, provisional); controller A / B / X; a disconnect releases only
+  that device (held inputs and its pending pulse) and invalidates the
+  callbacks it queued (`DeviceGenerations`); a restart/suspension reset
+  drops earlier callbacks globally.
+- Audio structure: injectable backend and monotonic clock; suspend/resume/
+  mute lifecycle (a new world stops one-shots too); wanted loops are
+  reconciled against actual playback with a one-second retry backoff;
+  exact impact voices from event payloads; player-only, throttled dry fire
+  whose throttle commits only when a click actually played; base-hit
+  priority per drained batch; allied own-fire voice (`sfx_base_own_hit`,
+  provisional placeholder). Sound CONTENT was replaced on 2026-09-10 by the
+  candidate reference-derived set — see "Reference audio and transitions".
+- Presentation: impact/pickup/shield/spawn effects from event payloads;
+  muzzle flashes anchored to the event's footprint and facing (the live rig
+  contributes only its muzzle offset); the ADR-0005 own-fire base cue is an
+  adapter-owned tinted silhouette overlay (teal for allied, red for enemy)
+  — an SKAction on the vendor base node would not tint its private sprites;
+  spawn-protection ring, invincibility ring, freeze overlay, equipment
+  attachments; mines through `PixelMineNode` (badge, level, arming); pickup
+  expiry blink; base shield appearing/warning phases; bounded effect and
+  scorch pools; `PixelArt` retained across restarts; explicit surface
+  change; ground strip clipped to the arena; liquids reconciled through
+  terrain changes (water → steel → water).
+- Debug overlay, collision box and the weapon cheat panel exist only in lab
+  mode (`MOVEMENT_LAB=1`); the playable stage shows a provisional HUD with
+  lives, armor, weapon/ammo, power/speed, equipment, status, enemies, base
+  and score.
+
+## Validation evidence (latest tree, 2026-09-10)
+
+Recorded separately from the 2026-09-09 evidence below, which describes
+the tree as it was then and is not rerun here. After the owner's device feedback of 2026-09-10 (no engine sound, longer
+stage stingers, rapid-fire stutter mitigations): `swift test` 245 tests /
+62 suites passed (Claude's run;
+PI's independent run of the same revision reported the same count),
+architecture check, content validator, `Scripts/check-audio.sh` (27 files
+match the generator and `Tools/audio_manifest.json`), `git diff --check`
+and the simulator `xcodebuild test` on iPhone 17 pass (Claude's runs only
+— not PI acceptance); the device build installs. This paragraph is the
+one current count; the handoff repeats it with the same date.
+
+## Validation evidence (2026-09-09)
+
+- `swift test`: 193 tests / 45 suites at the round-7 closure (Claude;
+  PI's independent run matched), 204 / 48 after the same-day
+  owner-directed changes (round 8). Historical counts; the current one is
+  in the section above.
+- `xcodebuild test … 'platform=iOS Simulator,name=iPhone 17'`: succeeded
+  (run by Claude after batch 3, after the round-4 fixes, and after the
+  round-5 fixes; PI did not run the simulator gate).
+- `sh Scripts/check-architecture.sh`: passed. `swift run content-validator
+  Content`: passed. `git diff --check`: clean.
+- Audio regeneration is deterministic (at the time: every existing WAV
+  byte-identical by sha256, only `sfx_base_own_hit.wav` new). The
+  2026-09-10 candidate set replaced most voices; PI regenerated that set
+  twice outside the repository and matched all 28 files.
+- The M1 movement golden was regenerated once with a stated reason: the
+  checksum surface gained `BaseState` fields; the run fires no shot.
+
+## Reference audio and transitions (owner direction 2026-09-09/10; ADR-0011 proposed)
+
+The owner wants the reference game's (决战坦克) sound effects and transitions
+replicated and supplied a complete gameplay recording (public video, 32
+stages, ~50 min). Policy (plan §12.7, manifest §M): extracted reference
+audio is research-only until the owner records a rights decision, and
+RE-SYNTHESIS IS A CANDIDATE PRODUCTION METHOD, NOT CLEARANCE — the
+candidate set in the working tree (`Tools/build_audio_assets.py`, rendered
+at 8363 Hz with zero-order-hold upsampling as an audition hypothesis) is
+provisional until the owner's audition and a recorded provenance/rights
+review. Nothing extracted is in the repository. The research clips,
+spectrograms and scripts were LOST with the machine restart of 2026-09-10
+(≈10:17); what follows are Claude's reported measurements, not
+independently re-verified by PI. The reproducible record is
+`Tools/reference_measure/` (README with source id, timebase check, the
+per-sound and per-transition windows, and the scripts; no media): rerunning
+it on the public recording regenerates every number below.
+
+Attribution status: CONFIRMED against frames — enemy destroyed (rumble),
+pickup collected (arpeggio). UNCERTAIN — the glide taken as the shot, the
+burst taken as the engine (and the engine's trigger: bursts while the
+player stood still at 17.9 s, silence while an enemy kept moving at 52 s).
+DERIVED — every other voice (launch variants, heavy explosion, base
+collapse, pickup appearance, steel/brick/deflect, tally tick, stage card,
+win stinger); INVENTED — the loss stinger (no loss in the recording).
+Native-rate hypothesis: two mirror pairs sum to 8377 and 8355 Hz; a third
+pair quoted earlier (2692 ↔ 5017 = 7709 Hz) does not fit and is withdrawn.
+Per-file peak normalisation makes the envelope points relative shapes, not
+calibrated dBFS.
+
+Measured (STFT, 2.5–5 ms hops; times are positions in the recording):
+
+| Sound | Where | Measurement → synthesis |
+| --- | --- | --- |
+| shot (assumed: the most frequent tonal event, runs at 0.2 s) | 43.17 s ×8, 87.8, 89.1, 90.2 s | pulse wave, exponential glide 3.1 kHz → 0.5 kHz, ≈0.26 s, flat then 30 ms release |
+| engine burst (assumed: held direction) | 17.9–19.3 s, 47–52 s | 300 ms noise, broad, peak 2–2.5 kHz, roll-off above 3 kHz, V-chirp 2.3→3.0→2.2 kHz in the last 120 ms; 0.3 s on / 0.1 s off |
+| enemy destroyed (confirmed: kill + score roll at 21.87 s) | 21.9 s, 63–67 s | 0.2 s low crunch (≤900 Hz) then a 260→170 Hz tone, −13 dBFS for 0.3 s, −40 dB by 0.7 s |
+| heavy explosion (kill at 98.62 s) | 98.6, 100.3, 103.5 s | 0.2 s hiss (tread spectrum) then 0.6 s rumble ≤350 Hz |
+| pickup collected (confirmed: score +2000 at 104.76 s; "Flag On Guard!" at 38.12 s) | 38.12, 104.76, 105.52 s | triangle notes C6 110 ms, C5 70, G6 30, C6 30, G5 90, C5 20, G6 30, E5 30, G5 70, C5 20, G6 20, C6 70, G5 20, C5 40; envelope −2 dB → −40 dB over 650 ms |
+| steel click | 102.28 s | 2.69 kHz tone, 130 ms, −6 → −20 dB by 100 ms, over a 40 ms 150 Hz thump |
+| tally blips | 77.4–77.7 s | 3.14 kHz and 1.85 kHz blips during the results table |
+| stage card slide | 79.2–79.8 s | 1.2 → 0.86 kHz tonal slide under the title |
+| results drum riff (reacquired audio; owner: "dong ×6, dong ×6, dong, dong ×4") | 73.9–78.3 s | ≈37 low-band hits (`hits.py`) in groups of 5–7, ≈0.12 s between hits, ≈0.24 s between group onsets; one hit: body ≈150–195 Hz, broadband stroke, −10 dB by ≈120 ms (0–250 Hz 0 dB, 250–500 −6, ≈−16 flat above 500 Hz). The first cut read this as an amplitude-modulated bed — wrong |
+| stage-card drum riff (reacquired audio) | 78.3–79.6 s | the same riff (8 hits, rest, 2, rest, 1 …) until play; the first card (8.54–9.13 s) opens with six hits |
+
+Transitions (frame-accurate, seeks verified against the audio):
+
+- Intro: card 8.9 s; title slides in from the left 9.4–10.4 s and holds;
+  cross-shaped strip reveal of the playfield 11.2–11.6 s; title flips away
+  11.6–12.0 s; HUD and player spawn at 12.0 s.
+- Outro: last sound 70.8 s; "Mission Complete" appears at the centre
+  72.73 s and rises to the top by 73.07 s; playfield darkens 75.5–76.0 s;
+  the results table (kills by enemy type, total, reward) slides in from the
+  left 76.0–76.5 s and counts up with ticks; next stage card 78.27 s;
+  reveal 79.5 s; play 80.0 s. The video has no loss, so the loss variant
+  (same motion, restart button) is ours.
+
+Implemented (2026-09-10): `StageFlow` (GameApplication, pure tick
+timeline gating the simulation, cues for sounds; results capacity derived
+from the tally, hold stretched to fit), `KillTally` (results rows from
+events), the scene's per-cell curtain lifted in growing-cross order,
+SwiftUI card/outcome/fade/panel animations with the measured durations
+(touch controls hidden over the card and the results), the candidate set and its
+mapping (`GameAudio.soundNames`); outcome stingers moved from the decisive
+event to the transition. Round-11 corrections (PI): transient effects age
+on the scene's presentation clock so the decisive tick's explosion plays
+out during the outro; ONE input-admission policy (clock running AND flow in
+play; every transition releases held/pending input and advances the reset
+watermark, so cutscene presses never reach the first gameplay tick); the
+completed recording is kept on the controller before the automatic
+continue. Not implemented: the reference's stage-clear "Reward" bonus (a
+scoring rule; owner decision), tank icons in the results rows, a title
+screen. The automatic continue replays the same stage (provisional
+prototype loop, not campaign progression).
+
+Owner's CREATIVE decision of 2026-09-10 (later the same day, verbatim; not
+a rights decision — the distribution-rights review stays PENDING for the
+excerpts and the synthesized voices alike, `ASSET_PRODUCTION_MANIFEST.md`): "我不是让你重做，是让你采用
+决战坦克原版的开场音效，我要求音效是复刻原版的" — the sounds are to be the ORIGINAL
+game's sounds. Applied: `Tools/extract_reference_audio.py` extracts the
+cleanest isolated instances from the pinned recording (isolation score:
+silent margins), deterministically resampled; eight files are now
+EXCERPTS of the recording (processed cuts, not the game's asset files) — `sfx_stage_win` (end-of-stage loop
+74.00–78.20 s, the results screen from its rise to the card; the owner
+identified it as the end sound), `sfx_fire_normal`/`_rapid`/`_special` (the one isolated
+shot instance at 185.29 s; whether the reference has other launch sounds
+is not established), `sfx_tank_explode`
+(21.86 s), `sfx_player_explode` (heavy, 100.20 s), `sfx_pickup_collect`
+(104.74 s), `sfx_hit_steel` (click, 102.26 s). The manifest marks them
+`excerpt` with window, processing, file hash and the extractor's hash; `Scripts/check-audio.sh`
+verifies hashes and re-extracts when `SPARKTREAD_REFERENCE_WAV` is set.
+Cue table for the audition (source vs. attribution confidence are
+separate columns):
+
+| Cue | Source | Event assignment | Audition |
+| --- | --- | --- | --- |
+| stage card | ORIGINAL composition (`inspired`): NES-style jingle following Battle City's stage start (Namco) in key, tempo, rhythmic skeleton, instrumentation and length — own melody; no excerpt, not a transcription | owner chose this over a near-copy | ACCEPTED by the owner 2026-09-10 ("开场曲子我觉得可以") |
+| stage won | excerpt (end-of-stage loop 74.00–78.20 s) | the results-screen loop the owner identified as the end sound | ACCEPTED by the owner 2026-09-10 ("结束曲还是用决战坦克的那个"); rights review pending |
+| normal / rapid / special launch | excerpt (shot 185.29 s, one clip, three names) | glide = shot: assumed, uncontradicted | pending |
+| enemy destroyed | excerpt (21.86 s) | confirmed (score roll) | pending |
+| player destroyed | excerpt (heavy explosion 100.20 s) | assigned by sound design | pending |
+| pickup collected | excerpt (104.74 s) | confirmed (score +2000) | pending |
+| steel / boundary | excerpt (click 102.26 s) | assigned; cause not observed | pending |
+| everything else | synthesized, provisional | derived / invented | pending |
+
+Still synthesized (no isolated instance in the recording): brick hit,
+deflect, pickup appear, tally tick, stage lose, base hit/own-hit/collapse/
+shield, ap/explosion/flame/mine launches, flame loop, spawn warp, dry
+fire, hit tank, explosion blast. The re-synthesized riff of the same day
+is superseded.
+
+Owner's opening-sound correction (2026-09-10, later still): the opening
+reference is the first seven seconds of the NES Battle City sound-effects
+video (Namco's stage-start jingle, 2.63–7.2 s of that video: two pulse
+voices, triangle bass, noise drums on a 0.15 s grid, ≈100 bpm, 4.6 s), and
+the owner asked whether it can be used without the copyright problem.
+Recorded answer: it is Namco's composition and recording; an excerpt or a
+note-for-note re-creation would reproduce it. Applied: `sfx_stage_card` is
+an ORIGINAL NES-style jingle (generated, attribution `inspired` with the
+second reference on its manifest entry). The owner then asked for a
+near-copy of the melody with slight changes; Claude declined (slight
+changes do not avoid copyright) and offered three paths; the owner chose
+to keep the original and follow the reference's direction as far as
+possible — the jingle now shares the reference's key/mode (C minor),
+tempo (≈103 bpm), rhythmic skeleton, register, instrumentation and length
+(≈4.66 s) with its own note sequences and contours (no note run of the
+reference reproduced), no Battle City audio in the repository, the
+provisional 决战坦克 card excerpt withdrawn (eight excerpts remain). Not a
+legal clearance; the rights review for the whole set stays pending.
+
+Earlier owner decisions after the device session (2026-09-10, applied): NO
+engine/tread sound (voice, retrigger and tests removed; the attribution
+question is moot); a LONGER sound on entering and on finishing a stage,
+like the reference — `sfx_stage_card` is the 6-6-1-4 drum riff
+(≈2.6 s; the owner corrected the first cut's throbbing bed the same day:
+"开场音效错了", then sang the pattern) and `sfx_stage_win` the riff twice
+(≈5.2 s) through the results, both from the reacquired recording's hit
+measurements above and played at the card cue and at the outcome text;
+`sfx_stage_lose` is an invented slower, falling variant. The owner also
+reported the tank's movement stuttering while firing rapid rounds: three
+mitigations landed — the simulation driver's PREFERRED callback rate
+is the tick rate (60 Hz; a preference, not a guarantee, and SpriteKit
+renders on its own schedule — the hypothesis is that a 120 Hz callback
+cadence alternated 0/1 ticks and turned into 0,1,1 under load), audio
+voice pools are warmed at construction and playback never allocates or
+restarts a playing voice (a short or busy pool drops the launch), and
+own-recoil haptics are throttled to one impact per 0.12 s
+(`RapidFireAudioTests`, `RecoilThrottleTests`). These are PLAUSIBLE
+main-thread costs at twelve shots a second, not a profiled cause: the
+symptom is undiagnosed until the owner's next device session compares
+sustained movement with and without rapid fire (frame intervals and ticks
+per rendered frame); if it persists, profile the per-hit effect-node
+construction and `syncProjectiles`. Cue timing is adapted: the results bed
+starts 0.45 s after the outcome text, the reference's about a second after
+its text (historical pairing). The bed's band spectrum was tuned against
+the reference bed with `bands.py` (a rough comparison: up to about 4 dB
+off in one 250 Hz band, 0–4 kHz; PI reproduced the vector).
+
+Owner check still open: is the synthesized set close enough — and in
+either case the provenance/rights review has to be recorded before the
+set is shipped.
+
+## Owner-directed changes after the first device session (2026-09-09, after round 7)
+
+Applied by Claude on the owner's feedback from the iPhone 17 Pro; PI
+re-verified them in rounds 8–9 (R8-01 goal-cost convention, R8-02 fallback
+placement legality, R8-03 replay boundary — all closed; see "Joint review
+status"):
+
+- Drops (carrier items and kill rolls) appear at a random interior cell
+  anywhere on the map, never under the base or a tank — the fallback around
+  the death cell keeps the same constraints, and an item with no legal cell
+  anywhere near is lost rather than placed under a tank (`PickupRuleset.
+  dropsSpawnAtRandomCells`, default true; ADR-0010 item 7, proposed).
+  `spawnPickup` now excludes the base box for every placement.
+- Enemy navigation (§10.4): a deterministic cost field over footprint
+  anchors (`Navigation`), Dijkstra from the target — the four aligned
+  firing positions beside the base (corner cells only as a fallback) or the
+  player's neighbourhood — with steel/water/base impassable and brick
+  passable at a cost for families whose weapon breaks brick (flame routes
+  around it); the cost convention prices the goal cell too, so a cheap
+  clear approach beats digging into an expensive one. At a goal the enemy
+  faces the target and holds; the free-direction probe is snap-aware like
+  the movement system, so a tank a few subunits off a dug opening still
+  takes it. Base focus raised (normal 80 %, rapid 50 %, AP/explosion 90 %).
+  Tests: field shape, mixed-cost goals, flame routing around brick, an
+  enemy crosses the open arena and digs through a brick band to the fort
+  (base shielded, approach only), an unobstructed enemy actually damages
+  the base, and the first VS-01 wave reaches the fort ring within a minute.
+  Observed in the fixtures: an enemy aligned with an unshielded base fires
+  along the row and can destroy it from thirty cells away — reference
+  behaviour, worth a device look.
+- Replay format is now 3: earlier recordings embed a rules shape and an
+  AI this build no longer reproduces and are rejected as
+  `unsupportedFormat` at the DECODING boundary (header-first check, so a
+  real format-2 file never surfaces as a key-not-found error). Policy, not
+  an enforced build identity: a behaviour-changing simulation change must
+  bump the number; an un-bumped one is undetectable except as a checksum
+  mismatch (R8-03 / R9 closeout).
+
+## Joint review status
+
+Closed in round 7 (2026-09-09): PI independently re-verified every item it
+had raised (R3-01…05, R4-01…06, R5-01…04, R6-01/02) against the current
+tree with its own check programs and package test run, and reported no
+further implementation correction in this scoped pass. Rounds 8–9
+(2026-09-10) covered the owner-directed drops/navigation changes and the
+replay boundary: R8-01/02 closed by PI's exact reproducers, R8-03 accepted
+with the header-first decoding correction applied. Round 11 (reference
+set + transitions) returned five findings — R11-01 outro effect clock,
+R11-02 cutscene input leak, R11-03 engine attribution policy, R11-04
+provenance/evidence wording, R11-05 results capacity — all applied with
+integration tests (`StageFlowIntegrationTests`, 15 tests driving the
+controller callback, the scene drain and the audio backend). Round 12: PI
+closed R11-02…05 with its own reproducers and raised R12-01 (the scene's
+presentation clock kept aging effects through a controller suspension) —
+applied: `MovementLabScene.update` ages nothing while the controller is
+not running and rebases on the first active frame, the SCENE is paused
+while the scene phase is inactive (parking SKActions), two regressions
+use the production update loop. The first cut passed `isPaused:` to the
+`SpriteView` itself; that left the SKView blank on device and simulator
+(owner report of 2026-09-10: flat gray after the intro, reproduced in the
+simulator in the lab world too) and was replaced the same day. PI verified
+the replacement on a separate, freshly created simulator (stage card,
+post-intro playfield, lab, and rendering again after Settings and back) —
+simulator evidence, not device acceptance. `Scripts/smoke-render.sh`
+(in CI, needs ffmpeg) now cold-launches the stage and the lab and requires
+real luminance spread in the playfield region with a bounded retry; the
+HUD cannot serve as the assertion because it kept updating over the blank
+SKView. Round 13: PI showed the remaining case — a
+suspension with no frame in between still counted the clamped 0.1 s on
+resume — fixed with `MovementLabController.activityGeneration`, which the
+scene clock compares before computing elapsed time (control-compared
+regression at the 0.70 s lifetime boundary with an observable clock
+value); two README statements corrected (source sample rate not assumed,
+61 ms ≈ two frames, pairing settled only by the alignment check). Round 14
+(2026-09-10): PI reran every R11/R12 reproducer against the current
+objects (suspended callbacks, no-inactive-frame resume at the 0.70 s
+boundary, active-outro expiry, final-intro-tick presses, steel-blocked
+engine, nine-archetype results) and recorded the R11/R12 findings as
+independently reverified and CLOSED at this scope.
+
+Round 15 (whole-tree pre-commit pass, 2026-09-10) raised nine items; all
+applied:
+- R15-01 (High) decoded out-of-domain entity ids trapped in AI cadence
+  arithmetic → `WorldInvariants` checks every entity id and id reference
+  (owners, hit lists) against `1..<nextEntityID`; −1 stays the documented
+  no-owner sentinel; `EntityIDDomainTests` cover every entity kind, the
+  exact boundary and PI's negative-enemy-id replay reproduction.
+- R15-02 (High) a single `Int.max` enemy count passed validation →
+  `StageValidator.maxEnemiesPerStage` (500) per entry and in total, timer
+  and cap domains from `WorldInvariants`, and `StageBuilder` validates
+  before it allocates (`StageBudgetTests`).
+- R15-03 (Medium) open-edge worlds moved the nominal footprint outside the
+  arena → movement bounds the NOMINAL footprint; the inset applies to
+  obstacles only (`ArenaBoundaryTests`, four edges, approach, turn assist).
+- R15-04 (Medium) session validated pickups only → all three rulesets are
+  preconditioned; `MovementLabSession.make` throws for data
+  (`SessionConfigurationTests`).
+- R15-05 (Medium) every loss read "基地失守" → the loss reason travels with
+  `StageFlow`, titles are truthful (`OutcomeTitleTests`); results rows
+  scroll inside a panel bounded to half the surface, restart outside it —
+  a layout policy, not device-verified for large tallies.
+- R15-06 (Medium) README now states the Foundation exception at the
+  content-loading boundary, matching the architecture check.
+- R15-07 (Low) handoff consolidated (current counts, candidate status,
+  round-14 closure), stale source comments fixed, event-anchor doc attached
+  to `DomainEvent`; this document keeps dated evidence sections.
+- R15-08 (Low) integration-test time is an explicit input advanced once per
+  frame.
+- R15-09 (Medium) `Tools/audio_manifest.json` (per-file sha256, length,
+  attribution, generator hash, pending shipping review) and
+  `Scripts/check-audio.sh` (regenerate outside the tree; compare files and
+  manifest), wired into `Scripts/ci.sh`.
+PI's suggested commit split (core/content contracts; adapter lifecycle and
+presentation; stage orchestration + candidate audio + ADR; tooling + docs)
+is recorded in the handoff for the owner. Rounds 16–17 closed R15
+(R16-01 results hit testing, R16-02 evidence counts). Rounds 18–19
+(owner-directed changes after the device session: no engine sound, longer
+stage stingers from the reacquired audio, rapid-fire stutter mitigations):
+PI closed R18-01 (playback never allocates), R18-02 (recoil boundary),
+R18-03 (hypothesis wording) and requested no further synthesis change
+before the owner's audition. Round 20 (owner: blank playfield on the
+phone): cause was round 13's `SpriteView(isPaused:)` binding; replaced by
+pausing the scene on inactivity; PI verified the replacement on a fresh
+simulator; its recommended presentation smoke test is
+`Scripts/smoke-render.sh` in CI (round 21). Round 21 (PI): the first
+classifier accepted the intro card (contrast alone) and a failed launch
+could pass — replaced by a gameplay-surface predicate (≥ 20 % frontier
+ground pixels and ≥ 2 % brick pixels in the central crop), strict failure
+propagation for launch/capture/classification, a simulator-free
+`selftest` (synthetic positive; intro-card, flat and results-overlay
+negatives; mock launch and capture failures must fail the gate), and
+ffmpeg required under CI (`brew install ffmpeg` in the workflow) while a
+local miss still skips with a notice. Round 22 (PI): the decoder's status
+was masked by the pipeline and the results negative was whitened instead
+of darkened — the crop is now decoded to a file with a checked ffmpeg
+status (a decoder that fails after plausible output is rejected; self-
+tested with a late-failing wrapper), and the results fixture uses output
+maxima plus title/table blocks and is asserted darker than its source
+before the classifier must reject it. Round 23: PI reran its decoder
+injection and the real smoke on a fresh simulator (stage 61.4 % / 23.6 %,
+lab 82.0 % / 10.6 %) and CLOSED rounds 20–22; the guard is a smoke check
+for the frontier fixtures, not a general visual test, and
+background/foreground automation stays deferred. Engineering review is closed
+at every scope reviewed. Round 24 (drum riff): PI accepted the owner's
+6-6-1-4 phrasing for the synthesized riff and raised R24-01 (docs still
+described the removed bed) and R24-02 (`hits.py` timebase) — R24-02
+applied (frame times from hop/rate, detector labelled heuristic); R24-01
+is superseded by the owner's originals decision, and the builder's riff
+comments were corrected for the one synthesized use left (the loss
+stinger). Round 25 (excerpts): PI closed R25-01 (creative decision separated from the
+PENDING rights review; "excerpt" terminology), R25-02 (extractor hash and
+full excerpt-metadata comparison, self-tested), R25-03 (protected names
+refused before any write) and R25-04 (mapping rewritten) in round 26,
+which raised R26-01 (metadata wording: provisional endpoint, one
+selected launch instance, 15–80 ms fades, the silent-margin exception)
+and R26-02 (preserve the rhythm-analysis scripts and windows in the
+record) — both applied. The opening-sound excerpt stays PROVISIONAL until
+the owner pinpoints it; no further blind re-cut. Round 27 (original jingle): PI accepted `inspired` as a provenance class
+(not a legal conclusion), kept the intro duration (the jingle's tail
+overlaps ≈1.8 s of play; duck rather than delay control if cues suffer),
+and raised R27-01 (the excerpt self-tests mutated the now-generated card)
+and R27-02 (comment/README/provenance migration) — both applied: the
+self-tests target `sfx_stage_win.wav` after asserting it is an excerpt,
+generated entries have their own corruption cases, the card's manifest
+entry carries its inspiration provenance, durations are stated as phrase
+vs file, and the README's withdrawn windows are marked historical. The standing limits (audition, provenance/rights, device
+performance/layout, video re-alignment, ADR acceptance, commit) are the
+owner's. Standing limits stay
+explicit and pending: owner audition, reconstructed measurement evidence
+(a rerun of `Tools/reference_measure/`), provenance/rights review,
+large-results-panel layout, device readability/mix/performance, broader
+product acceptance. (ADR-0010 and ADR-0011 were accepted by the owner
+later on 2026-09-10 — see the decisions below; the review itself never
+accepted them on the owner's behalf.) Round 28 (R27-01/02 applied, the
+jingle revised toward the reference's direction and accepted by the
+owner) reached PI, which began verifying (`check-audio.sh selftest` in
+both modes, `git diff --check`) and then hit its ChatGPT usage limit
+("Try again in ~7167 min", ≈5 days); the round has no PI reply. The
+changes after round 27 (jingle revision, the owner's decisions B/3/4/6/7,
+the reward rule) are therefore Claude-only until PI is back. This is a scoped
+review sign-off, not a claim that every possible malformed recording is
+safe, that the product is complete, or that device/audio acceptance has
+passed — see the gaps below.
+
+## Owner decisions of 2026-09-10 (evening)
+
+Recorded verbatim: "应该是 B 恢复为加固前记录的材质；3 正确；4 正确；5，按照原作来；6 消失了；7 提交；9 不用".
+
+- ADR-0010 accepted; fort-ring restoration = B (recorded materials):
+  `PickupRuleset.fortRingRestoresRecordedKinds` now defaults to `true`.
+- ADR-0011 accepted; the shot attribution (the glide) confirmed.
+- Rights: the owner reviewed and accepts the use of the eight recording
+  excerpts, the synthesized voices and the original jingle with no
+  third-party licence held; recorded in `Tools/audio_manifest.json`
+  (`rights_review`) — the decision and its responsibility are the owner's.
+- Stage-clear reward: to follow the reference ("按照原作来") — a scoring
+  rule to be measured from the reference's results screens and proposed as
+  an ADR item (open work).
+- Rapid-fire stutter: gone on the device ("消失了").
+- Commit the tree ("提交"); no CLAUDE.md ("不用").
+- Still open: the invincibility duration (A 10 s default / B the reference
+  25 s rule) — not answered.
+
+## Remaining gaps / follow-up review
+
+Do not interpret green tests as product completion:
+
+- Physical-device legibility, touch occlusion, audio mix and sustained
+  performance are unverified (ADR-0006 gate still pending).
+- VS-01 keeps the owner-directed reference layout; the plan's "one visible
+  Speed or Power pickup" teaching goal is served by carriers and hidden
+  treasures, which is a recorded deviation, not equivalence.
+- Deferred to M4: amphibious traversal, ice inertia, foliage rendering,
+  difficulty profiles, mine launch/flight, persistence/settings/tutorials,
+  full pause UI, a title screen. Equipment is rendered and mine
+  interactions work; traversal effects are not. (Cost-map navigation and
+  the results screen landed on 2026-09-10.)
+- Explosions resolve after the contact queue (documented approximation).
+- The ground tile family is fixed to the frontier theme until stage data
+  selects it.
+- Reachability validation is a cell flood approximation.
+- Owner decisions still open: the reference-invincibility rule; the
+  stage-clear reward rule is decided in principle (follow the reference)
+  and awaits measurement and implementation.
