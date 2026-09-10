@@ -21,6 +21,7 @@ enum Stage {
         _ world: inout WorldState, ruleset: MovementRuleset
     ) -> [Int: (normal: Bool, special: Bool)] {
         guard let stage = world.stage, stage.phase == .playing else { return [:] }
+        let profile = stage.enemyBehavior // difficulty-shaped data (ADR-0015)
         var fire: [Int: (normal: Bool, special: Bool)] = [:]
         let playerTank = world.players.first.flatMap { p in
             p.tankEntityID.flatMap { id in world.tank(entityID: id) }
@@ -34,9 +35,10 @@ enum Stage {
                 world.tanks[index] = tank
                 continue
             }
-            // Movement decision cadence, staggered by entity ID. Draw count
-            // per decision is fixed (3) so the ai stream stays aligned.
-            if (world.tick + tank.entityID * 13) % 30 == 0 {
+            // Movement decision cadence (the profile's reaction interval),
+            // staggered by entity ID. Draw count per decision is fixed (3)
+            // so the ai stream stays aligned.
+            if (world.tick + tank.entityID * 13) % max(1, profile.decisionIntervalTicks) == 0 {
                 let roll = world.rng.ai.next(upperBound: 100)
                 let jitter = world.rng.ai.next(upperBound: 4)
                 let commit = world.rng.ai.next(upperBound: 100)
@@ -46,7 +48,8 @@ enum Stage {
                 let canDig = enemyFamily(tank.archetypeID) != "fire"
                 let targetCenter: Vec2i
                 let goals: [Vec2i]
-                if let base = world.base, roll < attributes.baseFocusPercent || playerTank == nil {
+                let baseFocus = min(100, attributes.baseFocusPercent * profile.baseFocusPercent / 100)
+                if let base = world.base, roll < baseFocus || playerTank == nil {
                     targetCenter = Vec2i(x: base.topLeftSubunits.x + base.sizeSubunits / 2,
                                          y: base.topLeftSubunits.y + base.sizeSubunits / 2)
                     goals = Navigation.baseApproachGoals(world, canDig: canDig)
@@ -122,7 +125,7 @@ enum Stage {
                 // the target — otherwise a committed enemy cruises past the
                 // base it rolled to attack.
                 let keepCourse: Bool = {
-                    guard let current = tank.movementIntent, free(current), commit < 55
+                    guard let current = tank.movementIntent, free(current), commit < profile.courseCommitPercent
                     else { return false }
                     let v = current.vector
                     return v.x * dx + v.y * dy >= 0
@@ -153,7 +156,7 @@ enum Stage {
                 // blocked only by another tank yields to the next option.
                 let guided: Direction? = descent.first { free($0.direction) || brickBlocked($0.direction) }?.direction
                 let atGoal = !costField.isEmpty && Navigation.isAtGoal(field: costField, world: world, anchor: selfAnchor)
-                if roll >= 90 {
+                if roll >= 100 - profile.wanderPercent {
                     // Wander (§10.4): a slice of decisions roams instead of
                     // bee-lining, so enemies don't grind at the same wall.
                     tank.movementIntent = steer()
@@ -183,10 +186,14 @@ enum Stage {
             // cap. Rapid keeps a wider window — bursts are its identity.
             let cadencePhase = world.tick + tank.entityID * 11
             let family = enemyFamily(tank.archetypeID)
+            // The open part of each duty cycle scales with the profile
+            // (authored: rapid 16/32, others 12/48, break 12/64), clamped
+            // to the cycle so 0 % never fires and 400 % never exceeds it.
+            func open(_ base: Int, of period: Int) -> Int { min(period, base * profile.fireWindowPercent / 100) }
             let alignedWindowOpen = family == "rapid"
-                ? cadencePhase % 32 < 16
-                : cadencePhase % 48 < 12
-            let breakWindowOpen = cadencePhase % 64 < 12
+                ? cadencePhase % 32 < open(16, of: 32)
+                : cadencePhase % 48 < open(12, of: 48)
+            let breakWindowOpen = cadencePhase % 64 < open(12, of: 64)
             var shouldFire = false
             let selfCenter = Vec2i(x: tank.positionSubunits.x + footprint / 2,
                                    y: tank.positionSubunits.y + footprint / 2)
@@ -227,8 +234,9 @@ enum Stage {
                 pressNormal = shouldFire
             case "mine":
                 pressNormal = shouldFire
-                if (world.tick + tank.entityID * 7) % 24 == 0 && world.rng.ai.next(upperBound: 5) == 0 {
-                    pressSpecial = true // lay a mine (§9.1)
+                if (world.tick + tank.entityID * 7) % 24 == 0
+                    && world.rng.ai.next(upperBound: 100) < profile.minePlacePercent {
+                    pressSpecial = true // lay a mine (§9.1; the profile's percent)
                 }
             default: // rapid, fire, ap, explosion
                 pressSpecial = shouldFire
@@ -740,11 +748,34 @@ enum Stage {
         }
         for i in spawnedIndices.reversed() { world.spawnTelegraphs.remove(at: i) }
 
+        // Authored director phases (ADR-0015): once enough enemies have
+        // been scheduled, reinforcements jump the queue (elite wave), the
+        // alive cap may change, and the base may be repaired — each phase
+        // once, in order.
+        while stage.directorPhasesFired < stage.directorPhases.count,
+              stage.directorPhases[stage.directorPhasesFired].afterSpawned <= stage.directorSpawned {
+            let phase = stage.directorPhases[stage.directorPhasesFired]
+            stage.directorPhasesFired += 1
+            stage.spawnQueue.insert(contentsOf: phase.reinforcements, at: 0)
+            if !stage.carriedPickupQueue.isEmpty {
+                stage.carriedPickupQueue.insert(contentsOf: [String?](repeating: nil, count: phase.reinforcements.count), at: 0)
+            }
+            if let cap = phase.maxAliveEnemies { stage.maxAliveEnemies = cap }
+            if phase.repairsBase, var base = world.base, base.durability > 0 {
+                let restored = base.maxDurability - base.durability
+                base.durability = base.maxDurability
+                world.base = base
+                if restored > 0 { events.append(.baseRepaired(restored: restored)) }
+            }
+            events.append(.directorPhaseStarted(id: phase.id, reinforcements: phase.reinforcements.count))
+        }
+
         // Schedule new telegraphs up to the alive cap.
         let aliveEnemies = world.tanks.filter { $0.teamID != 1 }.count
         while !stage.spawnQueue.isEmpty,
               aliveEnemies + world.spawnTelegraphs.count < stage.maxAliveEnemies {
             let archetypeID = stage.spawnQueue.removeFirst()
+            stage.directorSpawned += 1
             let carried = stage.carriedPickupQueue.isEmpty
                 ? nil : stage.carriedPickupQueue.removeFirst()
             let pointIndex = stage.nextSpawnPointIndex % stage.spawnPointsCells.count

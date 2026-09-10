@@ -430,6 +430,36 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         #expect(controller.session.world.player(.one)?.score == 0 && controller.flow.phase == .card)
     }
 
+    /// ADR-0015: the bundled-style provider hands the session the
+    /// difficulty's weapon rules and the run's difficulty id; a director
+    /// phase raises a HUD notice that expires.
+    @Test func theProviderCarriesTheDifficultyAndPhasesRaiseANotice() throws {
+        let campaign = CampaignDefinition(id: "test", displayNameKey: "k", stageIDs: ["one"])
+        let provider = MovementLabController.StageProvider { run in
+            var world = makeOpenWorld()
+            world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 12 * cell, y: 20 * cell))
+            world.stage = StageState(spawnQueue: ["normal_a", "normal_a"], maxAliveEnemies: 1, enemyStartDelayTicks: 0,
+                                     spawnPointsCells: [Vec2i(x: 50, y: 1)], playerRespawnCell: Vec2i(x: 3, y: 3), dropTable: [],
+                                     directorPhases: [DirectorPhase(id: "elite_minelayer", afterSpawned: 1, reinforcements: ["ap_c"])])
+            var weapons = WeaponRuleset.provisional
+            weapons.alliedBaseDamage = run.difficultyID != "casual"
+            return .init(world: world, weapons: weapons)
+        }
+        let controller = MovementLabController(campaign: CampaignRun(campaign: campaign, difficultyID: "casual"), stages: provider)
+        #expect(controller.session.weapons.alliedBaseDamage == false)
+        #expect(controller.session.recording.difficultyID == "casual")
+        let (_, _, clock) = (0, 0, FakeClock())
+        controller.applicationDidBecomeActive()
+        var steps = 0
+        while controller.directorNotice == nil, steps < 800 { frame(controller, clock: clock); steps += 1 }
+        #expect(controller.directorNotice?.text == "精英布雷车来袭 ×1")
+        let raised = controller.session.world.tick
+        while controller.directorNotice != nil, steps < 2000 { frame(controller, clock: clock); steps += 1 }
+        #expect(controller.session.world.tick - raised > MovementLabController.directorNoticeTicks)
+        #expect(HUDLabels.directorPhase("elite_x", reinforcements: 0) == "精英部队来袭")
+        #expect(HUDLabels.directorPhase("wave2", reinforcements: 3) == "敌军增援 ×3")
+    }
+
     /// ADR-0012: the world pays the clear bonuses on the deciding tick; the
     /// HUD withholds them until the panel's total line (tally bonus) and
     /// reward line (reward) the way the reference counts them in, and the

@@ -33,6 +33,9 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public var carriedDrops: [CarriedDrop]?
     /// Treasures hidden under brick cells, revealed on destruction.
     public var hiddenPickups: [PickupSpawn]?
+    /// Authored director phases (ADR-0015): elite reinforcements, alive
+    /// cap changes and base repair keyed on enemies scheduled so far.
+    public var directorPhases: [DirectorPhase]?
 
     public struct TerrainSpec: Codable, Equatable, Sendable {
         public var border: String            // terrain kind for the arena border

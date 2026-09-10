@@ -13,6 +13,7 @@ public enum StageValidator {
         public var enemies: Set<String>
         public var pickups: Set<String>
         public var themes: Set<String>
+        public var difficulties: Set<String> = ["casual", "standard", "veteran"]
         public var terrainKinds: Set<String>
         public init(enemies: Set<String>, pickups: Set<String>,
                     themes: Set<String>, terrainKinds: Set<String>) {
@@ -39,6 +40,8 @@ public enum StageValidator {
     /// and in total). The reference schedules about twenty; the budget is
     /// generous but finite so the loader never admits an unbounded queue.
     public static let maxEnemiesPerStage = 500
+    /// §10.6 fairness floor for spawn telegraphs.
+    public static let telegraphFairnessFloor = 45
     /// Campaign positions are small integers; the tier table (ADR-0012)
     /// saturates far below this.
     public static let maxStageNumber = 999
@@ -130,12 +133,30 @@ public enum StageValidator {
             else { totalEnemies = sum }
         }
         if totalEnemies == 0 { issues.append("enemy_composition is empty") }
+        var phaseIDs = Set<String>()
+        var lastTrigger = -1
+        for phase in def.directorPhases ?? [] {
+            if phase.id.isEmpty { issues.append("director phase without id") }
+            if !phaseIDs.insert(phase.id).inserted { issues.append("director phase '\(phase.id)' repeats") }
+            if phase.afterSpawned < 0 || phase.afterSpawned > totalEnemies {
+                issues.append("director phase '\(phase.id)' after_spawned \(phase.afterSpawned) outside 0…\(totalEnemies)")
+            }
+            if phase.afterSpawned < lastTrigger { issues.append("director phase '\(phase.id)' out of trigger order") }
+            lastTrigger = max(lastTrigger, phase.afterSpawned)
+            for archetype in phase.reinforcements where !known.enemies.contains(archetype) {
+                issues.append("director phase '\(phase.id)' unknown enemy archetype '\(archetype)'")
+            }
+            if phase.reinforcements.count > maxEnemiesPerStage { issues.append("director phase '\(phase.id)' reinforcements exceed the stage budget") }
+            if let cap = phase.maxAliveEnemies, cap <= 0 || cap > WorldInvariants.maxCount {
+                issues.append("director phase '\(phase.id)' max_alive_enemies \(cap) out of domain")
+            }
+        }
         if totalEnemies > maxEnemiesPerStage { issues.append("enemy_composition total \(totalEnemies) exceeds the stage budget of \(maxEnemiesPerStage)") }
         if def.maxAliveEnemies <= 0 { issues.append("max_alive_enemies must be positive") }
         if def.maxAliveEnemies > WorldInvariants.maxCount { issues.append("max_alive_enemies \(def.maxAliveEnemies) out of domain") }
         if def.initialEnemyDelayTicks < 0 { issues.append("initial_enemy_delay_ticks negative") }
         if def.initialEnemyDelayTicks > WorldInvariants.maxTicks { issues.append("initial_enemy_delay_ticks \(def.initialEnemyDelayTicks) out of domain") }
-        if def.telegraphTicks < 45 { issues.append("telegraph_ticks \(def.telegraphTicks) below the 45-tick fairness floor") }
+        if def.telegraphTicks < telegraphFairnessFloor { issues.append("telegraph_ticks \(def.telegraphTicks) below the 45-tick fairness floor") }
         if def.telegraphTicks > WorldInvariants.maxTicks { issues.append("telegraph_ticks \(def.telegraphTicks) out of domain") }
 
         for pickup in def.pickupSpawns {

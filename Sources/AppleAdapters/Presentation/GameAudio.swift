@@ -299,6 +299,10 @@ public final class GameAudio {
                 add("sfx_pickup_collect")
             case .enemyWaveStarted:
                 add("sfx_spawn_warp")
+            case .directorPhaseStarted:
+                add("sfx_spawn_warp") // the elite wave's own warp, ahead of its telegraphs
+            case .baseRepaired:
+                add("sfx_base_shield_on")
             case .stageWon:
                 break // the outcome stinger plays with the outro fade (StageFlow cue)
             case .stageLost(let reason):

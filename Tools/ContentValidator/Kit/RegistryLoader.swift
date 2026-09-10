@@ -65,6 +65,41 @@ public enum RegistryLoader {
         var issues = validateRegistry(at: registry)
         issues.append(contentsOf: validateStages(in: root))
         issues.append(contentsOf: validateCampaigns(in: root))
+        issues.append(contentsOf: validateDifficulties(in: root))
+        return issues
+    }
+
+    /// Validates every difficulty JSON under `Content/difficulties` and
+    /// requires the registry's three presets to exist (ADR-0005 makes
+    /// `allied_base_damage` a required field of each; ADR-0015).
+    public static func validateDifficulties(in root: URL) -> [ContentIssue] {
+        let dir = root.appendingPathComponent("difficulties")
+        var issues: [ContentIssue] = []
+        var seen = Set<String>()
+        if let entries = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+            for url in entries.filter({ $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+                let file = "difficulties/" + url.lastPathComponent
+                guard let data = try? Data(contentsOf: url) else {
+                    issues.append(ContentIssue(file: file, field: "-", message: "cannot read file"))
+                    continue
+                }
+                do {
+                    let def = try DifficultyLoader.decode(data)
+                    for message in DifficultyValidator.validate(def) {
+                        issues.append(ContentIssue(file: file, field: def.id.isEmpty ? "-" : def.id, message: message))
+                    }
+                    if url.deletingPathExtension().lastPathComponent != def.id {
+                        issues.append(ContentIssue(file: file, field: def.id, message: "file name does not match the id"))
+                    }
+                    seen.insert(def.id)
+                } catch {
+                    issues.append(ContentIssue(file: file, field: "-", message: "invalid difficulty JSON: \(error)"))
+                }
+            }
+        }
+        for id in ["casual", "standard", "veteran"] where !seen.contains(id) {
+            issues.append(ContentIssue(file: "difficulties/\(id).json", field: id, message: "difficulty preset missing (plan §5.1)"))
+        }
         return issues
     }
 

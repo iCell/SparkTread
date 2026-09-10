@@ -241,6 +241,17 @@ public enum WorldInvariants {
                 || stage.clearBonus.reward < 0 || stage.clearBonus.reward > maxScore {
                 issues.append("stage clear bonus out of domain")
             }
+            issues += stage.enemyBehavior.validationIssues().map { "enemy behaviour: \($0)" }
+            if stage.directorPhasesFired < 0 || stage.directorPhasesFired > stage.directorPhases.count {
+                issues.append("director phase cursor out of domain")
+            }
+            if stage.directorSpawned < 0 || stage.directorSpawned > maxCount { issues.append("director spawn count out of domain") }
+            for phase in stage.directorPhases {
+                if phase.id.isEmpty { issues.append("director phase without id") }
+                if phase.afterSpawned < 0 || phase.afterSpawned > maxCount { issues.append("director phase '\(phase.id)' trigger out of domain") }
+                if let cap = phase.maxAliveEnemies, cap < 1 || cap > maxCount { issues.append("director phase '\(phase.id)' alive cap out of domain") }
+                if phase.reinforcements.count > maxCount { issues.append("director phase '\(phase.id)' reinforcements out of domain") }
+            }
             for c in stage.spawnPointsCells + [stage.playerRespawnCell] + stage.hiddenPickups.map(\.cell)
             where c.x < 0 || c.y < 0 || c.x >= arena.cellsWide || c.y >= arena.cellsHigh {
                 issues.append("stage cell (\(c.x),\(c.y)) outside the arena")

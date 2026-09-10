@@ -139,6 +139,16 @@ extension WorldState {
             c.mix(stage.nextSpawnPointIndex); c.mix(stage.telegraphTicks)
             c.mix(stage.playerRespawnCell.x); c.mix(stage.playerRespawnCell.y)
             c.mix(stage.clearBonus.tally); c.mix(stage.clearBonus.reward)
+            let b = stage.enemyBehavior
+            c.mix(b.decisionIntervalTicks); c.mix(b.baseFocusPercent); c.mix(b.wanderPercent)
+            c.mix(b.fireWindowPercent); c.mix(b.minePlacePercent); c.mix(b.courseCommitPercent)
+            c.mix(stage.directorPhases.count)
+            for phase in stage.directorPhases {
+                c.mix(phase.id); c.mix(phase.afterSpawned); c.mix(phase.reinforcements.count)
+                for id in phase.reinforcements { c.mix(id) }
+                c.mix(phase.maxAliveEnemies); c.mix(phase.repairsBase)
+            }
+            c.mix(stage.directorPhasesFired); c.mix(stage.directorSpawned)
             for id in stage.dropTable { c.mix(id) }
             c.mix(stage.dropChancePercent)
             c.mix(stage.carriedPickupQueue.count)

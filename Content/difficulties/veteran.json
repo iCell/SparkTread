@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "veteran",
+  "displayNameKey": "difficulty.veteran.name",
+  "enemyBehavior": {
+    "decisionIntervalTicks": 20,
+    "baseFocusPercent": 125,
+    "wanderPercent": 5,
+    "fireWindowPercent": 140,
+    "minePlacePercent": 30,
+    "courseCommitPercent": 40
+  },
+  "telegraphTicksPercent": 100,
+  "composition": "advanced",
+  "alliedBaseDamage": true,
+  "enemySpecialAmmoPercent": 140
+}

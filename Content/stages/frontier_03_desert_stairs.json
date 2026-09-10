@@ -268,11 +268,11 @@
     },
     {
       "queueIndex": 9,
-      "pickup": "base_shield"
+      "pickup": "bomb"
     },
     {
       "queueIndex": 15,
-      "pickup": "bomb"
+      "pickup": "base_shield"
     },
     {
       "queueIndex": 21,
@@ -293,6 +293,19 @@
         41,
         11
       ]
+    }
+  ],
+  "directorPhases": [
+    {
+      "id": "elite_minelayer",
+      "afterSpawned": 16,
+      "reinforcements": [
+        "mine_c",
+        "ap_c",
+        "ap_c"
+      ],
+      "maxAliveEnemies": 6,
+      "repairsBase": true
     }
   ]
 }

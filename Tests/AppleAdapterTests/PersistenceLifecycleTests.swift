@@ -131,7 +131,7 @@ private func play(_ controller: MovementLabController, ticks: Int = 0) {
                                         bestScore: 530)
         try store.saveProgress(progress)
         #expect(try store.loadProgress() == progress)
-        let world = try provider().load("a_01_x", .campaignStart)
+        let world = try provider().build(CampaignRun(campaign: campaign)).world
         let session = MovementLabSession(world: world, stageID: "a_01_x", sessionState: .campaignStart)
         let snapshot = SuspendedSession(run: CampaignRun(campaign: campaign), world: world, recording: session.recording)
         try store.saveSuspended(snapshot)

@@ -91,13 +91,27 @@ public struct StageState: Codable, Equatable, Sendable {
     /// by content from the stage number (`ScoreRules.reference`); `.none`
     /// for worlds without a campaign position (lab, tests).
     public var clearBonus: ScoreRules.ClearBonus
+    /// Difficulty-shaped enemy behaviour (ADR-0015), set by content from
+    /// the difficulty definition; `.standard` when absent.
+    public var enemyBehavior: EnemyBehaviorProfile
+    /// Authored director phases in order (ADR-0015) and how many have
+    /// fired; `directorSpawned` counts enemies scheduled so far.
+    public var directorPhases: [DirectorPhase]
+    public var directorPhasesFired: Int
+    public var directorSpawned: Int
 
     public init(spawnQueue: [String], maxAliveEnemies: Int, enemyStartDelayTicks: Int = 240,
                 spawnPointsCells: [Vec2i], telegraphTicks: Int = 45,
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 45,
                 carriedPickupQueue: [String?] = [], hiddenPickups: [HiddenPickup] = [],
-                clearBonus: ScoreRules.ClearBonus = .none) {
+                clearBonus: ScoreRules.ClearBonus = .none,
+                enemyBehavior: EnemyBehaviorProfile = .standard,
+                directorPhases: [DirectorPhase] = []) {
         self.clearBonus = clearBonus
+        self.enemyBehavior = enemyBehavior
+        self.directorPhases = directorPhases
+        self.directorPhasesFired = 0
+        self.directorSpawned = 0
         self.phase = .playing
         self.spawnQueue = spawnQueue
         self.carriedPickupQueue = carriedPickupQueue
@@ -116,6 +130,7 @@ public struct StageState: Codable, Equatable, Sendable {
         case phase, spawnQueue, carriedPickupQueue, hiddenPickups, maxAliveEnemies
         case enemyStartDelayTicks, spawnPointsCells, nextSpawnPointIndex, telegraphTicks
         case playerRespawnCell, dropTable, dropChancePercent, clearBonus
+        case enemyBehavior, directorPhases, directorPhasesFired, directorSpawned
     }
 
     /// `clearBonus` was added after recordings of this format existed: a
@@ -135,6 +150,10 @@ public struct StageState: Codable, Equatable, Sendable {
         dropTable = try c.decode([String].self, forKey: .dropTable)
         dropChancePercent = try c.decode(Int.self, forKey: .dropChancePercent)
         clearBonus = try c.decodeIfPresent(ScoreRules.ClearBonus.self, forKey: .clearBonus) ?? .none
+        enemyBehavior = try c.decodeIfPresent(EnemyBehaviorProfile.self, forKey: .enemyBehavior) ?? .standard
+        directorPhases = try c.decodeIfPresent([DirectorPhase].self, forKey: .directorPhases) ?? []
+        directorPhasesFired = try c.decodeIfPresent(Int.self, forKey: .directorPhasesFired) ?? 0
+        directorSpawned = try c.decodeIfPresent(Int.self, forKey: .directorSpawned) ?? 0
     }
 }
 

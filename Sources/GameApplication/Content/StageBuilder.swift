@@ -14,8 +14,9 @@ public enum StageBuilder {
     /// score, ammunition and retained upgrades land on player one; the tank
     /// spawns with the stage's armor and the retained upgrades applied.
     public static func build(_ def: StageDefinition, rules: PickupRuleset = .provisional,
-                             session: SessionState = .campaignStart) throws -> WorldState {
-        let issues = StageValidator.validate(def) + session.validationIssues
+                             session: SessionState = .campaignStart,
+                             difficulty: DifficultyDefinition = .standard) throws -> WorldState {
+        let issues = StageValidator.validate(def) + session.validationIssues + DifficultyValidator.validate(difficulty)
         guard issues.isEmpty else { throw BuildError.invalidDefinition(issues) }
         let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
@@ -67,7 +68,8 @@ public enum StageBuilder {
                                topLeftSubunits: Vec2i(x: def.baseSpawn[0] * cell,
                                                       y: def.baseSpawn[1] * cell))
 
-        // Interleave the ordered composition into a deterministic queue.
+        // Interleave the ordered composition into a deterministic queue,
+        // then apply the difficulty's composition variant (ADR-0015).
         var pools = def.enemyComposition.map { ($0.archetype, $0.count) }
         var queue: [String] = []
         while pools.contains(where: { $0.1 > 0 }) {
@@ -87,11 +89,11 @@ public enum StageBuilder {
         }
 
         world.stage = StageState(
-            spawnQueue: queue,
+            spawnQueue: difficulty.apply(toComposition: queue),
             maxAliveEnemies: def.maxAliveEnemies,
             enemyStartDelayTicks: def.initialEnemyDelayTicks,
             spawnPointsCells: def.enemySpawns.map { Vec2i(x: $0[0], y: $0[1]) },
-            telegraphTicks: def.telegraphTicks,
+            telegraphTicks: difficulty.telegraphTicks(authored: def.telegraphTicks),
             playerRespawnCell: Vec2i(x: playerCell[0], y: playerCell[1]),
             dropTable: def.dropTable,
             dropChancePercent: def.dropChancePercent,
@@ -100,7 +102,13 @@ public enum StageBuilder {
                 HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id)
             },
             // Validated present above; the fallback is unreachable data hygiene.
-            clearBonus: ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 1))
+            clearBonus: ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 1),
+            enemyBehavior: difficulty.enemyBehavior,
+            directorPhases: (def.directorPhases ?? []).map { phase in
+                DirectorPhase(id: phase.id, afterSpawned: phase.afterSpawned,
+                              reinforcements: difficulty.apply(toComposition: phase.reinforcements),
+                              maxAliveEnemies: phase.maxAliveEnemies, repairsBase: phase.repairsBase)
+            })
 
         var events: [DomainEvent] = []
         for pickup in def.pickupSpawns {

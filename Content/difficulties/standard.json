@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "standard",
+  "displayNameKey": "difficulty.standard.name",
+  "enemyBehavior": {
+    "decisionIntervalTicks": 30,
+    "baseFocusPercent": 100,
+    "wanderPercent": 10,
+    "fireWindowPercent": 100,
+    "minePlacePercent": 20,
+    "courseCommitPercent": 55
+  },
+  "telegraphTicksPercent": 100,
+  "composition": "baseline",
+  "alliedBaseDamage": true,
+  "enemySpecialAmmoPercent": 100
+}

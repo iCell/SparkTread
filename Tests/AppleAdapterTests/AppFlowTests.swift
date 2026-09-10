@@ -50,6 +50,17 @@ import GameCore
         #expect(model.resumeSuspended() == snapshot && model.screen == .playing(stageIndex: 0))
     }
 
+    @Test func theDifficultyChoiceShapesNewRunsNotTheCheckpoint() {
+        let checkpoint = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["a_01_x"], difficultyID: "casual")
+        var model = AppFlowModel(campaign: campaign, progress: CampaignProgress(campaignID: "c", completedStageIDs: ["a_01_x"], checkpoint: checkpoint))
+        #expect(model.difficultyID == "casual") // follows the checkpoint
+        #expect(model.run(forStageIndex: 1) == checkpoint)
+        model.difficultyID = "veteran"
+        #expect(model.run(forStageIndex: 1)?.difficultyID == "veteran") // a new run on that stage, not the casual checkpoint
+        #expect(model.run(forStageIndex: 0)?.difficultyID == "veteran")
+        #expect(AppFlowModel(campaign: campaign).difficultyID == "standard")
+    }
+
     @Test func launchEnvironmentSkipsTheTitle() {
         #expect(AppFlowModel(campaign: campaign, autostart: true).screen == .playing(stageIndex: 0))
         #expect(AppFlowModel(campaign: nil, autostart: true).screen == .title)

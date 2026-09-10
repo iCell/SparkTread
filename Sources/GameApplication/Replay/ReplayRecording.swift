@@ -18,6 +18,10 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         public let checksum: UInt64
     }
 
+    /// Format 5 (2026-09-10, ADR-0015): the enemy brain reads its cadence,
+    /// focus, fire windows and mine roll from `StageState.enemyBehavior`
+    /// (the mine roll draws differently), the director runs authored
+    /// phases, and the header names the difficulty.
     /// Format 4 (2026-09-10, ADR-0013): the header gained the campaign
     /// fields `stageID` and `sessionState` (plan §16.3 `initial_session_state`)
     /// so a campaign replay can verify that each stage's exit state equals
@@ -35,13 +39,16 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 4
+    public static let currentFormatVersion = 5
 
     public let formatVersion: Int
     /// Campaign header (ADR-0013): the stage this recording plays and the
     /// session state it started from; nil for lab and ad-hoc worlds.
     public let stageID: String?
     public let sessionState: SessionState?
+    /// The difficulty the stage was built under (ADR-0015); the world
+    /// carries its effects, this names them.
+    public let difficultyID: String?
     public let initialWorld: WorldState
     public let movement: MovementRuleset
     public let weapons: WeaponRuleset
@@ -54,10 +61,11 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
                 movement: MovementRuleset = .provisional,
                 weapons: WeaponRuleset = .provisional,
                 pickups: PickupRuleset = .provisional,
-                stageID: String? = nil, sessionState: SessionState? = nil) {
+                stageID: String? = nil, sessionState: SessionState? = nil, difficultyID: String? = nil) {
         self.formatVersion = Self.currentFormatVersion
         self.stageID = stageID
         self.sessionState = sessionState
+        self.difficultyID = difficultyID
         self.initialWorld = initialWorld
         self.movement = movement
         self.weapons = weapons
@@ -68,7 +76,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, stageID, sessionState, initialWorld, movement, weapons, pickups
+        case formatVersion, stageID, sessionState, difficultyID, initialWorld, movement, weapons, pickups
         case startChecksum, commandLog, checksums
     }
 
@@ -88,6 +96,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         formatVersion = version
         stageID = try container.decodeIfPresent(String.self, forKey: .stageID)
         sessionState = try container.decodeIfPresent(SessionState.self, forKey: .sessionState)
+        difficultyID = try container.decodeIfPresent(String.self, forKey: .difficultyID)
         initialWorld = try container.decode(WorldState.self, forKey: .initialWorld)
         movement = try container.decode(MovementRuleset.self, forKey: .movement)
         weapons = try container.decode(WeaponRuleset.self, forKey: .weapons)

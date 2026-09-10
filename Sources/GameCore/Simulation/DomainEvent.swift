@@ -55,6 +55,11 @@ public enum DomainEvent: Codable, Equatable, Sendable {
     case equipmentChanged(entityID: Int, equipmentID: String)
     case enemyWaveStarted(archetypeID: String, position: Vec2i)
     case scoreChanged(delta: Int)
+    /// An authored director phase fired (ADR-0015): `reinforcements` is
+    /// the number of enemies pushed to the front of the queue.
+    case directorPhaseStarted(id: String, reinforcements: Int)
+    /// A director phase repaired the base by `restored` durability.
+    case baseRepaired(restored: Int)
     case stageWon
     /// The won stage's clear bonuses (ADR-0012), already added to every
     /// active player's score on this tick; follows `stageWon`. Emitted only

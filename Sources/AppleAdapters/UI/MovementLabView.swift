@@ -40,12 +40,35 @@ public final class MovementLabController {
     /// Where campaign stages come from (ADR-0013): the bundled content in
     /// the app, an in-memory provider in tests.
     public struct StageProvider {
-        public let load: (_ stageID: String, _ session: SessionState) throws -> WorldState
-        public init(load: @escaping (_ stageID: String, _ session: SessionState) throws -> WorldState) {
-            self.load = load
+        /// A built stage: the world and the weapon rules it runs under (the
+        /// difficulty's `alliedBaseDamage` lives in the rules, ADR-0005).
+        public struct StageBuild {
+            public var world: WorldState
+            public var weapons: WeaponRuleset
+            public init(world: WorldState, weapons: WeaponRuleset = .provisional) {
+                self.world = world
+                self.weapons = weapons
+            }
         }
+        public let build: (_ run: CampaignRun) throws -> StageBuild
+
+        public init(build: @escaping (_ run: CampaignRun) throws -> StageBuild) { self.build = build }
+
+        /// Worlds only, provisional rules (tests).
+        public init(load: @escaping (_ stageID: String, _ session: SessionState) throws -> WorldState) {
+            build = { run in StageBuild(world: try load(run.stageID, run.checkpoint)) }
+        }
+
+        /// The app bundle: the stage under the run's difficulty (ADR-0015).
         public static func bundled(_ bundle: Bundle = .main, rules: PickupRuleset = .provisional) -> StageProvider {
-            StageProvider { id, session in try StageLoader.loadWorld(id: id, bundle: bundle, rules: rules, session: session) }
+            StageProvider { run in
+                let difficulty = try DifficultyLoader.load(id: run.difficultyID, bundle: bundle)
+                let world = try StageLoader.loadWorld(id: run.stageID, bundle: bundle, rules: rules,
+                                                      session: run.checkpoint, difficulty: difficulty)
+                var weapons = WeaponRuleset.provisional
+                weapons.alliedBaseDamage = difficulty.alliedBaseDamage
+                return StageBuild(world: world, weapons: weapons)
+            }
         }
     }
 
@@ -165,8 +188,9 @@ public final class MovementLabController {
     /// validated against its stages when it was loaded.
     private static func makeSession(for run: CampaignRun, stages: StageProvider) -> MovementLabSession {
         do {
-            let world = try stages.load(run.stageID, run.checkpoint)
-            return MovementLabSession(world: world, stageID: run.stageID, sessionState: run.checkpoint)
+            let built = try stages.build(run)
+            return MovementLabSession(world: built.world, weapons: built.weapons, stageID: run.stageID,
+                                      sessionState: run.checkpoint, difficultyID: run.difficultyID)
         } catch {
             fatalError("campaign stage '\(run.stageID)' failed to build: \(error)")
         }
@@ -263,6 +287,7 @@ public final class MovementLabController {
 
     private func replaceSession(_ next: MovementLabSession) {
         isPaused = false
+        directorNotice = nil
         pendingEvents.removeAll()
         audio.resetForNewWorld()
         session = next
@@ -470,7 +495,14 @@ public final class MovementLabController {
             if case .stageClearBonus(let tally, let reward) = event {
                 clearBonus = ScoreRules.ClearBonus(tally: tally, reward: reward)
             }
+            if case .directorPhaseStarted(let id, let reinforcements) = event {
+                directorNotice = (HUDLabels.directorPhase(id, reinforcements: reinforcements), session.world.tick)
+            }
+            if case .baseRepaired = event, directorNotice == nil {
+                directorNotice = ("基地已修复", session.world.tick)
+            }
         }
+        if let notice = directorNotice, session.world.tick - notice.tick > Self.directorNoticeTicks { directorNotice = nil }
         for event in events {
             if case .stageWon = event {
                 flow.beginOutro(won: true, resultRows: KillTally.tableRows, rewardLine: clearBonus.reward > 0)
@@ -501,6 +533,11 @@ public final class MovementLabController {
         case .reward: break // no isolated reference instance for the reward line yet
         }
     }
+
+    /// HUD wave/pressure cue (plan §12.2): the last director phase, shown
+    /// for `directorNoticeTicks` simulation ticks.
+    public private(set) var directorNotice: (text: String, tick: Int)?
+    public static let directorNoticeTicks = 180
 
     /// The won stage's clear bonuses (ADR-0012), already in the world's
     /// score; the HUD withholds them until the results panel pays them out
@@ -613,6 +650,15 @@ enum HUDLabels {
         }
     }
 
+    /// Wave/pressure cue text for a director phase (plan §12.2).
+    static func directorPhase(_ id: String, reinforcements: Int) -> String {
+        let base: String = switch id {
+        case "elite_minelayer": "精英布雷车来袭"
+        default: id.hasPrefix("elite") ? "精英部队来袭" : "敌军增援"
+        }
+        return reinforcements > 0 ? "\(base) ×\(reinforcements)" : base
+    }
+
     /// One line under the stamped outcome title: why the stage ended.
     static func outcomeSubtitle(won: Bool, lossReason: String?) -> String {
         guard !won else { return "敌军全部歼灭" }
@@ -705,6 +751,19 @@ public struct MovementLabView: View {
                 if controller.isLab { weaponDebugPanel }
                 stageHUD
                 if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused { pauseButton }
+                if let notice = controller.directorNotice, !Self.isDimmed(flowPhase) {
+                    Text(notice.text)
+                        .font(.system(size: 22, weight: .heavy))
+                        .foregroundStyle(Color.red)
+                        .shadow(color: .black, radius: 0, x: 2, y: 2)
+                        .padding(.horizontal, 16).padding(.vertical, 6)
+                        .background(Capsule().fill(Color.black.opacity(0.55)))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .padding(.top, geometry.size.height * 0.16)
+                        .allowsHitTesting(false)
+                        .id(notice.tick)
+                        .transition(.scale(scale: 1.5).combined(with: .opacity))
+                }
                 stageFlowOverlay(size: geometry.size)
                 if paused { pauseOverlay }
             }

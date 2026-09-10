@@ -24,6 +24,10 @@ public struct AppFlowModel: Equatable, Sendable {
     /// A mid-stage snapshot offered on the title, if any.
     public private(set) var suspended: SuspendedSession?
     public let campaign: CampaignDefinition?
+    /// The difficulty new runs start on (plan §5.1 presets); a checkpoint
+    /// run keeps its own.
+    public var difficultyID: String = CampaignRun.defaultDifficultyID
+    public static let difficultyIDs = ["casual", "standard", "veteran"]
 
     public init(campaign: CampaignDefinition?, progress: CampaignProgress? = nil,
                 suspended: SuspendedSession? = nil, autostart: Bool = false, lab: Bool = false) {
@@ -31,6 +35,7 @@ public struct AppFlowModel: Equatable, Sendable {
         if let progress, progress.campaignID == campaign?.id {
             completedStageIDs = Set(progress.completedStageIDs)
             checkpoint = progress.checkpoint
+            if let checkpoint = progress.checkpoint { difficultyID = checkpoint.difficultyID }
         }
         if let suspended, suspended.run.campaign.id == campaign?.id { self.suspended = suspended }
         if lab { screen = .playing(stageIndex: nil) }
@@ -41,8 +46,8 @@ public struct AppFlowModel: Equatable, Sendable {
     /// else the campaign-start state on that stage.
     public func run(forStageIndex index: Int) -> CampaignRun? {
         guard let campaign, isUnlocked(stageIndex: index) else { return nil }
-        if let checkpoint, checkpoint.stageIndex == index { return checkpoint }
-        return CampaignRun(campaign: campaign, stageIndex: index)
+        if let checkpoint, checkpoint.stageIndex == index, checkpoint.difficultyID == difficultyID { return checkpoint }
+        return CampaignRun(campaign: campaign, stageIndex: index, difficultyID: difficultyID)
     }
 
     /// Resuming the snapshot leaves the title; declining discards it.
@@ -153,6 +158,7 @@ public struct AppRootView: View {
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model,
                                          onSelect: { index in if let run = model.run(forStageIndex: index) { start(run) } },
+                                         onDifficulty: { id in model.difficultyID = id },
                                          onBack: { model.backToTitle() })
                 }
             case .playing:
@@ -259,7 +265,17 @@ struct CampaignSelectScreen: View {
     let campaign: CampaignDefinition
     let model: AppFlowModel
     let onSelect: (Int) -> Void
+    var onDifficulty: (String) -> Void = { _ in }
     let onBack: () -> Void
+
+    static func difficultyLabel(_ id: String) -> String {
+        switch id {
+        case "casual": "休闲"
+        case "standard": "标准"
+        case "veteran": "老兵"
+        default: id
+        }
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -277,6 +293,20 @@ struct CampaignSelectScreen: View {
                 Color.clear.frame(width: 60, height: 1)
             }
             .padding(.horizontal, 24)
+            HStack(spacing: 10) {
+                Text("难度")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                ForEach(AppFlowModel.difficultyIDs, id: \.self) { id in
+                    Button { onDifficulty(id) } label: {
+                        Text(Self.difficultyLabel(id))
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(model.difficultyID == id ? Color.black : Color.white)
+                            .padding(.horizontal, 14).padding(.vertical, 6)
+                            .background(Capsule().fill(model.difficultyID == id ? Color.yellow : Color.white.opacity(0.15)))
+                    }
+                }
+            }
             HStack(spacing: 18) {
                 ForEach(Array(campaign.stageIDs.enumerated()), id: \.offset) { index, id in
                     let card = HUDLabels.stageCard(id)

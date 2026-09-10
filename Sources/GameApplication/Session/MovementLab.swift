@@ -72,6 +72,7 @@ public struct MovementLabSession: Sendable {
     /// session state the world was built from; nil for lab/ad-hoc worlds.
     public let stageID: String?
     public let sessionState: SessionState?
+    public let difficultyID: String?
     public static let checksumInterval = 60
 
     /// Configuration rejected at the session boundary.
@@ -94,12 +95,13 @@ public struct MovementLabSession: Sendable {
                             ruleset: MovementRuleset = .provisional,
                             weapons: WeaponRuleset = .provisional,
                             pickups: PickupRuleset = .provisional,
-                            stageID: String? = nil, sessionState: SessionState? = nil) throws -> MovementLabSession {
+                            stageID: String? = nil, sessionState: SessionState? = nil,
+                            difficultyID: String? = nil) throws -> MovementLabSession {
         let issues = configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
             + (sessionState?.validationIssues ?? [])
         guard issues.isEmpty else { throw ConfigurationError.invalidRules(issues) }
         return MovementLabSession(world: world, ruleset: ruleset, weapons: weapons, pickups: pickups,
-                                  stageID: stageID, sessionState: sessionState)
+                                  stageID: stageID, sessionState: sessionState, difficultyID: difficultyID)
     }
 
     /// Trusted-code initializer: ALL THREE rulesets are preconditioned
@@ -109,7 +111,7 @@ public struct MovementLabSession: Sendable {
                 ruleset: MovementRuleset = .provisional,
                 weapons: WeaponRuleset = .provisional,
                 pickups: PickupRuleset = .provisional,
-                stageID: String? = nil, sessionState: SessionState? = nil) {
+                stageID: String? = nil, sessionState: SessionState? = nil, difficultyID: String? = nil) {
         let issues = Self.configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
             + (sessionState?.validationIssues ?? [])
         precondition(issues.isEmpty, "session configuration rejected: \(issues)")
@@ -119,9 +121,10 @@ public struct MovementLabSession: Sendable {
         self.pickups = pickups
         self.stageID = stageID
         self.sessionState = sessionState
+        self.difficultyID = difficultyID
         self.recording = ReplayRecording(initialWorld: world, movement: ruleset,
                                          weapons: weapons, pickups: pickups,
-                                         stageID: stageID, sessionState: sessionState)
+                                         stageID: stageID, sessionState: sessionState, difficultyID: difficultyID)
     }
 
     /// Resumes a suspended session (ADR-0003 §3): the snapshot world with
@@ -136,6 +139,7 @@ public struct MovementLabSession: Sendable {
         self.pickups = recording.pickups
         self.stageID = recording.stageID
         self.sessionState = recording.sessionState
+        self.difficultyID = recording.difficultyID
         self.recording = recording
     }
 
@@ -145,7 +149,7 @@ public struct MovementLabSession: Sendable {
     private mutating func rebaseRecording() {
         recording = ReplayRecording(initialWorld: world, movement: ruleset,
                                     weapons: weapons, pickups: pickups,
-                                    stageID: stageID, sessionState: sessionState)
+                                    stageID: stageID, sessionState: sessionState, difficultyID: difficultyID)
     }
 
     /// Advances one tick with the local player's held direction and fire

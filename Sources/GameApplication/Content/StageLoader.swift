@@ -17,8 +17,9 @@ public enum StageLoader {
     /// validates it, and builds the world.
     public static func loadWorld(id: String, bundle: Bundle,
                                  rules: PickupRuleset = .provisional,
-                                 session: SessionState = .campaignStart) throws -> WorldState {
-        try loadWorld(at: stageURL(id: id, bundle: bundle), rules: rules, session: session)
+                                 session: SessionState = .campaignStart,
+                                 difficulty: DifficultyDefinition = .standard) throws -> WorldState {
+        try loadWorld(at: stageURL(id: id, bundle: bundle), rules: rules, session: session, difficulty: difficulty)
     }
 
     public static func stageURL(id: String, bundle: Bundle) throws -> URL {
@@ -34,11 +35,13 @@ public enum StageLoader {
     /// rules it will run under AND the carried session state are validated
     /// before a world exists.
     public static func loadWorld(at url: URL, rules: PickupRuleset = .provisional,
-                                 session: SessionState = .campaignStart) throws -> WorldState {
+                                 session: SessionState = .campaignStart,
+                                 difficulty: DifficultyDefinition = .standard) throws -> WorldState {
         let def = try loadDefinition(at: url)
         let issues = StageValidator.validate(def) + rules.validationIssues() + session.validationIssues
+            + DifficultyValidator.validate(difficulty)
         if !issues.isEmpty { throw LoadError.build(issues.joined(separator: "; ")) }
-        do { return try StageBuilder.build(def, rules: rules, session: session) }
+        do { return try StageBuilder.build(def, rules: rules, session: session, difficulty: difficulty) }
         catch { throw LoadError.build(String(describing: error)) }
     }
 
@@ -93,6 +96,36 @@ public enum CampaignLoader {
         catch { throw StageLoader.LoadError.notFound(url.lastPathComponent) }
         let def = try decode(data)
         let issues = CampaignValidator.validate(def)
+        if !issues.isEmpty { throw StageLoader.LoadError.build(issues.joined(separator: "; ")) }
+        return def
+    }
+}
+
+/// Decodes difficulty JSON (Content/difficulties/*.json) and validates it
+/// (ADR-0015). Same Foundation boundary.
+public enum DifficultyLoader {
+    public static func decode(_ data: Data) throws -> DifficultyDefinition {
+        do { return try JSONDecoder().decode(DifficultyDefinition.self, from: data) }
+        catch { throw StageLoader.LoadError.decode(String(describing: error)) }
+    }
+
+    public static func load(id: String, bundle: Bundle) throws -> DifficultyDefinition {
+        guard let url = bundle.url(forResource: id, withExtension: "json", subdirectory: "Content/difficulties")
+            ?? bundle.url(forResource: id, withExtension: "json", subdirectory: "difficulties")
+            ?? bundle.url(forResource: id, withExtension: "json") else {
+            throw StageLoader.LoadError.notFound(id)
+        }
+        let def = try load(at: url)
+        guard def.id == id else { throw StageLoader.LoadError.build("difficulty file '\(id)' declares id '\(def.id)'") }
+        return def
+    }
+
+    public static func load(at url: URL) throws -> DifficultyDefinition {
+        let data: Data
+        do { data = try Data(contentsOf: url) }
+        catch { throw StageLoader.LoadError.notFound(url.lastPathComponent) }
+        let def = try decode(data)
+        let issues = DifficultyValidator.validate(def)
         if !issues.isEmpty { throw StageLoader.LoadError.build(issues.joined(separator: "; ")) }
         return def
     }

@@ -712,6 +712,28 @@ text treatment (no Phase 1 art):
   store reported not fatal, file store round trip / foreign version /
   corrupt file.
 
+## M4 item 4 — difficulty profiles and director phases (2026-09-10 late evening; ADR-0015 proposed)
+
+- `EnemyBehaviorProfile` in `StageState` (decision interval, base-focus
+  scale, wander, fire-window scale, mine roll, course commitment;
+  checksummed, range-checked; `.standard` = the previous constants);
+  the enemy brain reads it. `DirectorPhase` list + cursor in
+  `StageState`; the director fires phases once in order (reinforcements
+  jump the queue, cap change, base repair) with events, a HUD notice and
+  cues. VS-03 authors the elite mine-layer wave after 16 spawns.
+- `DifficultyDefinition` content (casual/standard/veteran; behaviour,
+  telegraph percent with the 45-tick floor, composition variant,
+  allied base damage Off/On/On, enemy ammo percent recorded only), the
+  loader/validator, the tool requiring the three presets; the builder
+  applies it; `CampaignRun.difficultyID`; replay format 5 with the
+  difficulty in the header; the stage provider hands the session the
+  difficulty's weapon rules; the stage-select difficulty picker.
+- Tests (304 / 77): profile validation and effect (closed window never
+  fires, wide fires more, interval paces decisions), phases (once, in
+  order, cap, repair, paired carriers), presets load and differ as the
+  plan intends, variants and the floor, builder application, run and
+  header naming, notice raise/expiry, app-flow difficulty choice.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -735,5 +757,6 @@ Do not interpret green tests as product completion:
   icons; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
   is in progress: items 1 (campaign progression, ADR-0013 proposed), 2
-  (screen flow) and 3 (checkpoint save, ADR-0014 proposed) landed; items
-  4–5 follow.
+  (screen flow), 3 (checkpoint save, ADR-0014 proposed) and 4
+  (difficulty profiles and director phases, ADR-0015 proposed) landed;
+  item 5 follows.
