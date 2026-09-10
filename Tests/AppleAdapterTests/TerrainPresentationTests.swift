@@ -108,6 +108,26 @@ import GameCore
         #expect(MovementLabScene.equipmentArtName(nil) == nil)
     }
 
+    /// Owner report 2026-09-10: the moon plow sat on the tank's flank. The
+    /// atlas draws it on the right for every facing, so the right-facing
+    /// sprite is rotated to the front; the other attachments keep their
+    /// per-facing sprites.
+    @Test func theMoonPlowTurnsToTheTankFront() throws {
+        let (art, _, _) = try makeScene()
+        let rightSprite = try art.texture("px_equipment_moon_right")
+        for (direction, rotation) in [(0, CGFloat.pi / 2), (1, 0), (2, -CGFloat.pi / 2), (3, CGFloat.pi)] {
+            let node = try PixelTankNode(kind: "scout", weapon: "normal", direction: direction, pixelScale: 1, art: art)
+            try node.setEquipment("moon")
+            let plow = try #require(node.children.first { $0.zPosition == 4 } as? SKSpriteNode)
+            #expect(plow.texture === rightSprite && abs(plow.zRotation - rotation) < 0.001, "direction \(direction)")
+            #expect(PixelTankNode.frontRotation(direction) == rotation)
+        }
+        let skirt = try PixelTankNode(kind: "scout", weapon: "normal", direction: 0, pixelScale: 1, art: art)
+        try skirt.setEquipment("anti_skid")
+        let attachment = try #require(skirt.children.first { $0.zPosition == 0 } as? SKSpriteNode)
+        #expect(attachment.texture === (try art.texture("px_equipment_anti_skid_up")) && attachment.zRotation == 0)
+    }
+
     /// R5-03: the own-fire base cue tints an actual overlay sprite (teal for
     /// allied, red for enemy), not the vendor node.
     @Test func baseFlashTintsAnOverlaySprite() throws {

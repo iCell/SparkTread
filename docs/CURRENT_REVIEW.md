@@ -137,7 +137,7 @@ decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
 `Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
 architecture check, content validator, `Scripts/check-audio.sh` selftest
 and check (18 synthesized files match the generator, 8 excerpts match the
-manifest and the re-run extractor), `swift test` 327 tests / 82 suites (after M4 items 1–5, the arena and ADR-0017),
+manifest and the re-run extractor), `swift test` 329 tests / 82 suites (after M4 items 1–5, the arena, ADR-0017 and the follow-ups),
 xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
 selftest and the smoke render itself; `git diff --check` is clean. This
 paragraph is the one current count; the handoff repeats it with the same
@@ -805,6 +805,22 @@ tap (24 buttons, resistance ascending, "清空敌人"); flames on foliage
 spread to the neighbouring foliage after 20 ticks and burn it to ground
 (ruleset data; ownerless spread patches; burned-grass decal; replay
 format 7); the §10.6 danger telegraph is removed. Tests 331 / 82.
+
+## Owner follow-ups (2026-09-10 late evening, second device look)
+
+- "带月牙的坦克，月牙的位置错了": the vendor's four `px_equipment_moon_*`
+  sprites all draw the crescent on the tank's RIGHT (the plow belongs at
+  the front); `PixelTankNode.setEquipment` now uses the right-facing
+  sprite rotated to the facing (`frontRotation`). Amphi/AntiSkid skirts
+  and the Memory of Sea sensor keep their per-facing sprites (they were
+  drawn correctly).
+- "每种坦克一个按钮，点击这个按钮之后让我选择这个坦克的火力等级以及它可以搭配的装备": the
+  training panel offers six family buttons; choosing one shows 火力 P0–P3
+  and 装备 (无 / 两栖 / 防滑 / 月牙 / 海忆) and an 添加 button; the tank is the
+  family's A archetype with those overrides, and respawns with them.
+- "你是不是缺少能在冰面上走的装备": 防滑 (`anti_skid`) is that equipment — the
+  traction profile never slides (ADR-0016); it is in the pickup spawner
+  and the enemy equipment picker.
 
 ## Remaining gaps / follow-up review
 

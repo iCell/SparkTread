@@ -78,7 +78,19 @@ public struct MovementLabSession: Sendable {
     /// `TrainingArenaFixture`): enemies respawn on death, the base and the
     /// player's lives are topped up. Never set for authored stages.
     public private(set) var isTrainingArena = false
-    private var trainingRoster: [Int: String] = [:]
+    /// What the panel asked for per enemy, so a respawn brings back the
+    /// same tank (archetype tier, power level, equipment).
+    public struct TrainingEnemy: Equatable, Sendable {
+        public var archetype: String
+        public var powerLevel: Int?
+        public var equipmentID: String??
+        public init(archetype: String, powerLevel: Int? = nil, equipmentID: String?? = nil) {
+            self.archetype = archetype
+            self.powerLevel = powerLevel
+            self.equipmentID = equipmentID
+        }
+    }
+    private var trainingRoster: [Int: TrainingEnemy] = [:]
     private var trainingSpawnCursor = 0
 
     /// Configuration rejected at the session boundary.
@@ -118,7 +130,7 @@ public struct MovementLabSession: Sendable {
         var session = MovementLabSession(world: TrainingArenaFixture.makeWorld())
         session.isTrainingArena = true
         for tank in session.world.tanks where tank.ownerPlayerID == nil {
-            session.trainingRoster[tank.entityID] = tank.archetypeID
+            session.trainingRoster[tank.entityID] = TrainingEnemy(archetype: tank.archetypeID)
         }
         return session
     }
@@ -224,12 +236,31 @@ public struct MovementLabSession: Sendable {
     /// when destroyed. False when no cell within the scan is free.
     @discardableResult
     public mutating func debugSpawnEnemy(_ archetype: String) -> Bool {
-        guard isTrainingArena, TrainingArenaFixture.enemyArchetypes.contains(archetype) else { return false }
+        debugSpawnEnemy(TrainingEnemy(archetype: archetype))
+    }
+
+    /// Training Arena: adds one enemy of a family with a chosen power level
+    /// and equipment (owner 2026-09-10: pick the family, then its 火力 and
+    /// 装备); nil keeps the archetype's own value.
+    @discardableResult
+    public mutating func debugSpawnEnemy(family: String, powerLevel: Int?, equipmentID: String??) -> Bool {
+        debugSpawnEnemy(TrainingEnemy(archetype: "\(family)_a", powerLevel: powerLevel, equipmentID: equipmentID))
+    }
+
+    @discardableResult
+    private mutating func debugSpawnEnemy(_ enemy: TrainingEnemy) -> Bool {
+        guard isTrainingArena, TrainingArenaFixture.enemyArchetypes.contains(enemy.archetype) else { return false }
+        if let power = enemy.powerLevel, !(0...3).contains(power) { return false }
+        if case .some(.some(let equipment)) = enemy.equipmentID, !TrainingArenaFixture.equipmentIDs.contains(equipment) { return false }
         let origin = TrainingArenaFixture.enemySpawnCells[trainingSpawnCursor % TrainingArenaFixture.enemySpawnCells.count]
         trainingSpawnCursor += 1
         guard let cellPos = TrainingArenaFixture.freeCell(in: world, near: origin) else { return false }
-        let id = TrainingArenaFixture.spawnEnemy(&world, archetype: archetype, at: cellPos)
-        trainingRoster[id] = archetype
+        let id = TrainingArenaFixture.spawnEnemy(&world, archetype: enemy.archetype, at: cellPos)
+        world.withTank(entityID: id) {
+            if let power = enemy.powerLevel { $0.powerLevel = power }
+            if let equipment = enemy.equipmentID { $0.equipmentID = equipment }
+        }
+        trainingRoster[id] = enemy
         rebaseRecording()
         return true
     }
@@ -272,15 +303,19 @@ public struct MovementLabSession: Sendable {
             changed = true
         }
         for case .tankDestroyed(let id, nil, _) in events {
-            guard let archetype = trainingRoster.removeValue(forKey: id) else { continue }
+            guard let enemy = trainingRoster.removeValue(forKey: id) else { continue }
             let origin = TrainingArenaFixture.enemySpawnCells[trainingSpawnCursor % TrainingArenaFixture.enemySpawnCells.count]
             trainingSpawnCursor += 1
             guard let cellPos = TrainingArenaFixture.freeCell(in: world, near: origin) else {
-                trainingRoster[id] = archetype // no room this tick: keep the debt, retry on the next death pass
+                trainingRoster[id] = enemy // no room this tick: keep the debt, retry on the next death pass
                 continue
             }
-            let newID = TrainingArenaFixture.spawnEnemy(&world, archetype: archetype, at: cellPos)
-            trainingRoster[newID] = archetype
+            let newID = TrainingArenaFixture.spawnEnemy(&world, archetype: enemy.archetype, at: cellPos)
+            world.withTank(entityID: newID) {
+                if let power = enemy.powerLevel { $0.powerLevel = power }
+                if let equipment = enemy.equipmentID { $0.equipmentID = equipment }
+            }
+            trainingRoster[newID] = enemy
             changed = true
         }
         if var base = world.base, base.durability < base.maxDurability {

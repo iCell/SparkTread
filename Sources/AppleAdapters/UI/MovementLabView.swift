@@ -574,10 +574,14 @@ public final class MovementLabController {
     public var pickupIDs: [String] { isLab ? TrainingArenaFixture.pickupIDs : [] }
     @discardableResult
     public func spawnPickup(_ id: String) -> Bool { isLab ? session.debugSpawnPickup(id) : false }
-    /// Training Arena: the enemy roster (resistance ascending) and spawner.
-    public var enemyRoster: [TrainingArenaFixture.RosterEntry] { isLab ? TrainingArenaFixture.enemyRoster : [] }
+    /// Training Arena: the enemy families, equipment, and the spawner
+    /// (family + power level + equipment; nil keeps the archetype's own).
+    public var enemyFamilies: [String] { isLab ? TrainingArenaFixture.enemyFamilies : [] }
+    public var enemyEquipmentIDs: [String] { isLab ? TrainingArenaFixture.equipmentIDs : [] }
     @discardableResult
-    public func spawnEnemy(_ archetype: String) -> Bool { isLab ? session.debugSpawnEnemy(archetype) : false }
+    public func spawnEnemy(family: String, powerLevel: Int, equipmentID: String?) -> Bool {
+        isLab ? session.debugSpawnEnemy(family: family, powerLevel: powerLevel, equipmentID: .some(equipmentID)) : false
+    }
     public func clearEnemies() { if isLab { session.debugClearEnemies() } }
 
     public var playerTank: TankState? {
@@ -657,6 +661,11 @@ enum HUDLabels {
         case "player_eliminated": "全军覆没"
         default: "任务失败"
         }
+    }
+
+    /// Enemy family names for the training panel.
+    static func enemyFamily(_ family: String) -> String {
+        family == "normal" ? "普通" : weapon(family)
     }
 
     /// Training roster label: family, tier and resistance, e.g. "普通A 1".
@@ -764,6 +773,10 @@ public struct MovementLabView: View {
     @State private var selectedWeapon = "rapid"
     @State private var powerLevel = 0
     @State private var showWeaponPanel = false
+    /// Training panel enemy picker: family, then power level and equipment.
+    @State private var enemyFamily: String?
+    @State private var enemyPower = 0
+    @State private var enemyEquipment: String?
     @State private var hudTick = 0
     /// Stage-flow state mirrored from the controller at 30 Hz; SwiftUI
     /// animates each transition (ADR-0011 timings) when it changes.
@@ -1202,12 +1215,29 @@ public struct MovementLabView: View {
                                 }
                             }
                         }
-                        Text("敌人（抵抗力从低到高，点一下加一辆）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
-                        let roster = controller.enemyRoster
-                        ForEach(Array(stride(from: 0, to: roster.count, by: 4)), id: \.self) { start in
+                        Text("敌人（选类型，再选火力和装备）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        HStack(spacing: 4) {
+                            ForEach(controller.enemyFamilies, id: \.self) { family in
+                                panelButton(HUDLabels.enemyFamily(family), selected: enemyFamily == family) { enemyFamily = family }
+                            }
+                        }
+                        if let family = enemyFamily {
                             HStack(spacing: 4) {
-                                ForEach(roster[start..<min(start + 4, roster.count)], id: \.archetypeID) { entry in
-                                    panelButton(HUDLabels.rosterEntry(entry), selected: false) { controller.spawnEnemy(entry.archetypeID) }
+                                Text("火力").font(.system(size: 11)).foregroundStyle(.white)
+                                ForEach(0..<4, id: \.self) { level in
+                                    panelButton("P\(level)", selected: enemyPower == level) { enemyPower = level }
+                                }
+                            }
+                            HStack(spacing: 4) {
+                                Text("装备").font(.system(size: 11)).foregroundStyle(.white)
+                                panelButton("无", selected: enemyEquipment == nil) { enemyEquipment = nil }
+                                ForEach(controller.enemyEquipmentIDs, id: \.self) { id in
+                                    panelButton(HUDLabels.equipment(id), selected: enemyEquipment == id) { enemyEquipment = id }
+                                }
+                            }
+                            HStack(spacing: 4) {
+                                panelButton("添加 \(HUDLabels.enemyFamily(family)) P\(enemyPower) \(HUDLabels.equipment(enemyEquipment))", selected: true) {
+                                    controller.spawnEnemy(family: family, powerLevel: enemyPower, equipmentID: enemyEquipment)
                                 }
                             }
                         }

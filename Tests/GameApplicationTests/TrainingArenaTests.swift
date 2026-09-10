@@ -87,6 +87,29 @@ import GameCore
         #expect(session.world.stage?.phase == .playing)
     }
 
+    @Test func familiesSpawnWithTheChosenPowerAndEquipmentAndRespawnTheSame() throws {
+        var session = MovementLabSession.trainingArena()
+        #expect(TrainingArenaFixture.enemyFamilies.count == 6 && TrainingArenaFixture.equipmentIDs.count == 4)
+        let added = session.debugSpawnEnemy(family: "rapid", powerLevel: 3, equipmentID: .some("shield_of_moon"))
+        #expect(added)
+        let tank = try #require(session.world.tanks.first { $0.ownerPlayerID == nil })
+        #expect(tank.archetypeID == "rapid_a" && tank.powerLevel == 3 && tank.equipmentID == "shield_of_moon"
+                && tank.specialWeaponID == "rapid")
+        // Bare: the archetype's own values; explicit nil equipment strips it.
+        let bare = session.debugSpawnEnemy(family: "ap", powerLevel: nil, equipmentID: nil)
+        #expect(bare && session.world.tanks.last?.powerLevel == EnemyArchetypes.attributes(for: "ap_a").powerLevel)
+        let stripped = session.debugSpawnEnemy(family: "normal", powerLevel: 0, equipmentID: .some(nil))
+        #expect(stripped && session.world.tanks.last?.equipmentID == nil)
+        let badPower = session.debugSpawnEnemy(family: "rapid", powerLevel: 9, equipmentID: nil)
+        let badGear = session.debugSpawnEnemy(family: "rapid", powerLevel: 1, equipmentID: .some("jetpack"))
+        #expect(!badPower && !badGear)
+        // A respawn keeps the settings.
+        session.debugDestroyTank(tank.entityID)
+        session.advance(holding: nil)
+        let reborn = try #require(session.world.tanks.first { $0.archetypeID == "rapid_a" })
+        #expect(reborn.entityID != tank.entityID && reborn.powerLevel == 3 && reborn.equipmentID == "shield_of_moon")
+    }
+
     @Test func pickupsSpawnAheadOfThePlayerOnDemand() throws {
         var session = MovementLabSession.trainingArena()
         let spawnedAmphi = session.debugSpawnPickup("amphi_tank")

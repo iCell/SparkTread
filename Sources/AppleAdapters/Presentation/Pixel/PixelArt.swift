@@ -125,10 +125,27 @@ struct PixelManifest: Decodable {
     }
     func setEquipment(_ name:String?) throws {
         let id:String?
-        if let name {guard let found=art.manifest.equipment[name+"_"+Self.directions[direction]] else {throw PixelArtError.missing(name)};id=found} else {id=nil}
+        // Shield of Moon: the atlas draws the crescent on the right-hand side
+        // in all four variants (the plow belongs at the FRONT — owner report
+        // 2026-09-10), so the right-facing sprite is rotated to the facing.
+        let key = name == "moon" ? "moon_right" : name.map { $0 + "_" + Self.directions[direction] }
+        if let key {guard let found=art.manifest.equipment[key] else {throw PixelArtError.missing(name ?? key)};id=found} else {id=nil}
         equipmentNode?.removeFromParent();equipmentNode=nil;equipmentName=name
         if let id {
-            let n=try art.sprite(id,scale:pixelScale);n.zPosition=(name=="amphi" || name=="anti_skid") ? 0 : 4;addChild(n);equipmentNode=n
+            let n=try art.sprite(id,scale:pixelScale);n.zPosition=(name=="amphi" || name=="anti_skid") ? 0 : 4
+            if name == "moon" { n.zRotation = Self.frontRotation(direction) }
+            addChild(n);equipmentNode=n
+        }
+    }
+
+    /// Rotation that carries a right-facing front attachment to the facing
+    /// (scene y is up; a positive rotation is counter-clockwise).
+    static func frontRotation(_ direction: Int) -> CGFloat {
+        switch direction {
+        case 0: .pi / 2      // up
+        case 1: 0            // right
+        case 2: -.pi / 2     // down
+        default: .pi         // left
         }
     }
     func setRecoil(_ value: CGFloat) {

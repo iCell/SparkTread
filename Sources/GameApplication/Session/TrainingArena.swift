@@ -63,6 +63,12 @@ public enum TrainingArenaFixture {
 
     public static let enemyArchetypes: [String] = enemyRoster.map(\.archetypeID)
 
+    /// The six weapon families the panel offers (owner 2026-09-10: one
+    /// button per family, then its power level and equipment).
+    public static let enemyFamilies = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
+    /// Equipment an enemy can carry (§8.6).
+    public static let equipmentIDs = ["amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea"]
+
     public static func makeWorld() -> WorldState {
         let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
