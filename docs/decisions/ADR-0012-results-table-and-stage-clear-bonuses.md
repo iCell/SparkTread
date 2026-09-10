@@ -1,7 +1,9 @@
 # ADR-0012: Reference Results Table and Stage-Clear Bonuses
 
-Status: Proposed (awaiting owner acceptance; drafted 2026-09-10 on the owner's decision "5，按照原作来")  
-Date: 2026-09-10  
+Status: Accepted by the owner on 2026-09-10 (late evening) with its questions answered: the bonus rule was delegated ("我不知道原作怎么算的，你可以用一种最合理的方式来决定" — the stage-number brackets stand), MaxHits/MaxCombos "不要", table icons "坦克图标"
+
+Date: 2026-09-10
+
 Related: plan §11, §12.2; `GAME_MECHANICS_SPEC.md` §8.2 (reward category column), §11; ADR-0011 (stage transitions); `docs/CURRENT_REVIEW.md` "Stage-clear results table and bonuses"; `Tools/reference_measure/results_screens.py`
 
 ## Context
@@ -89,12 +91,19 @@ What the screens show:
    until the reward line ("奖励 +N"), so the displayed score counts in as
    the reference does while the authoritative score is final at the
    decision. A tally tick plays per row (four rows + total).
-5. **Left out, with owner decisions attached:** MaxHits/MaxCombos (no
-   semantics), tank icons in the rows (ADR-0011 follow-up), a reward
-   sound (no isolated instance in the recording), and the alternative
-   continue-count reading — if the owner knows the reference's rule to be
-   continue-based, `ScoreRules` needs a continue counter instead of a
-   stage-number tier.
+5. **Tank icons in the rows** (owner: "坦克图标"): `PixelTankIcons` composes
+   one up-facing enemy tank per category from the rig sprites the scene
+   uses (shared `PixelTankNode.appearance` mapping), cropped to the body
+   bounds; the view builds them once from the scene's art and falls back
+   to the category label without art. The panel is the reference's
+   compact card on the left of the darkened playfield (owner feedback on
+   the first cut: "很难看" — it had stretched across the surface).
+6. **Left out by owner decision:** MaxHits/MaxCombos ("不要"). Left out for
+   lack of material: a reward sound (no isolated instance). The
+   continue-count reading was put to the owner, who does not know the
+   reference's rule and delegated the choice: the stage-number brackets
+   stay as the most reasonable reading (a bonus that grows with progress
+   and needs no hidden state).
 
 ## Consequences
 
@@ -106,6 +115,6 @@ What the screens show:
 - The HUD's score is a presentation value during the outro (world score
   minus the unpaid bonuses); tests read `controller.hud.score` for the
   paced value and the world for the authoritative one.
-- Owner acceptance decides: the stage-bracket reading (default) vs. a
-  continue-based rule; whether MaxHits/MaxCombos are wanted and what they
-  mean; the category labels vs. icons.
+- Owner answers (2026-09-10 late evening): brackets by delegation; no
+  MaxHits/MaxCombos; icons. The device look at the redesigned panel is
+  the remaining acceptance check.

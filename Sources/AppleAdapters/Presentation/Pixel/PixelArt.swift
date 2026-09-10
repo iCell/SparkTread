@@ -79,6 +79,23 @@ struct PixelManifest: Decodable {
 /// Directional texture swaps preserve ground pivot. Only turret receives recoil.
 @MainActor final class PixelTankNode: SKNode {
     static let directions=["up","right","down","left"]
+
+    /// Archetype → chassis silhouette (tier letter) and turret (weapon
+    /// family); the player always drives the player rig with the normal
+    /// turret. Shared by the scene and the results-table icons.
+    static func appearance(archetypeID: String, isPlayer: Bool) -> (kind: String, weapon: String) {
+        if isPlayer { return ("player", "normal") }
+        let parts = archetypeID.split(separator: "_").map(String.init)
+        let kind: String = switch parts.last ?? "a" {
+        case "b": "standard"
+        case "c": "armored"
+        case "d": "heavy"
+        default: "scout"
+        }
+        let family = parts.first ?? ""
+        let weapon = ["normal", "rapid", "fire", "ap", "explosion", "mine"].contains(family) ? family : "normal"
+        return (kind, weapon)
+    }
     let art: PixelArt, kind: String, pixelScale: CGFloat
     private(set) var weapon: String, direction: Int, phase: Int=0
     private var hull: SKSpriteNode!, left: SKSpriteNode!, right: SKSpriteNode!, turret: SKSpriteNode!
@@ -129,5 +146,46 @@ struct PixelManifest: Decodable {
         for (node,id) in [(hull!,rig.hull),(left!,rig.treads[0][phase]),(right!,rig.treads[1][phase]),(turret!,gun.texture)] { r=r.union(art.visibleRect(node,id:id,in:target)) }
         if let node=equipmentNode,let id=node.name {r=r.union(art.visibleRect(node,id:id,in:target))}
         return r
+    }
+}
+
+
+/// Results-table tank icons (ADR-0012): one enemy tank per reward
+/// category, facing up, composed from the rig's tread, hull and turret
+/// sprites at native pixel scale and cropped to the rig's body bounds. The
+/// sprites share one 64×64 canvas origin (hull/tread anchor 32,35; turret
+/// anchor 32,32 mounted 3 px up), so they stack without offsets.
+@MainActor enum PixelTankIcons {
+    /// A representative archetype per reward category 0…7 (the §8.2 column):
+    /// the Normal pairs, Rapid, Mine, Explosion, Fire, the AP pairs.
+    static let archetypes = ["normal_a", "normal_c", "rapid_a", "mine_a", "explosion_a", "fire_a", "ap_a", "ap_c"]
+
+    static func image(category: Int, art: PixelArt) throws -> CGImage {
+        guard archetypes.indices.contains(category) else { throw PixelArtError.missing("category \(category)") }
+        return try image(archetypeID: archetypes[category], art: art)
+    }
+
+    static func image(archetypeID: String, art: PixelArt) throws -> CGImage {
+        let look = PixelTankNode.appearance(archetypeID: archetypeID, isPlayer: false)
+        guard let rig = art.manifest.rigs[look.kind + "_up"],
+              let turret = art.manifest.turrets[(look.weapon == "normal" ? "enemy_normal" : look.weapon) + "_up"]
+        else { throw PixelArtError.missing(archetypeID) }
+        let layers = try [rig.treads[0][0], rig.treads[1][0], rig.hull, turret.texture].map { try art.texture($0).cgImage() }
+        let b = rig.bodyBounds // x0, y0, x1, y1 in canvas pixels, y down
+        let width = Int(b[2] - b[0]), height = Int(b[3] - b[1])
+        let canvas = art.manifest.tankCanvasPixels
+        guard width > 0, height > 0,
+              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { throw PixelArtError.missing(archetypeID) }
+        ctx.interpolationQuality = .none
+        // CG origin is bottom-left: the canvas row y1 (from the top) is the icon's bottom edge.
+        let origin = CGPoint(x: -b[0], y: -(Double(canvas) - b[3]))
+        for layer in layers {
+            ctx.draw(layer, in: CGRect(origin: origin, size: CGSize(width: canvas, height: canvas)))
+        }
+        guard let image = ctx.makeImage() else { throw PixelArtError.missing(archetypeID) }
+        return image
     }
 }

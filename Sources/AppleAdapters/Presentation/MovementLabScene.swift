@@ -13,6 +13,9 @@ final class MovementLabScene: SKScene {
     /// Retained across stage restarts and surface changes: the manifest and
     /// atlases decode once; a failed load is retried on the next rebuild.
     private var art: PixelArt?
+    /// The loaded art, for presentation that lives outside the scene (the
+    /// results-table icons); nil until the scene has built once.
+    var loadedArt: PixelArt? { art }
     private var debugLabel: SKLabelNode?
     /// Intro curtain: one opaque tile per cell, lifted in cross-shaped
     /// strips from the arena centre as `StageFlow.revealStep` grows
@@ -415,23 +418,9 @@ final class MovementLabScene: SKScene {
                 node = existing
             } else {
                 // Archetype tier → chassis silhouette; family → turret.
-                let kind: String
-                let weapon: String
-                if tank.ownerPlayerID != nil {
-                    kind = "player"; weapon = "normal"
-                } else {
-                    let parts = tank.archetypeID.split(separator: "_").map(String.init)
-                    kind = switch parts.last ?? "a" {
-                    case "b": "standard"
-                    case "c": "armored"
-                    case "d": "heavy"
-                    default: "scout"
-                    }
-                    weapon = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
-                        .contains(parts.first ?? "") ? parts.first! : "normal"
-                }
+                let look = PixelTankNode.appearance(archetypeID: tank.archetypeID, isPlayer: tank.ownerPlayerID != nil)
                 guard let created = try? PixelTankNode(
-                    kind: kind, weapon: weapon, direction: tank.facing.rawValue,
+                    kind: look.kind, weapon: look.weapon, direction: tank.facing.rawValue,
                     pixelScale: artScale, art: art) else { continue }
                 created.zPosition = 500
                 addChild(created)

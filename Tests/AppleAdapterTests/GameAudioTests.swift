@@ -50,7 +50,7 @@ private let origin = Vec2i(x: 0, y: 0)
             .stageLost(reason: "base_destroyed"),
         ])
         #expect(loss.contains("sfx_base_destroyed"))
-        #expect(!loss.contains("sfx_stage_lose")) // the stinger plays with the outro fade (StageFlow cue)
+        #expect(!loss.contains("sfx_stage_win")) // the stage-end passage plays with the outcome text (StageFlow cue)
         #expect(!loss.contains("sfx_base_hit"))
         // Duplicate events collapse to one play.
         let volley = names([

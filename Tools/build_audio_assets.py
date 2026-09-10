@@ -58,7 +58,7 @@ INSPIRATION = {
 ATTRIBUTION = {
     "sfx_stage_card": "inspired",
     "sfx_base_destroyed": "derived", "sfx_pickup_spawn": "derived", "sfx_deflect": "derived",
-    "sfx_hit_brick": "derived", "sfx_tally_tick": "derived", "sfx_stage_lose": "invented",
+    "sfx_hit_brick": "derived", "sfx_tally_tick": "derived",
 }
 SOURCE_NOTE = ("measurements of the public reference gameplay recording BV14b411K7bv, "
                "2026-09-10; procedure in Tools/reference_measure/")
@@ -607,46 +607,11 @@ def build():
         # −10 dB (bands: 0–250 Hz 0 dB, 250–500 −6, ≈ −16 flat above 500 Hz).
         # The earlier "throbbing bed" was an interpretation error: band
         # averages and 20 ms envelopes discard the rhythm's structure.
-        def dong(seed):
-            # Body: a 30 % pulse gliding 195 -> 140 Hz (second harmonic
-            # carries the measured -6 dB at 250-500 Hz); stroke: broadband
-            # noise decaying with the body, so the spectrum stays a shelf
-            # (≈ -16 dB above 500 Hz) instead of a dark thud.
-            n = samples(150)
-            body = apply(square(expo_sweep(195, 140, n), 0.3), env_db(n, [(0, 0), (30, -3), (120, -18), (150, -40)]))
-            stroke = apply(lowpass(noise(n, NATIVE_RATE, seed), 5000, 1),
-                           env_db(n, [(0, -3), (20, -6), (100, -24), (150, -45)]))
-            return mix((body, 0.8), (stroke, 0.7))
-
-        def riff(hit_ms=120, gap_ms=120, groups=(6, 6, 1, 4), tempo=1.0, seed=0xD0):
-            """The 6-6-1-4 phrase on a `hit_ms` grid; `gap_ms` is the extra
-            rest after a group, so the spacing from a group's LAST hit to the
-            next group's FIRST hit is hit_ms + gap_ms (measured ≈0.24 s)."""
-            hits = []
-            t = 0
-            for group in groups:
-                for _ in range(group):
-                    hits.append(t); t += int(hit_ms * tempo)
-                t += int(gap_ms * tempo)
-            total = samples(t + 200)
-            out = [0.0] * total
-            for k, start in enumerate(hits):
-                d = dong(seed + k)
-                offset = samples(start)
-                for i, v in enumerate(d):
-                    if offset + i < total: out[offset + i] += v
-            return out
-
-        # Stage lost (invented: the recording has no loss): the riff phrase
-        # at three-quarter tempo over a falling 120 -> 45 Hz tone. (The
-        # results passage itself is an excerpt of the recording; the stage
-        # card is the original jingle above — neither is generated here.)
-        lose = riff(tempo=1.35, seed=0xF0)
-        n = len(lose)
-        write_native("sfx_stage_lose",
-                     mix((lose, 1.0),
-                         (apply(triangle(expo_sweep(120, 45, n)), env_db(n, [(0, -14), (2500, -16), (n * 1000 // RATE, -45)])), 0.5)),
-                     peak=0.7)
+        # Stage lost: no separate stinger — the owner (2026-09-10 evening)
+        # wants the reference's results passage (the `sfx_stage_win`
+        # excerpt) at every stage end; the invented falling variant and
+        # the 6-6-1-4 riff helper it used were removed (the riff analysis
+        # stays in Tools/reference_measure/README.md as history).
 
 
 if __name__ == "__main__":

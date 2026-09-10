@@ -62,7 +62,7 @@ public final class GameAudio {
         "sfx_tank_explode", "sfx_player_explode", "sfx_explosion_blast",
         "sfx_base_hit", "sfx_base_own_hit", "sfx_base_destroyed", "sfx_base_shield_on",
         "sfx_pickup_spawn", "sfx_pickup_collect", "sfx_mine_place",
-        "sfx_spawn_warp", "sfx_stage_win", "sfx_stage_lose",
+        "sfx_spawn_warp", "sfx_stage_win",
         "sfx_tally_tick", "sfx_stage_card",
     ]
 

@@ -273,7 +273,9 @@ public final class MovementLabController {
         // The reference's results ambience starts about a second after the
         // outcome text and runs through the results (owner: a longer sound
         // on finishing a stage); the stinger carries its own lead-in.
-        case .outcomeText: audio.play(flow.outcome == .won ? "sfx_stage_win" : "sfx_stage_lose")
+        // Both outcomes (owner 2026-09-10 evening: the stage-end music is the
+        // reference's results passage; the invented loss variant was removed).
+        case .outcomeText: audio.play("sfx_stage_win")
         case .fade: break
         case .panelRow: audio.play("sfx_tally_tick", volume: 0.6) // four table rows + the total line
         case .reward: break // no isolated reference instance for the reward line yet
@@ -426,6 +428,9 @@ public struct MovementLabView: View {
     /// animates each transition (ADR-0011 timings) when it changes.
     @State private var flowPhase: StageFlow.Phase = .playing
     @State private var panelRows = 0
+    /// Results-table tank icons by reward category, composed once from the
+    /// scene's art (ADR-0012; the reference shows a tank per category).
+    @State private var tankIcons: [Int: CGImage] = [:]
 
     private let hudTimer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
     private let flowTimer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
@@ -535,6 +540,13 @@ public struct MovementLabView: View {
         default: nil
         }
         if let animation { withAnimation(animation) { flowPhase = phase } } else { flowPhase = phase }
+        if Self.isDimmed(phase), tankIcons.isEmpty, let art = scene?.loadedArt {
+            var icons: [Int: CGImage] = [:]
+            for category in 0..<KillTally.tableRows * 2 {
+                if let image = try? PixelTankIcons.image(category: category, art: art) { icons[category] = image }
+            }
+            tankIcons = icons
+        }
     }
 
     /// Intro card, playfield reveal title, outcome text, fade, results.
@@ -573,82 +585,123 @@ public struct MovementLabView: View {
                     .transition(.offset(y: size.height * 0.36)) // rises from the centre
             }
             if flowPhase != .outroFade, Self.isDimmed(flowPhase) {
+                // Below the outcome title, on the left (reference: title at
+                // 11–17 % of the height, panel from 26 % down).
                 resultsPanel(size: size)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.leading, size.width * 0.07)
+                    .padding(.top, size.height * 0.23)
                     .transition(.move(edge: .leading))
             }
         }
         .allowsHitTesting(StageFlowPresentationPolicy.resultsInteractive(phase: flowPhase))
     }
 
-    /// The reference's "战斗成绩" table (ADR-0012): four rows of two reward
-    /// categories with the row multiplier and subtotal, the weighted total,
-    /// then — on a won stage with a clear bonus — the reward line, and the
-    /// score; a lost stage adds the restart button. Layout policy (R15-05):
-    /// the rows scroll inside a panel bounded to the surface, so every row
-    /// can be read and the restart button — kept outside the scroll — is
-    /// always reachable.
+    /// The reference's "战斗成绩" panel (ADR-0012, owner layout feedback
+    /// 2026-09-10): a compact card on the left of the darkened playfield —
+    /// title band, four rows of "icon count icon count ×k = subtotal", a
+    /// rule, "总计"; the reward text rises over the title on a won stage
+    /// with a clear bonus; the score and, on a loss, the restart button sit
+    /// in the footer. Fixed at four rows, so no scrolling (R15-05 applied
+    /// to a variable tally; the table is now the reference's fixed shape).
     private func resultsPanel(size: CGSize) -> some View {
         let tally = controller.tally
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("战斗成绩")
-                .font(.system(size: 22, weight: .heavy))
-                .foregroundStyle(Color.yellow)
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(0..<KillTally.tableRows, id: \.self) { row in
-                        if row < panelRows {
-                            let counts = tally.rowCounts(row)
-                            HStack(spacing: 10) {
-                                Text(HUDLabels.rewardCategory(2 * row)).foregroundStyle(.white)
-                                Text("\(counts.left)").foregroundStyle(Color.cyan)
-                                Text(HUDLabels.rewardCategory(2 * row + 1)).foregroundStyle(.white)
-                                Text("\(counts.right)").foregroundStyle(Color.cyan)
-                                Spacer(minLength: 16)
-                                Text("×\(row + 1) =").foregroundStyle(Color.green)
-                                Text("\(tally.rowSubtotal(row))").foregroundStyle(Color.yellow)
-                                    .frame(minWidth: 30, alignment: .trailing)
-                            }
-                            .font(.system(size: 15, weight: .bold, design: .monospaced))
-                        }
-                    }
-                    if panelRows > KillTally.tableRows {
-                        Divider().overlay(Color.yellow.opacity(0.6))
-                        HStack {
-                            Text("总计").foregroundStyle(.white)
-                            Spacer(minLength: 24)
-                            Text("\(tally.weightedTotal)").foregroundStyle(Color.yellow)
-                        }
-                        .font(.system(size: 18, weight: .heavy, design: .monospaced))
-                        if controller.flow.showsReward {
-                            Text("奖励 +\(controller.clearBonus.reward)")
-                                .font(.system(size: 16, weight: .heavy, design: .monospaced))
-                                .foregroundStyle(Color.orange)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-                        Text("得分 \(controller.hud.score)")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+        let width = min(size.width * 0.42, 380)
+        let compact = size.height < 420
+        let rowFont = Font.system(size: compact ? 15 : 17, weight: .bold, design: .monospaced)
+        let iconScale: CGFloat = compact ? 1.0 : 1.25
+        return VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                Text("战斗成绩")
+                    .font(.system(size: compact ? 22 : 26, weight: .heavy))
+                    .foregroundStyle(Color(red: 0.86, green: 0.42, blue: 0.96))
+                    .shadow(color: .black, radius: 0, x: 1, y: 1)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, compact ? 6 : 9)
+                if controller.flow.showsReward {
+                    Text("Reward +\(controller.clearBonus.reward)")
+                        .font(.system(size: compact ? 18 : 21, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(Color.yellow)
+                        .shadow(color: .black, radius: 0, x: 1, y: 1)
+                        .padding(.top, compact ? 4 : 7)
+                        .transition(.offset(y: 60).combined(with: .opacity)) // rises from the table
+                }
+            }
+            .background(Color.black.opacity(0.35))
+            Rectangle().fill(Color(red: 0.93, green: 0.72, blue: 0.2)).frame(height: 2)
+            VStack(spacing: compact ? 4 : 6) {
+                ForEach(0..<KillTally.tableRows, id: \.self) { row in
+                    let counts = tally.rowCounts(row)
+                    HStack(spacing: 6) {
+                        categoryCell(2 * row, count: counts.left, scale: iconScale, visible: row < panelRows)
+                        categoryCell(2 * row + 1, count: counts.right, scale: iconScale, visible: row < panelRows)
+                        Spacer(minLength: 8)
+                        Text("×\(row + 1) =").foregroundStyle(Color(red: 0.35, green: 0.95, blue: 0.55))
+                        Text(row < panelRows ? "\(tally.rowSubtotal(row))" : "")
                             .foregroundStyle(.white)
+                            .frame(width: compact ? 34 : 40, alignment: .trailing)
+                    }
+                    .font(rowFont)
+                    .frame(height: 26 * iconScale + 4)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, compact ? 6 : 10)
+            Rectangle().fill(Color(red: 0.95, green: 0.5, blue: 0.1)).frame(height: 3)
+                .padding(.horizontal, 10)
+            HStack(alignment: .firstTextBaseline) {
+                Text("总计")
+                    .font(.system(size: compact ? 18 : 21, weight: .heavy))
+                    .foregroundStyle(Color(red: 0.93, green: 0.72, blue: 0.2))
+                Spacer()
+                Text(panelRows > KillTally.tableRows ? "\(tally.weightedTotal)" : "")
+                    .font(.system(size: compact ? 26 : 30, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(Color.yellow)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, compact ? 4 : 6)
+            HStack {
+                Text("得分 \(controller.hud.score)")
+                    .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                Spacer()
+                if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
+                    Button {
+                        controller.restart()
+                    } label: {
+                        Text("重新开始")
+                            .font(.system(size: compact ? 15 : 17, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 18).padding(.vertical, compact ? 6 : 8)
+                            .background(Capsule().fill(Color.white))
                     }
                 }
             }
-            .frame(maxHeight: size.height * 0.5)
-            if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
-                Button {
-                    controller.restart()
-                } label: {
-                    Text("重新开始")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 26).padding(.vertical, 10)
-                        .background(Capsule().fill(Color.white))
-                }
-                .padding(.top, 6)
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, compact ? 6 : 10)
         }
-        .padding(22)
-        .frame(minWidth: 240)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.black.opacity(0.9)))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.yellow, lineWidth: 2))
+        .frame(width: width)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.94)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.93, green: 0.72, blue: 0.2), lineWidth: 3))
+        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+    }
+
+    /// One category of a table row: the tank icon (or its label while the
+    /// art is unavailable) and the kill count, blank until the row's cue.
+    @ViewBuilder private func categoryCell(_ category: Int, count: Int, scale: CGFloat, visible: Bool) -> some View {
+        HStack(spacing: 5) {
+            if let icon = tankIcons[category] {
+                Image(decorative: icon, scale: 1)
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: CGFloat(icon.width) * scale, height: CGFloat(icon.height) * scale)
+            } else {
+                Text(HUDLabels.rewardCategory(category)).foregroundStyle(.white)
+            }
+            Text(visible ? "\(count)" : "")
+                .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
+                .frame(width: 24, alignment: .trailing)
+        }
     }
 
     /// Weapon debug panel (lab only): special-weapon

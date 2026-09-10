@@ -150,13 +150,15 @@ environments or caches.
 
 ## Next steps
 
-1. Owner: decide the invincibility duration (A 10 s default / B the
-   reference 25 s rule, `.referenceInvincibility`).
-2. Owner: accept or amend ADR-0012 (results table + stage-clear
-   bonuses): the stage-bracket reading vs a continue-based rule,
-   MaxHits/MaxCombos, icons vs category labels. Every stage JSON now
-   needs `stageNumber`; the HUD score is paced during the outro
-   (`controller.hud.score` vs the world's score).
+1. Owner: look at the redesigned results panel on the device (compact
+   card, tank icons, reward text over the title) and the stage-end
+   passage on both outcomes. Decided already: invincibility stays 10 s;
+   ADR-0012 accepted (brackets by delegation, no MaxHits/MaxCombos,
+   icons). Every stage JSON needs `stageNumber`; the HUD score is paced
+   during the outro (`controller.hud.score` vs the world's score).
+2. When PI is back (usage limit, ≈5 days from 2026-09-10): hand it
+   rounds 28+ — the jingle revision, the owner's decisions, ADR-0012,
+   the icons/panel and the stinger removal — for its own probes.
 3. Physical-device pass (ADR-0006 gate): legibility, touch occlusion, HUD
    fit, audio mix; large-results-panel layout.
 4. M4 work per plan §19 (VS-02/VS-03, traversal, difficulty, lifecycle

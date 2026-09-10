@@ -136,8 +136,8 @@ the tree as it was then and is not rerun here. After the owner's
 decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
 `Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
 architecture check, content validator, `Scripts/check-audio.sh` selftest
-and check (19 synthesized files match the generator, 8 excerpts match the
-manifest and the re-run extractor), `swift test` 258 tests / 63 suites,
+and check (18 synthesized files match the generator, 8 excerpts match the
+manifest and the re-run extractor), `swift test` 260 tests / 64 suites,
 xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
 selftest and the smoke render itself; `git diff --check` is clean. This
 paragraph is the one current count; the handoff repeats it with the same
@@ -185,7 +185,9 @@ burst taken as the engine (and the engine's trigger: bursts while the
 player stood still at 17.9 s, silence while an enemy kept moving at 52 s).
 DERIVED — every other voice (launch variants, heavy explosion, base
 collapse, pickup appearance, steel/brick/deflect, tally tick, stage card,
-win stinger); INVENTED — the loss stinger (no loss in the recording).
+win stinger); INVENTED — the loss stinger (no loss in the recording;
+removed 2026-09-10 late evening: the owner wants the reference passage at
+every stage end).
 Native-rate hypothesis: two mirror pairs sum to 8377 and 8355 Hz; a third
 pair quoted earlier (2692 ↔ 5017 = 7709 Hz) does not fit and is withdrawn.
 Per-file peak normalisation makes the envelope points relative shapes, not
@@ -299,7 +301,8 @@ like the reference — `sfx_stage_card` is the 6-6-1-4 drum riff
 "开场音效错了", then sang the pattern) and `sfx_stage_win` the riff twice
 (≈5.2 s) through the results, both from the reacquired recording's hit
 measurements above and played at the card cue and at the outcome text;
-`sfx_stage_lose` is an invented slower, falling variant. The owner also
+`sfx_stage_lose` was an invented slower, falling variant (removed later
+that day on the owner's instruction). The owner also
 reported the tank's movement stuttering while firing rapid rounds: three
 mitigations landed — the simulation driver's PREFERRED callback rate
 is the tick rate (60 Hz; a preference, not a guarantee, and SpriteKit
@@ -523,8 +526,25 @@ Recorded verbatim: "应该是 B 恢复为加固前记录的材质；3 正确；4
   (ADR-0012, proposed; section below).
 - Rapid-fire stutter: gone on the device ("消失了").
 - Commit the tree ("提交"); no CLAUDE.md ("不用").
-- Still open: the invincibility duration (A 10 s default / B the reference
-  25 s rule) — not answered.
+- Invincibility duration: decided later the same evening — A, keep 10 s
+  ("保持 10 秒"); the ruleset default stands, the reference's 25 s rule
+  stays expressible data.
+
+Second batch, 2026-09-10 late evening (on ADR-0012's questions and the
+first device look at the results panel): invincibility "保持 10 秒"; the
+bonus bracket rule "我不知道原作怎么算的，你可以用一种最合理的方式来决定" (delegated —
+the stage-number brackets stay, see ADR-0012); MaxHits/MaxCombos "不要";
+table icons "坦克图标". Two complaints: the results panel "很难看" (the
+first cut stretched across the whole landscape surface with the subtotals
+far from the counts) and the stage-end music "时好时坏，需要用决战坦克的那个音效"
+— a lost stage played the invented falling stinger, a won one the
+reference excerpt. Applied: the panel is a compact reference-style card
+on the left (title band, "icon count icon count ×k = subtotal" rows with
+the tank icons composed from the rig sprites, rule, 总计, the reward text
+rising over the title, score and restart in the footer; width 44 % of the
+surface, at most 400 pt); the reference's results passage plays at every
+stage end and the invented loss stinger is removed from the generator,
+the bundle and the manifest (26 files).
 
 ## Stage-clear results table and bonuses (owner decision 5, 2026-09-10 evening; ADR-0012 proposed)
 
@@ -568,7 +588,15 @@ decision; the panel shows the four category rows, "总计", "奖励 +N" and
 the score. Not implemented (owner decisions in ADR-0012): MaxHits /
 MaxCombos (semantics unknown), tank icons, a reward sound.
 
-Tests: `ScoreRulesTests` (tiers, categories, payment on the deciding tick,
+Icons (owner: "坦克图标"): `PixelTankIcons` composes one up-facing enemy
+tank per category from the rig's tread, hull and turret sprites (the same
+mapping the scene uses, now shared as `PixelTankNode.appearance`), cropped
+to the rig body bounds (32×26 px) and drawn nearest-neighbour; the view
+builds the eight icons once from the scene's art when the panel is about
+to show and falls back to the category label if the art is unavailable.
+
+Tests: `ResultsIconsTests` (every category renders an opaque 32×26 icon;
+the mapping), `ScoreRulesTests` (tiers, categories, payment on the deciding tick,
 no double payment, loss pays nothing, checksum/invariants, legacy decode),
 `StageFlowTests` (reward cue timing and gating, category grouping),
 `StageContentTests` (stage number required, tier selection),
@@ -593,6 +621,7 @@ Do not interpret green tests as product completion:
 - The ground tile family is fixed to the frontier theme until stage data
   selects it.
 - Reachability validation is a cell flood approximation.
-- Owner decisions still open: the reference-invincibility rule; ADR-0012
-  acceptance (stage-bracket vs continue-based bonus, MaxHits/MaxCombos,
-  icons vs labels).
+- Owner decisions: none open after 2026-09-10 late evening (invincibility
+  A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
+  icons). The owner still has to look at the redesigned panel on the
+  device.

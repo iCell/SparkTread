@@ -56,7 +56,9 @@ Findings that shape the decision:
   (0.35 s) and holds ≈2.4 s, the playfield darkens (0.5 s), a results table
   of kills by enemy type slides in from the left (0.5 s) and counts up with
   ticks, then the next stage card follows automatically. The video contains
-  no loss, so the loss variant is ours.
+  no loss, so the loss variant was ours — until the owner (2026-09-10 late
+  evening, "过关之后的音乐怎么时好时坏，需要用决战坦克的那个音效") had the invented
+  loss stinger removed: the results passage plays at every stage end.
 
 ## Owner's creative decision of 2026-09-10 (recorded; NOT a rights decision)
 
@@ -165,8 +167,9 @@ results passage) is unchanged.
    attribution `inspired`; see the opening-sound section above — not an
    excerpt, not a transcription) at the card cue; stage won →
    the end-of-stage loop excerpt (74.00–78.20 s, the results screen from its
-   rise to the card) at the outcome-text cue; stage lost → synthesized
-   (invented: no loss in the recording). Excerpt processing: mono mix, 147/320 polyphase
+   rise to the card) at the outcome-text cue; stage lost → the same
+   excerpt (owner, 2026-09-10 late evening; the invented falling variant
+   was removed). Excerpt processing: mono mix, 147/320 polyphase
    windowed-sinc resample (64 taps, Hann, cutoff 0.92 of the output
    Nyquist), DC removal, 2–5 ms fade-in, 15–80 ms fade-out, peak 0.8. Cue
    anchors are adapted: the riff excerpts start at t = 0 of their cue;
