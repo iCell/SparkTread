@@ -87,11 +87,17 @@ public struct StageState: Codable, Equatable, Sendable {
     public var dropTable: [String]
     /// Percent chance (0–100) that a kill rolls a drop.
     public var dropChancePercent: Int
+    /// Score bonuses paid when the stage is won (ADR-0012): stage data set
+    /// by content from the stage number (`ScoreRules.reference`); `.none`
+    /// for worlds without a campaign position (lab, tests).
+    public var clearBonus: ScoreRules.ClearBonus
 
     public init(spawnQueue: [String], maxAliveEnemies: Int, enemyStartDelayTicks: Int = 240,
                 spawnPointsCells: [Vec2i], telegraphTicks: Int = 45,
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 45,
-                carriedPickupQueue: [String?] = [], hiddenPickups: [HiddenPickup] = []) {
+                carriedPickupQueue: [String?] = [], hiddenPickups: [HiddenPickup] = [],
+                clearBonus: ScoreRules.ClearBonus = .none) {
+        self.clearBonus = clearBonus
         self.phase = .playing
         self.spawnQueue = spawnQueue
         self.carriedPickupQueue = carriedPickupQueue
@@ -104,6 +110,31 @@ public struct StageState: Codable, Equatable, Sendable {
         self.playerRespawnCell = playerRespawnCell
         self.dropTable = dropTable
         self.dropChancePercent = dropChancePercent
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case phase, spawnQueue, carriedPickupQueue, hiddenPickups, maxAliveEnemies
+        case enemyStartDelayTicks, spawnPointsCells, nextSpawnPointIndex, telegraphTicks
+        case playerRespawnCell, dropTable, dropChancePercent, clearBonus
+    }
+
+    /// `clearBonus` was added after recordings of this format existed: a
+    /// missing key decodes as `.none` (encoding always writes it).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        phase = try c.decode(StagePhase.self, forKey: .phase)
+        spawnQueue = try c.decode([String].self, forKey: .spawnQueue)
+        carriedPickupQueue = try c.decode([String?].self, forKey: .carriedPickupQueue)
+        hiddenPickups = try c.decode([HiddenPickup].self, forKey: .hiddenPickups)
+        maxAliveEnemies = try c.decode(Int.self, forKey: .maxAliveEnemies)
+        enemyStartDelayTicks = try c.decode(Int.self, forKey: .enemyStartDelayTicks)
+        spawnPointsCells = try c.decode([Vec2i].self, forKey: .spawnPointsCells)
+        nextSpawnPointIndex = try c.decode(Int.self, forKey: .nextSpawnPointIndex)
+        telegraphTicks = try c.decode(Int.self, forKey: .telegraphTicks)
+        playerRespawnCell = try c.decode(Vec2i.self, forKey: .playerRespawnCell)
+        dropTable = try c.decode([String].self, forKey: .dropTable)
+        dropChancePercent = try c.decode(Int.self, forKey: .dropChancePercent)
+        clearBonus = try c.decodeIfPresent(ScoreRules.ClearBonus.self, forKey: .clearBonus) ?? .none
     }
 }
 
@@ -122,45 +153,51 @@ public enum EnemyArchetypes {
         public let baseFocusPercent: Int
         /// Equipment variant (mine/traversal interactions, §8.6).
         public let equipmentID: String?
+        /// Results-table reward category 0…7 (GAME_MECHANICS_SPEC §8.2 last
+        /// column; ADR-0012): the reference's results screen lists kills in
+        /// these eight categories, four rows of two, multiplied ×1…×4 by row.
+        public let rewardCategory: Int
     }
 
     /// The reference-recovered per-slot table (GAME_MECHANICS_SPEC §8.2):
     /// each weapon family has a distinct property identity — Normal is
     /// 1-armor teaching fodder, Rapid is fragile but the fastest thing on
     /// the field, AP is a 5–6-armor near-stationary fortress, and so on.
-    /// (armor, enemy speed level -4…4, power level, equipment, score).
-    /// Scores are provisional (the reference reward-class semantics are
-    /// unverified); shields are a modern addition on the AP heavies.
-    private static let referenceTable: [String: (Int, Int, Int, String?, Int)] = [
-        "normal_a": (1, -1, 0, nil, 100),
-        "normal_b": (1, -1, 1, "amphi_tank", 150),
-        "normal_c": (1, 0, 1, nil, 200),
-        "normal_d": (1, 0, 2, "shield_of_moon", 250),
-        "rapid_a": (1, 1, 0, nil, 200),
-        "rapid_b": (1, 1, 1, "anti_skid", 250),
-        "rapid_c": (2, 2, 2, nil, 300),
-        "rapid_d": (2, 2, 3, "memory_of_sea", 350),
-        "fire_a": (2, -1, 0, nil, 300),
-        "fire_b": (2, -1, 1, nil, 350),
-        "fire_c": (3, 0, 2, nil, 400),
-        "fire_d": (3, 0, 3, "shield_of_moon", 450),
-        "ap_a": (5, -4, 0, nil, 400),
-        "ap_b": (5, -3, 1, nil, 450),
-        "ap_c": (6, -4, 1, nil, 500),
-        "ap_d": (6, -3, 2, "amphi_tank", 550),
-        "explosion_a": (3, -1, 0, nil, 300),
-        "explosion_b": (3, -1, 1, "amphi_tank", 350),
-        "explosion_c": (4, -2, 2, nil, 400),
-        "explosion_d": (4, -2, 3, "anti_skid", 450),
-        "mine_a": (2, -1, 0, nil, 200),
-        "mine_b": (2, -1, 1, "anti_skid", 250),
-        "mine_c": (2, 0, 1, nil, 300),
-        "mine_d": (2, 0, 2, "memory_of_sea", 350),
+    /// (armor, enemy speed level -4…4, power level, equipment, score,
+    /// reward category). Per-kill scores are provisional; the reward
+    /// category is the recovered §8.2 column, whose results-table role was
+    /// verified on the reference's results screens (ADR-0012); shields are
+    /// a modern addition on the AP heavies.
+    private static let referenceTable: [String: (Int, Int, Int, String?, Int, Int)] = [
+        "normal_a": (1, -1, 0, nil, 100, 0),
+        "normal_b": (1, -1, 1, "amphi_tank", 150, 0),
+        "normal_c": (1, 0, 1, nil, 200, 1),
+        "normal_d": (1, 0, 2, "shield_of_moon", 250, 1),
+        "rapid_a": (1, 1, 0, nil, 200, 2),
+        "rapid_b": (1, 1, 1, "anti_skid", 250, 2),
+        "rapid_c": (2, 2, 2, nil, 300, 2),
+        "rapid_d": (2, 2, 3, "memory_of_sea", 350, 2),
+        "fire_a": (2, -1, 0, nil, 300, 5),
+        "fire_b": (2, -1, 1, nil, 350, 5),
+        "fire_c": (3, 0, 2, nil, 400, 5),
+        "fire_d": (3, 0, 3, "shield_of_moon", 450, 5),
+        "ap_a": (5, -4, 0, nil, 400, 6),
+        "ap_b": (5, -3, 1, nil, 450, 6),
+        "ap_c": (6, -4, 1, nil, 500, 7),
+        "ap_d": (6, -3, 2, "amphi_tank", 550, 7),
+        "explosion_a": (3, -1, 0, nil, 300, 4),
+        "explosion_b": (3, -1, 1, "amphi_tank", 350, 4),
+        "explosion_c": (4, -2, 2, nil, 400, 4),
+        "explosion_d": (4, -2, 3, "anti_skid", 450, 4),
+        "mine_a": (2, -1, 0, nil, 200, 3),
+        "mine_b": (2, -1, 1, "anti_skid", 250, 3),
+        "mine_c": (2, 0, 1, nil, 300, 3),
+        "mine_d": (2, 0, 2, "memory_of_sea", 350, 3),
     ]
 
     public static func attributes(for archetypeID: String) -> Attributes {
         let family = archetypeID.split(separator: "_").first.map(String.init) ?? "normal"
-        let row = referenceTable[archetypeID] ?? (1, -1, 0, nil, 100)
+        let row = referenceTable[archetypeID] ?? (1, -1, 0, nil, 100, 0)
         // Modern addition (owner shield rule): the AP fortresses carry the
         // damage shields — the archetype that teaches "switch to explosives".
         let shield = archetypeID == "ap_c" ? 2 : archetypeID == "ap_d" ? 3 : 0
@@ -175,7 +212,7 @@ public enum EnemyArchetypes {
         }
         return Attributes(armor: row.0, speedLevel: row.1, powerLevel: row.2,
                           score: row.4, shieldHP: shield, baseFocusPercent: baseFocus,
-                          equipmentID: row.3)
+                          equipmentID: row.3, rewardCategory: row.5)
     }
 }
 

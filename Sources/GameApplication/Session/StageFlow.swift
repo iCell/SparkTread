@@ -41,6 +41,8 @@ public struct StageFlow: Equatable, Sendable {
         case fade
         /// Row `index` of the results table becomes visible.
         case panelRow(Int)
+        /// The "Reward +N" line appears (a won stage with a clear bonus).
+        case reward
     }
 
     /// Phase lengths in ticks (60 Hz). Reference timings: card 2.3 s,
@@ -61,6 +63,9 @@ public struct StageFlow: Equatable, Sendable {
         public var panelRowInterval = 12
         /// Time the last row stays before the timeline ends.
         public var panelSettle = 30
+        /// Ticks after the total line before the reward line (reference:
+        /// the reward text follows the finished tally by ≈0.2–0.4 s).
+        public var rewardDelay = 18
         public init() {}
     }
 
@@ -79,6 +84,8 @@ public struct StageFlow: Equatable, Sendable {
     /// line, fixed when the outro begins so `panelHold` is long enough for
     /// all of them (R11-05: never a cap independent of the tally).
     public private(set) var panelRows = 1
+    /// Whether the panel ends with a reward line (won with a clear bonus).
+    public private(set) var hasRewardLine = false
 
     /// A stage that opens with the intro card.
     public init(arenaCellsWide: Int, arenaCellsHigh: Int, durations: Durations = Durations()) {
@@ -128,8 +135,7 @@ public struct StageFlow: Equatable, Sendable {
         case .outroHold: durations.outroHold
         case .outroFade: durations.outroFade
         case .panelIn: durations.panelIn
-        case .panelHold: max(durations.panelHold,
-                             (panelRows - 1) * max(1, durations.panelRowInterval) + durations.panelSettle + 1)
+        case .panelHold: max(durations.panelHold, rewardTick + durations.panelSettle + 1)
         case .playing, .finished: nil
         }
     }
@@ -147,6 +153,22 @@ public struct StageFlow: Equatable, Sendable {
         case .card: nil
         case .reveal: min(revealSteps, Int(progress * Double(revealSteps + 1)))
         default: revealSteps
+        }
+    }
+
+    /// Tick of `panelHold` at which the reward line appears (the total
+    /// line's tick when there is no reward line).
+    private var rewardTick: Int {
+        (panelRows - 1) * max(1, durations.panelRowInterval) + (hasRewardLine ? durations.rewardDelay : 0)
+    }
+
+    /// The reward line is on screen: from its cue to the end of the panel.
+    public var showsReward: Bool {
+        guard hasRewardLine else { return false }
+        switch phase {
+        case .panelHold: return ticksInPhase > rewardTick
+        case .finished: return true
+        default: return false
         }
     }
 
@@ -175,9 +197,12 @@ public struct StageFlow: Equatable, Sendable {
             case .panelHold: cues.append(.panelRow(0))
             default: break
             }
-        } else if phase == .panelHold, ticksInPhase % max(1, durations.panelRowInterval) == 0 {
-            let row = ticksInPhase / max(1, durations.panelRowInterval)
-            if row < panelRows { cues.append(.panelRow(row)) }
+        } else if phase == .panelHold {
+            if ticksInPhase % max(1, durations.panelRowInterval) == 0 {
+                let row = ticksInPhase / max(1, durations.panelRowInterval)
+                if row < panelRows { cues.append(.panelRow(row)) }
+            }
+            if hasRewardLine, ticksInPhase == rewardTick { cues.append(.reward) }
         }
         ticksInPhase += 1
         if let length = duration(of: phase), ticksInPhase >= length {
@@ -205,12 +230,16 @@ public struct StageFlow: Equatable, Sendable {
 
     /// The simulation decided the stage: start the outro. `resultRows` is
     /// the number of tally rows the results panel will list; the panel
-    /// also shows a total line, and its hold stretches to fit them all.
-    /// Ignored once an outcome is recorded (a decided stage stays decided).
-    public mutating func beginOutro(won: Bool, resultRows: Int = 0, lossReason: String? = nil) {
+    /// also shows a total line and, for a won stage with a clear bonus
+    /// (`rewardLine`), the reward line after it; the hold stretches to fit
+    /// them all. Ignored once an outcome is recorded (a decided stage
+    /// stays decided).
+    public mutating func beginOutro(won: Bool, resultRows: Int = 0, lossReason: String? = nil,
+                                    rewardLine: Bool = false) {
         guard outcome == nil, phase == .playing else { return }
         outcome = won ? .won : .lost
         self.lossReason = won ? nil : lossReason
+        hasRewardLine = won && rewardLine
         panelRows = max(0, resultRows) + 1
         phase = .outroDelay
         ticksInPhase = 0
@@ -221,16 +250,40 @@ public struct StageFlow: Equatable, Sendable {
     public var wantsAutomaticContinue: Bool { phase == .finished && outcome == .won }
 }
 
-/// Enemies destroyed this stage, by archetype, in first-kill order — the
-/// results panel's rows. Derived from events, never from GameCore state:
+/// Enemies destroyed this stage — by archetype in first-kill order, and by
+/// the reference's eight reward categories (ADR-0012) for the results
+/// table: four rows of two categories, each row multiplied ×1…×4, and a
+/// weighted total. Derived from events, never from GameCore state:
 /// `remember` the pre-step world (archetypes of live enemies), then
 /// `observe` the step's events.
 public struct KillTally: Equatable, Sendable {
     public private(set) var byArchetype: [String: Int] = [:]
     public private(set) var order: [String] = []
+    /// Kills per reward category 0…7.
+    public private(set) var byCategory = [Int](repeating: 0, count: ScoreRules.rewardCategoryCount)
     private var archetypes: [Int: String] = [:]
 
     public init() {}
+
+    /// The results table's fixed row count (reference layout).
+    public static let tableRows = ScoreRules.rewardTableRows
+
+    /// Kills in the two categories of table row `row` (0…3).
+    public func rowCounts(_ row: Int) -> (left: Int, right: Int) {
+        precondition(row >= 0 && row < Self.tableRows)
+        return (byCategory[2 * row], byCategory[2 * row + 1])
+    }
+
+    /// Row `row`'s kills times its multiplier (`row + 1`).
+    public func rowSubtotal(_ row: Int) -> Int {
+        let counts = rowCounts(row)
+        return (counts.left + counts.right) * (row + 1)
+    }
+
+    /// The reference's "总计": kills weighted by their row multiplier.
+    public var weightedTotal: Int {
+        (0..<Self.tableRows).reduce(0) { $0 + rowSubtotal($1) }
+    }
 
     public mutating func remember(_ world: WorldState) {
         for tank in world.tanks where tank.ownerPlayerID == nil {
@@ -243,6 +296,8 @@ public struct KillTally: Equatable, Sendable {
             guard let archetype = archetypes.removeValue(forKey: entityID) else { continue }
             byArchetype[archetype, default: 0] += 1
             if !order.contains(archetype) { order.append(archetype) }
+            let category = EnemyArchetypes.attributes(for: archetype).rewardCategory
+            if byCategory.indices.contains(category) { byCategory[category] += 1 }
         }
     }
 

@@ -63,7 +63,7 @@ sh Scripts/check-audio.sh selftest   # corruption / builder-refusal cases on tem
 sh Scripts/check-audio.sh       # synthesized WAVs == generator; excerpts' hashes + extractor hash == manifest (re-extracted and metadata-compared if SPARKTREAD_REFERENCE_WAV is set)
 sh Scripts/smoke-render.sh selftest   # classifier + failure-path checks, no simulator
 sh Scripts/smoke-render.sh      # simulator: the SKView actually presents the PLAYFIELD (terrain occupancy, stage + lab); needs ffmpeg
-swift test                      # 2026-09-10 after the owner's device feedback: 245 tests / 62 suites (Claude's run; PI verifies each round)
+swift test                      # 2026-09-10 evening after ADR-0012: 258 tests / 63 suites (Claude's run; PI was unavailable)
 xcodegen generate && xcodebuild test -project SparkTread.xcodeproj -scheme SparkTread \
   -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/DerivedData
 python3 Tools/build_audio_assets.py   # regenerates the SYNTHESIZED voices and their manifest entries; originals are untouched
@@ -152,9 +152,11 @@ environments or caches.
 
 1. Owner: decide the invincibility duration (A 10 s default / B the
    reference 25 s rule, `.referenceInvincibility`).
-2. Implement the stage-clear reward "按照原作来": measure the reference's
-   results-screen reward values across stages, propose the rule as an
-   ADR item, add it to scoring with tests, show it in the results panel.
+2. Owner: accept or amend ADR-0012 (results table + stage-clear
+   bonuses): the stage-bracket reading vs a continue-based rule,
+   MaxHits/MaxCombos, icons vs category labels. Every stage JSON now
+   needs `stageNumber`; the HUD score is paced during the outro
+   (`controller.hud.score` vs the world's score).
 3. Physical-device pass (ADR-0006 gate): legibility, touch occlusion, HUD
    fit, audio mix; large-results-panel layout.
 4. M4 work per plan §19 (VS-02/VS-03, traversal, difficulty, lifecycle

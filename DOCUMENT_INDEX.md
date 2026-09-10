@@ -38,10 +38,12 @@
 - `docs/decisions/ADR-0008-a0-satisfied-by-pixelproduction.md`：PixelProduction 交付满足 A0 风格锁定。
 - `docs/decisions/ADR-0009-universal-arena-56x27.md`：V1 竞技场固定为 56×27 格。
 
+- `docs/decisions/ADR-0010-owner-combat-rules-and-fort-ring.md`：特殊弹药耗尽回退普通弹、基地护盾加固堡垒环与占用格策略（到期恢复为记录材质，所有者决定 B）、隐藏宝物揭示条件、地雷可见性。所有者 2026-09-10 接受。
+- `docs/decisions/ADR-0011-reference-sfx-and-stage-transitions.md`：参照原作的音效集（八段原作录音节选、原创开场曲、其余合成）、事件映射、关卡过场时间线（开场卡片/十字揭幕/任务完成/战斗成绩）。所有者 2026-09-10 接受，并记录了版权使用决定。
+
 ## 提议中的 ADR（待所有者接受，尚不具备权威）
 
-- `docs/decisions/ADR-0010-owner-combat-rules-and-fort-ring.md`：特殊弹药耗尽回退普通弹、基地护盾加固堡垒环与占用格策略、隐藏宝物揭示条件、地雷可见性。
-- `docs/decisions/ADR-0011-reference-sfx-and-stage-transitions.md`：参照原作测量重合成的音效集（8363 Hz 零阶保持渲染）、事件映射与履带引擎触发、关卡过场时间线（开场卡片/十字揭幕/任务完成/战斗成绩）。
+- `docs/decisions/ADR-0012-results-table-and-stage-clear-bonuses.md`：参照原作结算画面的战斗成绩表（8 个奖励类别、4 行 ×1…×4、加权总计）与过关奖励（结算加分 + Reward，按关卡区间 200/330、600/660、1000/1000；区间与续关的歧义待所有者裁定）。
 - `Tools/reference_measure/README.md`：参照原作录像的测量流程与脚本（不含媒体），复现 ADR-0011 / CURRENT_REVIEW 中的音效与过场数据。
 
 ## 当前固定摘要

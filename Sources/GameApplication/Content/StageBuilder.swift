@@ -84,7 +84,9 @@ public enum StageBuilder {
             carriedPickupQueue: carriedQueue,
             hiddenPickups: (def.hiddenPickups ?? []).map {
                 HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id)
-            })
+            },
+            // Validated present above; the fallback is unreachable data hygiene.
+            clearBonus: ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 1))
 
         var events: [DomainEvent] = []
         for pickup in def.pickupSpawns {

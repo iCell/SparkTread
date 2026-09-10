@@ -132,15 +132,16 @@ Application / adapters:
 ## Validation evidence (latest tree, 2026-09-10)
 
 Recorded separately from the 2026-09-09 evidence below, which describes
-the tree as it was then and is not rerun here. After the owner's device feedback of 2026-09-10 (no engine sound, longer
-stage stingers, rapid-fire stutter mitigations): `swift test` 245 tests /
-62 suites passed (Claude's run;
-PI's independent run of the same revision reported the same count),
-architecture check, content validator, `Scripts/check-audio.sh` (27 files
-match the generator and `Tools/audio_manifest.json`), `git diff --check`
-and the simulator `xcodebuild test` on iPhone 17 pass (Claude's runs only
-— not PI acceptance); the device build installs. This paragraph is the
-one current count; the handoff repeats it with the same date.
+the tree as it was then and is not rerun here. After the owner's
+decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
+`Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
+architecture check, content validator, `Scripts/check-audio.sh` selftest
+and check (19 synthesized files match the generator, 8 excerpts match the
+manifest and the re-run extractor), `swift test` 258 tests / 63 suites,
+xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
+selftest and the smoke render itself; `git diff --check` is clean. This
+paragraph is the one current count; the handoff repeats it with the same
+date.
 
 ## Validation evidence (2026-09-09)
 
@@ -517,13 +518,62 @@ Recorded verbatim: "应该是 B 恢复为加固前记录的材质；3 正确；4
   excerpts, the synthesized voices and the original jingle with no
   third-party licence held; recorded in `Tools/audio_manifest.json`
   (`rights_review`) — the decision and its responsibility are the owner's.
-- Stage-clear reward: to follow the reference ("按照原作来") — a scoring
-  rule to be measured from the reference's results screens and proposed as
-  an ADR item (open work).
+- Stage-clear reward: to follow the reference ("按照原作来") — measured
+  from the reference's results screens and implemented the same evening
+  (ADR-0012, proposed; section below).
 - Rapid-fire stutter: gone on the device ("消失了").
 - Commit the tree ("提交"); no CLAUDE.md ("不用").
 - Still open: the invincibility duration (A 10 s default / B the reference
   25 s rule) — not answered.
+
+## Stage-clear results table and bonuses (owner decision 5, 2026-09-10 evening; ADR-0012 proposed)
+
+Survey (`Tools/reference_measure/results_screens.py`, media-free) of the
+first 30 results screens of the owner's recording (the video's last 9 %
+would not download; 30 of 32 stages). Read by eye from the crops:
+
+- The table is FOUR rows of two tank icons with kill counts, "×k =" and a
+  subtotal (k = 1…4), then "总计" = Σ subtotals; a "MaxHits N / MaxCombos
+  N" line sits above. Every screen obeys subtotal = (left + right) × k
+  (stage 3: (2+2)×1, (3+0)×2, (2+0)×3, (1+0)×4 → 20). The eight icons are
+  the eight §8.2 reward categories in row-major order (rows 1 and 4 pair
+  two colour variants of one chassis: the Normal pairs, the AP pairs) —
+  inferred from the icons, not from attributing kills in the footage.
+- Two constant bonuses per cleared stage, read from the score counter
+  before/after the panel and the rising "Reward +N" text: stages 1–10
+  tally +200 / reward +330; 11–25 +600 / +660; 26–30 +1000 / +1000.
+  Independent of kills, total, MaxHits and MaxCombos (stage 1: 6 kills →
+  200/330; stage 7: 25 kills, hits 7, combos 5 → 200/330). The score
+  counter animates; a treasure still counting in at the first panel
+  frame explains the few larger differences (e.g. +1600 at stage 17).
+- Ambiguity recorded: the recording's two continues (score resets at
+  stages 11 and 26) coincide with the bracket changes, so a rule based on
+  continues or lives cannot be excluded; the stage-number bracket is the
+  implemented default. Owner decision attached in ADR-0012.
+
+Implemented: `EnemyArchetypes.Attributes.rewardCategory` (the §8.2
+column, now verified as the table category); `ScoreRules` (GameCore data:
+tiers by stage number, `rewardMultiplier`); `StageState.clearBonus` set
+by the builder from the required content field `stageNumber` (validator
+1…999; VS-01 states 1); the bonus is paid to every active player on the
+deciding tick after `stageWon` with a `stageClearBonus(tally:reward:)`
+event, checksummed and bounded, decoding as `.none` when absent; a lost
+stage pays nothing. `KillTally` groups kills by category with row counts,
+subtotals and the weighted total; `StageFlow` adds the `.reward` cue 18
+ticks after the total line on a won stage with a bonus (hold stretched);
+the controller withholds the tally bonus from the HUD score until the
+total line and the reward until the reward line, so the shown score
+counts in as the reference does while the world's score is final at the
+decision; the panel shows the four category rows, "总计", "奖励 +N" and
+the score. Not implemented (owner decisions in ADR-0012): MaxHits /
+MaxCombos (semantics unknown), tank icons, a reward sound.
+
+Tests: `ScoreRulesTests` (tiers, categories, payment on the deciding tick,
+no double payment, loss pays nothing, checksum/invariants, legacy decode),
+`StageFlowTests` (reward cue timing and gating, category grouping),
+`StageContentTests` (stage number required, tier selection),
+`StageFlowIntegrationTests` (HUD payout pacing, five tally ticks, reset
+with the world). Claude-only: PI was unavailable (usage limit).
 
 ## Remaining gaps / follow-up review
 
@@ -543,6 +593,6 @@ Do not interpret green tests as product completion:
 - The ground tile family is fixed to the frontier theme until stage data
   selects it.
 - Reachability validation is a cell flood approximation.
-- Owner decisions still open: the reference-invincibility rule; the
-  stage-clear reward rule is decided in principle (follow the reference)
-  and awaits measurement and implementation.
+- Owner decisions still open: the reference-invincibility rule; ADR-0012
+  acceptance (stage-bracket vs continue-based bonus, MaxHits/MaxCombos,
+  icons vs labels).

@@ -7,6 +7,10 @@ import GameCore
 public struct StageDefinition: Codable, Equatable, Sendable {
     public var schemaVersion: Int
     public var id: String
+    /// Campaign position, 1-based (required by the validator): selects the
+    /// stage-clear bonus tier (`ScoreRules.reference`, ADR-0012). Optional
+    /// in the schema so a missing key is reported, not a decoding failure.
+    public var stageNumber: Int?
     public var displayNameKey: String
     public var themeID: String
     public var arenaSpecID: String

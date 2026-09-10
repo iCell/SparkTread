@@ -56,5 +56,9 @@ public enum DomainEvent: Codable, Equatable, Sendable {
     case enemyWaveStarted(archetypeID: String, position: Vec2i)
     case scoreChanged(delta: Int)
     case stageWon
+    /// The won stage's clear bonuses (ADR-0012), already added to every
+    /// active player's score on this tick; follows `stageWon`. Emitted only
+    /// when the stage carries a bonus.
+    case stageClearBonus(tally: Int, reward: Int)
     case stageLost(reason: String)
 }

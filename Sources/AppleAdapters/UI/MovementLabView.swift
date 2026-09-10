@@ -92,6 +92,7 @@ public final class MovementLabController {
         }
         flow = Self.makeFlow(for: session.world, lab: isLab)
         tally = KillTally()
+        clearBonus = .none
         syncInputAdmission()
         worldGeneration += 1
     }
@@ -128,7 +129,7 @@ public final class MovementLabController {
             + world.tanks.filter { $0.teamID != 1 }.count
         let weaponID = tank?.specialWeaponID ?? player?.retainedSpecialWeaponID ?? "rapid"
         return HUDSnapshot(
-            lives: player?.lives ?? 0, score: player?.score ?? 0, enemiesLeft: enemiesLeft,
+            lives: player?.lives ?? 0, score: displayedScore, enemiesLeft: enemiesLeft,
             baseHP: world.base?.durability ?? 0, baseMaxHP: world.base?.maxDurability ?? 0,
             shield: (world.base?.shieldRemainingTicks ?? 0) > 0,
             armor: tank?.armor ?? 0, maxArmor: tank?.maxArmor ?? 8,
@@ -248,9 +249,16 @@ public final class MovementLabController {
         tally.observe(events)
         pendingEvents += events
         for event in events {
-            if case .stageWon = event { flow.beginOutro(won: true, resultRows: tally.rows.count) }
+            if case .stageClearBonus(let tally, let reward) = event {
+                clearBonus = ScoreRules.ClearBonus(tally: tally, reward: reward)
+            }
+        }
+        for event in events {
+            if case .stageWon = event {
+                flow.beginOutro(won: true, resultRows: KillTally.tableRows, rewardLine: clearBonus.reward > 0)
+            }
             if case .stageLost(let reason) = event {
-                flow.beginOutro(won: false, resultRows: tally.rows.count, lossReason: reason)
+                flow.beginOutro(won: false, resultRows: KillTally.tableRows, lossReason: reason)
             }
         }
         if !flow.allowsSimulation { syncInputAdmission() }
@@ -267,9 +275,26 @@ public final class MovementLabController {
         // on finishing a stage); the stinger carries its own lead-in.
         case .outcomeText: audio.play(flow.outcome == .won ? "sfx_stage_win" : "sfx_stage_lose")
         case .fade: break
-        case .panelRow(let row):
-            if row < tally.rows.count + 1 { audio.play("sfx_tally_tick", volume: 0.6) } // rows + total line
+        case .panelRow: audio.play("sfx_tally_tick", volume: 0.6) // four table rows + the total line
+        case .reward: break // no isolated reference instance for the reward line yet
         }
+    }
+
+    /// The won stage's clear bonuses (ADR-0012), already in the world's
+    /// score; the HUD withholds them until the results panel pays them out
+    /// (tally bonus with the total line, reward with the reward line) the
+    /// way the reference counts them in. Reset with the world.
+    public private(set) var clearBonus = ScoreRules.ClearBonus.none
+
+    /// Score the HUD shows: the world's score minus the clear bonuses the
+    /// panel has not yet paid out.
+    public var displayedScore: Int {
+        let score = session.world.player(.one)?.score ?? 0
+        guard flow.outcome == .won else { return score }
+        var withheld = 0
+        if flow.panelRowsVisible < flow.panelRows { withheld += clearBonus.tally }
+        if !flow.showsReward { withheld += clearBonus.reward }
+        return max(0, score - withheld)
     }
 
     public func drainEvents() -> [DomainEvent] {
@@ -318,6 +343,23 @@ enum HUDLabels {
         case "shield_of_moon": "月牙"
         case "memory_of_sea": "海忆"
         default: "无"
+        }
+    }
+
+    /// Results-table reward categories (ADR-0012; GAME_MECHANICS_SPEC §8.2
+    /// last column): 0/1 the two Normal pairs, 2 Rapid, 3 Mine,
+    /// 4 Explosion, 5 Fire, 6/7 the two AP pairs.
+    static func rewardCategory(_ category: Int) -> String {
+        switch category {
+        case 0: "普通Ⅰ"
+        case 1: "普通Ⅱ"
+        case 2: "快弹"
+        case 3: "地雷"
+        case 4: "爆破"
+        case 5: "燃烧"
+        case 6: "穿甲Ⅰ"
+        case 7: "穿甲Ⅱ"
+        default: "类别\(category)"
         }
     }
 
@@ -538,37 +580,51 @@ public struct MovementLabView: View {
         .allowsHitTesting(StageFlowPresentationPolicy.resultsInteractive(phase: flowPhase))
     }
 
-    /// The reference's "战斗成绩" table: one row per enemy archetype
-    /// destroyed, a total, the score; a lost stage adds the restart button.
-    /// Layout policy (R15-05): the rows scroll inside a panel bounded to
-    /// the surface, so every row can be read and the restart button — kept
-    /// outside the scroll — is always reachable, whatever the tally size.
+    /// The reference's "战斗成绩" table (ADR-0012): four rows of two reward
+    /// categories with the row multiplier and subtotal, the weighted total,
+    /// then — on a won stage with a clear bonus — the reward line, and the
+    /// score; a lost stage adds the restart button. Layout policy (R15-05):
+    /// the rows scroll inside a panel bounded to the surface, so every row
+    /// can be read and the restart button — kept outside the scroll — is
+    /// always reachable.
     private func resultsPanel(size: CGSize) -> some View {
-        let rows = controller.tally.rows
+        let tally = controller.tally
         return VStack(alignment: .leading, spacing: 8) {
             Text("战斗成绩")
                 .font(.system(size: 22, weight: .heavy))
                 .foregroundStyle(Color.yellow)
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                        if index < panelRows {
-                            HStack {
-                                Text(HUDLabels.archetype(row.archetypeID)).foregroundStyle(.white)
-                                Spacer(minLength: 24)
-                                Text("×\(row.count)").foregroundStyle(Color.yellow)
+                    ForEach(0..<KillTally.tableRows, id: \.self) { row in
+                        if row < panelRows {
+                            let counts = tally.rowCounts(row)
+                            HStack(spacing: 10) {
+                                Text(HUDLabels.rewardCategory(2 * row)).foregroundStyle(.white)
+                                Text("\(counts.left)").foregroundStyle(Color.cyan)
+                                Text(HUDLabels.rewardCategory(2 * row + 1)).foregroundStyle(.white)
+                                Text("\(counts.right)").foregroundStyle(Color.cyan)
+                                Spacer(minLength: 16)
+                                Text("×\(row + 1) =").foregroundStyle(Color.green)
+                                Text("\(tally.rowSubtotal(row))").foregroundStyle(Color.yellow)
+                                    .frame(minWidth: 30, alignment: .trailing)
                             }
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .font(.system(size: 15, weight: .bold, design: .monospaced))
                         }
                     }
-                    if panelRows > rows.count {
+                    if panelRows > KillTally.tableRows {
                         Divider().overlay(Color.yellow.opacity(0.6))
                         HStack {
                             Text("总计").foregroundStyle(.white)
                             Spacer(minLength: 24)
-                            Text("\(controller.tally.total)").foregroundStyle(Color.yellow)
+                            Text("\(tally.weightedTotal)").foregroundStyle(Color.yellow)
                         }
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .font(.system(size: 18, weight: .heavy, design: .monospaced))
+                        if controller.flow.showsReward {
+                            Text("奖励 +\(controller.clearBonus.reward)")
+                                .font(.system(size: 16, weight: .heavy, design: .monospaced))
+                                .foregroundStyle(Color.orange)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                         Text("得分 \(controller.hud.score)")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundStyle(.white)

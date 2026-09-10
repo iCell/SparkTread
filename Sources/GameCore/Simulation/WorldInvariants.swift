@@ -237,6 +237,10 @@ public enum WorldInvariants {
             ticks(stage.enemyStartDelayTicks, "enemy start delay")
             ticks(stage.telegraphTicks, "telegraph ticks")
             if stage.spawnPointsCells.isEmpty { issues.append("stage has no spawn points") }
+            if stage.clearBonus.tally < 0 || stage.clearBonus.tally > maxScore
+                || stage.clearBonus.reward < 0 || stage.clearBonus.reward > maxScore {
+                issues.append("stage clear bonus out of domain")
+            }
             for c in stage.spawnPointsCells + [stage.playerRespawnCell] + stage.hiddenPickups.map(\.cell)
             where c.x < 0 || c.y < 0 || c.x >= arena.cellsWide || c.y >= arena.cellsHigh {
                 issues.append("stage cell (\(c.x),\(c.y)) outside the arena")

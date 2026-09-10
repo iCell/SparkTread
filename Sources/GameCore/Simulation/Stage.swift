@@ -784,6 +784,16 @@ enum Stage {
         if !enemiesRemain {
             stage.phase = .won // includes the player-elimination-same-tick case
             events.append(.stageWon)
+            // Clear bonuses (ADR-0012): the tally bonus and the reward are
+            // stage data, paid to every active player on the deciding tick;
+            // presentation paces their display, the score is final here.
+            let bonus = stage.clearBonus
+            if bonus.total > 0 {
+                for i in world.players.indices where world.players[i].active {
+                    world.players[i].score += bonus.total
+                }
+                events.append(.stageClearBonus(tally: bonus.tally, reward: bonus.reward))
+            }
             return
         }
         if !playerAlive {

@@ -50,6 +50,25 @@ private let vs01URL = repoRoot
         #expect(WorldInvariants.violations(in: ra).isEmpty)
     }
 
+    /// ADR-0012: the campaign position is required content and selects the
+    /// stage-clear bonus tier the builder writes into the stage.
+    @Test func stageNumberIsRequiredAndSelectsTheClearBonus() throws {
+        var def = try StageLoader.decode(Data(contentsOf: vs01URL))
+        #expect(def.stageNumber == 1)
+        #expect(StageValidator.validate(def).isEmpty)
+        let world = try StageBuilder.build(def)
+        #expect(world.stage?.clearBonus == ScoreRules.ClearBonus(tally: 200, reward: 330))
+        def.stageNumber = 12
+        #expect(try StageBuilder.build(def).stage?.clearBonus == ScoreRules.ClearBonus(tally: 600, reward: 660))
+        def.stageNumber = nil
+        #expect(StageValidator.validate(def).contains { $0.contains("stage_number missing") })
+        #expect(throws: StageBuilder.BuildError.self) { try StageBuilder.build(def) }
+        def.stageNumber = 0
+        #expect(StageValidator.validate(def).contains { $0.contains("stage_number 0 outside") })
+        def.stageNumber = 1000
+        #expect(StageValidator.validate(def).contains { $0.contains("stage_number 1000 outside") })
+    }
+
     @Test func validatorRejectsUnknownAndOutOfBoundsReferences() {
         var def = try! StageLoader.decode(Data(contentsOf: vs01URL))
         def.enemyComposition.append(.init(archetype: "dragon_z", count: 1)) // unknown

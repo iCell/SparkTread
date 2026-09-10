@@ -138,6 +138,7 @@ extension WorldState {
             for p in stage.spawnPointsCells { c.mix(p.x); c.mix(p.y) }
             c.mix(stage.nextSpawnPointIndex); c.mix(stage.telegraphTicks)
             c.mix(stage.playerRespawnCell.x); c.mix(stage.playerRespawnCell.y)
+            c.mix(stage.clearBonus.tally); c.mix(stage.clearBonus.reward)
             for id in stage.dropTable { c.mix(id) }
             c.mix(stage.dropChancePercent)
             c.mix(stage.carriedPickupQueue.count)

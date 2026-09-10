@@ -159,6 +159,8 @@ counted.
 - `blobs.py FRAMEDIR T0 [MIN MAX]` — moving-object blobs between
   consecutive frames (bullets, tanks, spawn flashes).
 - `yellowtext.py FRAMEDIR T0` — position of yellow UI text per frame.
+- `results_screens.py VIDEO OUTDIR` — results-screen survey: reward text,
+  finished table, score counter and next stage card per screen (ADR-0012).
 - `compare.py OUT.png ref.wav=synth.wav …` — side-by-side spectrograms of
   reference clips and the builder's output (`SPARKTREAD_AUDIO_OUT=… python3
   Tools/build_audio_assets.py`).
@@ -203,3 +205,20 @@ triangle bass ≈ 194–345 Hz) and `hits.py 0 7.5` (noise drums on a ≈0.15 s
 sixteenth grid, ≈100 bpm). Namco's music: no excerpt is committed or
 shipped; the game's stage-start jingle is an original composition in the
 same idiom (`Tools/build_audio_assets.py`, attribution `inspired`).
+
+## Results screens and stage-clear bonuses (2026-09-10, ADR-0012)
+
+`results_screens.py VIDEO OUTDIR` surveys every "Mission Complete" screen
+of the first recording (30 of 32 stages were decodable from a 91 %
+download; scan the top 480×70 strip at 1 fps for the yellow title, runs of
+≥ 3 s). Per screen it crops, for reading by eye (no OCR): the rising
+"Reward +N" text (yellow, text-shaped, above the panel border), the
+finished table (run end + 0.7 s), the score counter at the run's start
+and end, and the next stage card (+3.0 s). Findings and readings are in
+ADR-0012 and `docs/CURRENT_REVIEW.md`: four rows × two categories with
+×1…×4 multipliers and a weighted total; a constant tally bonus and reward
+per stage bracket (200/330, 600/660, 1000/1000 at stages 1–10, 11–25,
+26–30); the recording's two continues coincide with the bracket changes
+(ambiguity recorded). Frame geometry assumes the 480×360 encode; the
+yellow mask is `r > .75, g > .65, b < .35, r − b > .5` as in
+`yellowtext.py`.

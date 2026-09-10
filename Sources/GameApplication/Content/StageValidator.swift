@@ -39,6 +39,9 @@ public enum StageValidator {
     /// and in total). The reference schedules about twenty; the budget is
     /// generous but finite so the loader never admits an unbounded queue.
     public static let maxEnemiesPerStage = 500
+    /// Campaign positions are small integers; the tier table (ADR-0012)
+    /// saturates far below this.
+    public static let maxStageNumber = 999
 
     public static func validate(_ def: StageDefinition, known: KnownIDs = .reference) -> [String] {
         var issues: [String] = []
@@ -49,6 +52,11 @@ public enum StageValidator {
 
         if def.schemaVersion != 1 { issues.append("schema_version \(def.schemaVersion) unsupported (expected 1)") }
         if def.id.isEmpty { issues.append("id is empty") }
+        if let number = def.stageNumber {
+            if number < 1 || number > maxStageNumber { issues.append("stage_number \(number) outside 1…\(maxStageNumber)") }
+        } else {
+            issues.append("stage_number missing")
+        }
         if !known.themes.contains(def.themeID) { issues.append("unknown theme_id '\(def.themeID)'") }
         if def.arenaSpecID != "universal" { issues.append("arena_spec_id must be 'universal'") }
         if UInt64(def.seed) == nil { issues.append("seed '\(def.seed)' is not a valid unsigned integer") }

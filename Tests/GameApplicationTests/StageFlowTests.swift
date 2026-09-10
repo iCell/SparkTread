@@ -107,6 +107,43 @@ import Testing
         #expect(holdTicks >= flow.durations.panelHold)
     }
 
+    /// ADR-0012: the reward line follows the total line by `rewardDelay`
+    /// on a won stage with a clear bonus, with its own cue; the hold covers
+    /// it. A lost stage or a stage without a bonus shows no reward line.
+    @Test func theRewardLineFollowsTheTotalWithItsOwnCue() {
+        var flow = StageFlow.playing()
+        flow.beginOutro(won: true, resultRows: KillTally.tableRows, rewardLine: true)
+        #expect(flow.panelRows == 5 && flow.hasRewardLine)
+        while flow.phase != .panelHold { flow.advance() }
+        var cues: [StageFlow.Cue] = []
+        var holdTicks = 0, rewardTick: Int?
+        while flow.phase == .panelHold {
+            #expect(flow.showsReward == (rewardTick != nil))
+            let fired = flow.advance()
+            if fired.contains(.reward) { rewardTick = holdTicks }
+            cues += fired
+            holdTicks += 1
+        }
+        let interval = flow.durations.panelRowInterval
+        #expect(cues == [.panelRow(0), .panelRow(1), .panelRow(2), .panelRow(3), .panelRow(4), .reward])
+        #expect(rewardTick == 4 * interval + flow.durations.rewardDelay)
+        #expect(holdTicks - (rewardTick ?? 0) >= flow.durations.panelSettle)
+        #expect(flow.phase == .finished && flow.showsReward && flow.panelRowsVisible == 5)
+
+        var plain = StageFlow.playing()
+        plain.beginOutro(won: true, resultRows: KillTally.tableRows)
+        var plainCues: [StageFlow.Cue] = []
+        while plain.phase != .finished { plainCues += plain.advance() }
+        #expect(!plainCues.contains(.reward) && !plain.showsReward)
+
+        var lost = StageFlow.playing()
+        lost.beginOutro(won: false, resultRows: KillTally.tableRows, lossReason: "base_destroyed", rewardLine: true)
+        #expect(!lost.hasRewardLine)
+        var lostCues: [StageFlow.Cue] = []
+        while lost.phase != .finished { lostCues += lost.advance() }
+        #expect(!lostCues.contains(.reward) && !lost.showsReward)
+    }
+
     /// R15-05: the loss reason travels with the outcome; a win carries none.
     @Test func lossReasonTravelsWithTheOutcome() {
         var lost = StageFlow.playing()
@@ -148,5 +185,29 @@ import Testing
         #expect(tally.rows.map(\.archetypeID) == ["heavy", "light"])
         #expect(tally.byArchetype == ["heavy": 1, "light": 2])
         #expect(tally.total == 3)
+        #expect(tally.byCategory == [3, 0, 0, 0, 0, 0, 0, 0]) // unknown archetypes count in the fodder row
+    }
+
+    /// ADR-0012: the results table groups kills by reward category — four
+    /// rows of two, multiplied by the row — and the weighted total is the
+    /// reference's "总计".
+    @Test func groupsKillsByRewardCategoryWithRowMultipliers() {
+        var world = WorldState(terrain: TerrainGrid(arena: .universal), seed: 2)
+        let cell = SpatialUnits.subunitsPerCell
+        var ids: [Int] = []
+        for (i, archetype) in ["normal_a", "normal_a", "normal_c", "rapid_b", "fire_a", "ap_d"].enumerated() {
+            ids.append(world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: archetype,
+                                       positionSubunits: Vec2i(x: (2 + 4 * i) * cell, y: 2 * cell), facing: .down))
+        }
+        var tally = KillTally()
+        tally.remember(world)
+        tally.observe(ids.map { .tankDestroyed(entityID: $0, ownerPlayerID: nil, position: Vec2i(x: 0, y: 0)) })
+        #expect(tally.byCategory == [2, 1, 1, 0, 0, 1, 0, 1])
+        #expect(tally.rowCounts(0) == (2, 1) && tally.rowSubtotal(0) == 3)
+        #expect(tally.rowCounts(1) == (1, 0) && tally.rowSubtotal(1) == 2)
+        #expect(tally.rowCounts(2) == (0, 1) && tally.rowSubtotal(2) == 3)
+        #expect(tally.rowCounts(3) == (0, 1) && tally.rowSubtotal(3) == 4)
+        #expect(tally.weightedTotal == 12 && tally.total == 6)
+        #expect(KillTally().weightedTotal == 0)
     }
 }

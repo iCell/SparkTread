@@ -15,24 +15,34 @@ private let repoRoot = URL(fileURLWithPath: #filePath)
 private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_01_first_defense.json")
 private let artRoot = repoRoot.appendingPathComponent("Vendor/SparkTreadPixel")
 
+/// A voice plays until stopped, or — when its backend models sample length
+/// (`voiceDuration`) — until that much clock time has passed since `play()`,
+/// the way a real player reports `isPlaying`.
 private final class CountingVoice: AudioVoice {
     let name: String
-    var isPlaying = false
+    unowned let backend: CountingBackend
+    private var playing = false
+    private var startedAt: TimeInterval = 0
+    var isPlaying: Bool { playing && backend.clock() - startedAt < backend.voiceDuration }
     var volume: Float = 1
     var numberOfLoops = 0
     var currentTime: TimeInterval = 0
     var plays = 0
-    init(name: String) { self.name = name }
+    init(name: String, backend: CountingBackend) { self.name = name; self.backend = backend }
     func prepareToPlay() -> Bool { true }
-    func play() -> Bool { isPlaying = true; plays += 1; return true }
-    func stop() { isPlaying = false }
+    func play() -> Bool { playing = true; startedAt = backend.clock(); plays += 1; return true }
+    func stop() { playing = false }
 }
 
 private final class CountingBackend: AudioBackend, @unchecked Sendable {
     var voices: [CountingVoice] = []
+    /// Test time source; with the default infinite `voiceDuration` a voice
+    /// stays busy until stopped (the historical semantics of these tests).
+    var clock: () -> TimeInterval = { 0 }
+    var voiceDuration: TimeInterval = .infinity
     func activateSession() {}
     func makeVoice(named name: String) -> AudioVoice? {
-        let voice = CountingVoice(name: name)
+        let voice = CountingVoice(name: name, backend: self)
         voices.append(voice)
         return voice
     }
@@ -81,6 +91,7 @@ private func makeOpenWorld(player: Bool = true, steelAhead: Bool = false, frozen
 private func makeOpenController(_ world: WorldState) -> (MovementLabController, CountingBackend, FakeClock) {
     let backend = CountingBackend()
     let clock = FakeClock()
+    backend.clock = { clock.now }
     let controller = MovementLabController(world: world, audio: GameAudio(backend: backend, clock: { clock.now }))
     controller.start()
     return (controller, backend, clock)
@@ -344,5 +355,40 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         frame(controller, clock: clock) // the new card's first tick fires its cue
         #expect(backend.plays("sfx_stage_card") == 2)
         #expect(!controller.input.isAcceptingInput)
+    }
+
+    /// ADR-0012: the world pays the clear bonuses on the deciding tick; the
+    /// HUD withholds them until the panel's total line (tally bonus) and
+    /// reward line (reward) the way the reference counts them in, and the
+    /// results table always has its four rows, the total and the reward.
+    @Test func theHUDPaysTheClearBonusesOutWithThePanel() {
+        var world = makeOpenWorld()
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 12 * cell, y: 20 * cell))
+        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 1, enemyStartDelayTicks: 0,
+                                 spawnPointsCells: [Vec2i(x: 1, y: 1)],
+                                 playerRespawnCell: Vec2i(x: 3, y: 3), dropTable: [],
+                                 clearBonus: .init(tally: 200, reward: 330))
+        let (controller, backend, clock) = makeOpenController(world)
+        backend.voiceDuration = 0.09 // the tally tick's length: five rows 0.2 s apart never exhaust its pool of three
+        var steps = 0
+        while controller.flow.outcome == nil, steps < 600 { frame(controller, clock: clock); steps += 1 }
+        #expect(controller.flow.outcome == .won && controller.flow.hasRewardLine)
+        #expect(controller.flow.panelRows == KillTally.tableRows + 1)
+        #expect(controller.clearBonus == .init(tally: 200, reward: 330))
+        #expect(controller.session.world.player(.one)?.score == 530) // authoritative, final
+        #expect(controller.hud.score == 0)                            // shown: nothing paid out yet
+        while controller.flow.panelRowsVisible < controller.flow.panelRows, steps < 2000 {
+            #expect(controller.hud.score == 0)
+            frame(controller, clock: clock); steps += 1
+        }
+        #expect(controller.hud.score == 200) // the total line pays the tally bonus
+        while !controller.flow.showsReward, steps < 2000 {
+            #expect(controller.hud.score == 200)
+            frame(controller, clock: clock); steps += 1
+        }
+        #expect(controller.hud.score == 530) // the reward line pays the reward
+        #expect(backend.plays("sfx_tally_tick") == KillTally.tableRows + 1)
+        while controller.flow.phase != .card, steps < 3000 { frame(controller, clock: clock); steps += 1 }
+        #expect(controller.clearBonus == .none) // reset with the world
     }
 }

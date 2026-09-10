@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "frontier_01_first_defense",
+  "stageNumber": 1,
   "displayNameKey": "stage.vs01.name",
   "themeID": "frontier",
   "arenaSpecID": "universal",
