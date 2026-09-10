@@ -159,7 +159,7 @@ public final class MovementLabController {
             session = MovementLabSession(world: world)
             isLab = false
         } else {
-            session = MovementLabSession()
+            session = .trainingArena()
             isLab = true
         }
         self.audio = audio ?? GameAudio()
@@ -214,7 +214,7 @@ public final class MovementLabController {
             replaceSession(MovementLabSession(world: injectedWorld, ruleset: session.ruleset,
                                               weapons: session.weapons, pickups: session.pickups))
         } else {
-            replaceSession(MovementLabSession())
+            replaceSession(.trainingArena())
         }
     }
 
@@ -570,6 +570,10 @@ public final class MovementLabController {
 
     public func selectWeapon(_ id: String) { if isLab { session.debugSelectSpecialWeapon(id) } }
     public func setPower(_ level: Int) { if isLab { session.debugSetPowerLevel(level) } }
+    /// Training Arena: every pickup the content knows, and a spawner.
+    public var pickupIDs: [String] { isLab ? TrainingArenaFixture.pickupIDs : [] }
+    @discardableResult
+    public func spawnPickup(_ id: String) -> Bool { isLab ? session.debugSpawnPickup(id) : false }
 
     public var playerTank: TankState? {
         session.world.player(.one)?.tankEntityID.flatMap { session.world.tank(entityID: $0) }
@@ -647,6 +651,38 @@ enum HUDLabels {
         case "base_destroyed": "基地失守"
         case "player_eliminated": "全军覆没"
         default: "任务失败"
+        }
+    }
+
+    /// Pickup names for the training panel (§12.2 Chinese UI).
+    static func pickup(_ id: String) -> String {
+        switch id {
+        case "speed_up": "加速"
+        case "armor_up": "护甲"
+        case "power_up": "火力"
+        case "level_up": "升级"
+        case "max_speed_power": "满速火"
+        case "max_armor_ammo": "满甲弹"
+        case "ammo_crate": "弹药箱"
+        case "rapid_weapon": "快弹枪"
+        case "fire_weapon": "火焰枪"
+        case "ap_weapon": "穿甲枪"
+        case "explosion_weapon": "爆破枪"
+        case "mine_weapon": "地雷枪"
+        case "amphi_tank": "两栖"
+        case "anti_skid": "防滑"
+        case "shield_of_moon": "月牙"
+        case "memory_of_sea": "海忆"
+        case "invincibility": "无敌"
+        case "base_shield": "基地盾"
+        case "freeze_enemy": "冻结"
+        case "bomb": "炸弹"
+        case "extra_life": "1UP"
+        case "score_200": "+200"
+        case "score_500": "+500"
+        case "score_1000": "+1000"
+        case "score_2000": "+2000"
+        default: id
         }
     }
 
@@ -811,8 +847,8 @@ public struct MovementLabView: View {
                 .padding(10)
                 .background(Circle().fill(Color.black.opacity(0.45)))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .padding(.trailing, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.leading, 14)
         .padding(.top, 6)
     }
 
@@ -1121,43 +1157,65 @@ public struct MovementLabView: View {
 
     /// Weapon debug panel (lab only): special-weapon
     /// selector and power-level control, top-right, collapsible.
+    /// Training Arena panel (lab only, top-right): special weapon and
+    /// power level, a pickup spawner for every pickup the content knows,
+    /// and a reset. Collapsible; the list scrolls inside half the surface.
     private var weaponDebugPanel: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            Button(showWeaponPanel ? "武器 ▲" : "武器 ▼") { showWeaponPanel.toggle() }
+            Button(showWeaponPanel ? "训练面板 ▲" : "训练面板 ▼") { showWeaponPanel.toggle() }
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Capsule().fill(Color.black.opacity(0.55)))
             if showWeaponPanel {
-                VStack(alignment: .trailing, spacing: 4) {
-                    ForEach(controller.specialWeaponIDs, id: \.self) { id in
-                        Button(id) {
-                            selectedWeapon = id
-                            controller.selectWeapon(id)
-                        }
-                        .font(.system(size: 12, weight: selectedWeapon == id ? .bold : .regular))
-                        .foregroundStyle(selectedWeapon == id ? .yellow : .white)
-                        .padding(.horizontal, 10).padding(.vertical, 3)
-                        .background(Capsule().fill(Color.black.opacity(0.45)))
-                    }
-                    HStack(spacing: 6) {
-                        ForEach(0..<4, id: \.self) { level in
-                            Button("P\(level)") {
-                                powerLevel = level
-                                controller.setPower(level)
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text("武器").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        HStack(spacing: 4) {
+                            ForEach(controller.specialWeaponIDs, id: \.self) { id in
+                                panelButton(HUDLabels.weapon(id), selected: selectedWeapon == id) {
+                                    selectedWeapon = id
+                                    controller.selectWeapon(id)
+                                }
                             }
-                            .font(.system(size: 11, weight: powerLevel == level ? .bold : .regular))
-                            .foregroundStyle(powerLevel == level ? .yellow : .white)
-                            .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.black.opacity(0.45)))
                         }
+                        Text("火力").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        HStack(spacing: 4) {
+                            ForEach(0..<4, id: \.self) { level in
+                                panelButton("P\(level)", selected: powerLevel == level) {
+                                    powerLevel = level
+                                    controller.setPower(level)
+                                }
+                            }
+                        }
+                        Text("掉落（出现在车前）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        let ids = controller.pickupIDs
+                        ForEach(Array(stride(from: 0, to: ids.count, by: 3)), id: \.self) { start in
+                            HStack(spacing: 4) {
+                                ForEach(ids[start..<min(start + 3, ids.count)], id: \.self) { id in
+                                    panelButton(HUDLabels.pickup(id), selected: false) { controller.spawnPickup(id) }
+                                }
+                            }
+                        }
+                        panelButton("重置训练场", selected: false) { controller.restart() }
                     }
                 }
+                .frame(maxWidth: 300, maxHeight: 220)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .padding(.trailing, 16)
         .padding(.top, 8)
+    }
+
+    private func panelButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: selected ? .bold : .regular))
+                .foregroundStyle(selected ? Color.yellow : Color.white)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+        }
     }
 
     /// One scene per view; surface changes are delivered explicitly through

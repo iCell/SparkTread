@@ -167,7 +167,10 @@ environments or caches.
    choice, a continue after game over, the difficulty and launch
    numbers, foliage AI perception) — all implemented with provisional
    defaults under the "自由发挥" delegation.
-4. M4 remainder: settings/accessibility/controller options (item 6),
+4. The Training Arena (`TrainingArenaFixture`, arena rules in the
+   session) is a lab fixture with its own rules; the M1 golden still runs
+   on `MovementLabFixture` — do not merge the two.
+5. M4 remainder: settings/accessibility/controller options (item 6),
    the external playtest build, the final visual language, performance
    and export targets, a PLAYED three-stage golden replay.
 3. Physical-device pass (ADR-0006 gate): legibility, touch occlusion, HUD

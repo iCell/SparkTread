@@ -763,6 +763,32 @@ text treatment (no Phase 1 art):
   waiver, foliage flammability and AI perception, wake/skid decals and
   a landing effect, a wake for amphibious tanks.
 
+## Training Arena (owner direction 2026-09-10 late evening)
+
+Owner (verbatim): "训练场应该有各种地形，所有类型的坦克，所有类型的砖墙，并且可以自由选择掉落不同的
+装备，选择不同的子弹。所有类型的坦克也可以活动并且发出它们该有的导弹，只是我死亡之后可以无限复活，
+以及自己的老家无法被摧毁。敌方坦克死亡会立即复活。另外，现在的武器和暂停按钮重叠在一起无法点击选择".
+
+- `TrainingArenaFixture` (GameApplication): every terrain kind, all eight
+  damaged-brick and four damaged-steel quadrant states, a water pool with
+  a foliage shore, an ice rink, a foliage patch, a mixed fortress, the
+  base with its brick U; all 24 enemy archetypes on a parade ground with
+  the director's attributes and their family weapons; a stage (phase
+  playing, empty queue) so the brain and the player lifecycle run; the
+  base at 999/999 and the player at 999 lives.
+- Arena rules (`MovementLabSession.trainingArena()`, lab only, outside
+  the command stream — each intervention rebases the recording): a
+  destroyed enemy respawns at once (same archetype, round-robin spawn
+  cells, nearest free footprint), the base is repaired to full every
+  tick, lives are topped up when low. `debugSpawnPickup` drops any of
+  the 25 known pickups one cell ahead of the player.
+- UI: the pause button moved to the top-LEFT; the top-right "训练面板"
+  (collapsible, scrolling) has the weapon and power selectors, the
+  pickup spawner grid and 重置训练场. The M1 movement fixture and its
+  golden are untouched (the arena is a separate fixture).
+- Tests: `TrainingArenaTests` (contents, enemies drive and fire several
+  families, respawn/repair/lives, pickup spawner, the flag).
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

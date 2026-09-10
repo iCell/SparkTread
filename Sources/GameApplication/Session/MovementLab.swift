@@ -74,6 +74,12 @@ public struct MovementLabSession: Sendable {
     public let sessionState: SessionState?
     public let difficultyID: String?
     public static let checksumInterval = 60
+    /// Training Arena rules (lab only, outside the recorded command stream;
+    /// `TrainingArenaFixture`): enemies respawn on death, the base and the
+    /// player's lives are topped up. Never set for authored stages.
+    public private(set) var isTrainingArena = false
+    private var trainingRoster: [Int: String] = [:]
+    private var trainingSpawnCursor = 0
 
     /// Configuration rejected at the session boundary.
     public enum ConfigurationError: Error, Equatable {
@@ -107,6 +113,16 @@ public struct MovementLabSession: Sendable {
     /// Trusted-code initializer: ALL THREE rulesets are preconditioned
     /// (R15-04: the session never appears to validate only one of them);
     /// data-driven callers use `make(...)`.
+    /// The Training Arena session (`MOVEMENT_LAB=1`, the title's 训练场).
+    public static func trainingArena() -> MovementLabSession {
+        var session = MovementLabSession(world: TrainingArenaFixture.makeWorld())
+        session.isTrainingArena = true
+        for tank in session.world.tanks where tank.ownerPlayerID == nil {
+            session.trainingRoster[tank.entityID] = tank.archetypeID
+        }
+        return session
+    }
+
     public init(world: WorldState = MovementLabFixture.makeWorld(),
                 ruleset: MovementRuleset = .provisional,
                 weapons: WeaponRuleset = .provisional,
@@ -188,6 +204,60 @@ public struct MovementLabSession: Sendable {
         rebaseRecording()
     }
 
+    /// Training Arena: drops a pickup one cell ahead of the player (or the
+    /// nearest free cell), so any equipment, weapon or effect can be tried.
+    @discardableResult
+    public mutating func debugSpawnPickup(_ pickupID: String) -> Bool {
+        guard isTrainingArena, let tank = world.player(.one)?.tankEntityID.flatMap({ world.tank(entityID: $0) }) else { return false }
+        let cell = SpatialUnits.subunitsPerCell, footprint = SpatialUnits.standardTankFootprintSubunits
+        let ahead = Vec2i(x: tank.positionSubunits.x + footprint / 2, y: tank.positionSubunits.y + footprint / 2)
+            + tank.facing.vector * (footprint / 2 + cell)
+        var events: [DomainEvent] = []
+        let spawned = world.spawnStagePickup(pickupID, nearCell: Vec2i(x: ahead.x / cell, y: ahead.y / cell),
+                                             rules: pickups, events: &events)
+        if spawned { rebaseRecording() }
+        return spawned
+    }
+
+    /// Training Arena test hook: destroys a tank outright (the next tick
+    /// runs its death and the respawn rule).
+    public mutating func debugDestroyTank(_ entityID: Int) {
+        guard isTrainingArena else { return }
+        world.withTank(entityID: entityID) { $0.armor = 0; $0.shieldHP = 0 }
+        rebaseRecording()
+    }
+
+    /// The arena's standing rules, applied after each tick: a destroyed
+    /// enemy comes back at once (same archetype, next spawn cell, nearest
+    /// free footprint), the base is repaired to full, the player's lives
+    /// never run low. Each intervention rebases the recording (it is not
+    /// part of the command stream).
+    private mutating func applyTrainingArenaRules(events: [DomainEvent]) {
+        var changed = false
+        for case .tankDestroyed(let id, nil, _) in events {
+            guard let archetype = trainingRoster.removeValue(forKey: id) else { continue }
+            let origin = TrainingArenaFixture.enemySpawnCells[trainingSpawnCursor % TrainingArenaFixture.enemySpawnCells.count]
+            trainingSpawnCursor += 1
+            guard let cellPos = TrainingArenaFixture.freeCell(in: world, near: origin) else {
+                trainingRoster[id] = archetype // no room this tick: keep the debt, retry on the next death pass
+                continue
+            }
+            let newID = TrainingArenaFixture.spawnEnemy(&world, archetype: archetype, at: cellPos)
+            trainingRoster[newID] = archetype
+            changed = true
+        }
+        if var base = world.base, base.durability < base.maxDurability {
+            base.durability = base.maxDurability
+            world.base = base
+            changed = true
+        }
+        if let lives = world.player(.one)?.lives, lives < TrainingArenaFixture.playerLives / 2 {
+            world.withPlayer(.one) { $0.lives = TrainingArenaFixture.playerLives }
+            changed = true
+        }
+        if changed { rebaseRecording() }
+    }
+
     /// Lab convenience only: instantly respawns the player when no stage is
     /// active. Stage worlds use the real lives/respawn flow (§6.5).
     public mutating func debugRespawnPlayerIfNeeded() {
@@ -208,6 +278,7 @@ public struct MovementLabSession: Sendable {
             assert(WorldInvariants.violations(in: world).isEmpty,
                    "invariants violated: \(WorldInvariants.violations(in: world))")
         }
+        if isTrainingArena { applyTrainingArenaRules(events: events) }
         return events
     }
 }
