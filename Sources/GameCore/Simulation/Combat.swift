@@ -51,6 +51,7 @@ enum Combat {
             world.projectiles[i] = p
         }
         for i in world.fireHazards.indices { world.fireHazards[i].lifetimeRemainingTicks -= 1 }
+        spreadFoliageFire(&world, weapons: weapons)
         for i in world.mines.indices where world.mines[i].phase == .arming {
             world.mines[i].phaseTicksRemaining -= 1
             if world.mines[i].phaseTicksRemaining <= 0 { world.mines[i].phase = .armed }
@@ -248,11 +249,13 @@ enum Combat {
             for (cx, cy) in patches {
                 let patchCenter = Vec2i(x: cx * cell + cell / 2, y: cy * cell + cell / 2)
                 let id = world.claimEntityID()
+                let lifetime = weapon.level(weapon.lifetimeTicks, power)
                 world.fireHazards.append(FireHazardState(
                     entityID: id, ownerEntityID: tank.entityID, ownerPlayerID: tank.ownerPlayerID,
                     teamID: tank.teamID, filter: filter, positionSubunits: patchCenter,
-                    lifetimeRemainingTicks: weapon.level(weapon.lifetimeTicks, power),
-                    damagePerTouch: weapon.level(weapon.tankDamage, power)))
+                    lifetimeRemainingTicks: lifetime,
+                    damagePerTouch: weapon.level(weapon.tankDamage, power),
+                    spreadsAtTicks: foliageSpreadTick(world, cellX: cx, cellY: cy, lifetime: lifetime, weapons: weapons)))
                 spawned.insert(id)
             }
             // Active-count bookkeeping is per PATCH (cleanup decrements one
@@ -1087,6 +1090,53 @@ enum Combat {
         }
     }
 
+    /// The tick at which a flame placed on `cell` spreads (ADR-0017): its
+    /// lifetime minus the spread delay, when the cell is foliage and the
+    /// rule is on; nil otherwise.
+    static func foliageSpreadTick(_ world: WorldState, cellX: Int, cellY: Int, lifetime: Int,
+                                  weapons: WeaponRuleset) -> Int? {
+        guard weapons.foliageSpreadDelayTicks > 0, world.terrain.isInside(cellX: cellX, cellY: cellY),
+              world.terrain[cellX, cellY].kind == .foliage else { return nil }
+        let at = lifetime - weapons.foliageSpreadDelayTicks
+        return at > 0 ? at : nil
+    }
+
+    /// Foliage fire (ADR-0017, owner rule: "火焰弹打到草坪的时候，应该需要把相邻的草坪
+    /// 都点着"): a flame whose remaining lifetime reaches its spread tick
+    /// ignites the four neighbouring foliage cells that hold no flame yet —
+    /// ownerless patches (sentinel −1: no active-count slot, so the
+    /// wildfire never blocks the shooter's next volley) that keep the
+    /// parent's team, filter, damage and full lifetime and spread on in
+    /// turn. Deterministic: parents ascending by entity id, neighbours in
+    /// up/right/down/left order.
+    private static func spreadFoliageFire(_ world: inout WorldState, weapons: WeaponRuleset) {
+        guard weapons.foliageSpreadDelayTicks > 0 else { return }
+        let cell = SpatialUnits.subunitsPerCell
+        var occupied = Set<Int>()
+        let width = world.arena.cellsWide
+        for h in world.fireHazards { occupied.insert((h.positionSubunits.y / cell) * width + h.positionSubunits.x / cell) }
+        var born: [FireHazardState] = []
+        for i in world.fireHazards.indices {
+            let parent = world.fireHazards[i]
+            guard let at = parent.spreadsAtTicks, parent.lifetimeRemainingTicks == at else { continue }
+            world.fireHazards[i].spreadsAtTicks = nil
+            let cx = parent.positionSubunits.x / cell, cy = parent.positionSubunits.y / cell
+            let lifetime = parent.lifetimeRemainingTicks + weapons.foliageSpreadDelayTicks
+            for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)] {
+                let nx = cx + dx, ny = cy + dy
+                guard world.terrain.isInside(cellX: nx, cellY: ny), world.terrain[nx, ny].kind == .foliage,
+                      occupied.insert(ny * width + nx).inserted else { continue }
+                born.append(FireHazardState(
+                    entityID: world.claimEntityID(), ownerEntityID: -1, ownerPlayerID: parent.ownerPlayerID,
+                    teamID: parent.teamID, filter: parent.filter,
+                    positionSubunits: Vec2i(x: nx * cell + cell / 2, y: ny * cell + cell / 2),
+                    lifetimeRemainingTicks: lifetime, damagePerTouch: parent.damagePerTouch,
+                    spreadsAtTicks: foliageSpreadTick(world, cellX: nx, cellY: ny, lifetime: lifetime, weapons: weapons)))
+            }
+        }
+        world.fireHazards.append(contentsOf: born)
+    }
+
     private static func resolveFireHazardDamage(
         _ world: inout WorldState, weapons: WeaponRuleset, events: inout [DomainEvent]
     ) {
@@ -1285,6 +1335,12 @@ enum Combat {
             let cell = SpatialUnits.subunitsPerCell
             let cx = hazard.positionSubunits.x / cell, cy = hazard.positionSubunits.y / cell
             if world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .ice {
+                world.terrain[cx, cy] = TerrainCell(kind: .ground)
+                events.append(.terrainChanged(cellX: cx, cellY: cy, quadrantMask: 0))
+            }
+            // Foliage a flame burns out on is gone (ADR-0017, owner rule).
+            if weapons.foliageBurnsAway, world.terrain.isInside(cellX: cx, cellY: cy),
+               world.terrain[cx, cy].kind == .foliage {
                 world.terrain[cx, cy] = TerrainCell(kind: .ground)
                 events.append(.terrainChanged(cellX: cx, cellY: cy, quadrantMask: 0))
             }

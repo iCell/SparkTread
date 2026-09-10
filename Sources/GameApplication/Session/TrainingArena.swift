@@ -30,10 +30,38 @@ public enum TrainingArenaFixture {
         "score_200", "score_500", "score_1000", "score_2000",
     ]
 
-    /// One enemy per weapon family (owner 2026-09-10: "一种类型的坦克一个就可以了"),
-    /// the A tier of each; the other tiers of a family differ in armour,
-    /// speed, power and equipment (§8.2) and can be swapped in here.
-    public static let enemyArchetypes: [String] = ["normal", "rapid", "fire", "ap", "explosion", "mine"].map { "\($0)_a" }
+    /// Every enemy archetype, offered on the training panel one button
+    /// each (owner 2026-09-10: "点击一个按钮增加一个类型的坦克"), sorted by
+    /// resistance — armour plus shield — from low to high, then by family
+    /// and tier for ties. The arena starts with no enemies.
+    public struct RosterEntry: Equatable, Sendable {
+        public let archetypeID: String
+        public let family: String
+        public let tier: String
+        public let resistance: Int
+    }
+
+    public static let enemyRoster: [RosterEntry] = {
+        let families = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
+        var entries: [RosterEntry] = []
+        for (f, family) in families.enumerated() {
+            for (t, tier) in ["a", "b", "c", "d"].enumerated() {
+                let id = "\(family)_\(tier)"
+                let attributes = EnemyArchetypes.attributes(for: id)
+                entries.append(RosterEntry(archetypeID: id, family: family, tier: tier.uppercased(),
+                                           resistance: attributes.armor + attributes.shieldHP))
+                _ = (f, t)
+            }
+        }
+        return entries.sorted {
+            if $0.resistance != $1.resistance { return $0.resistance < $1.resistance }
+            let fa = families.firstIndex(of: $0.family) ?? 0, fb = families.firstIndex(of: $1.family) ?? 0
+            if fa != fb { return fa < fb }
+            return $0.tier < $1.tier
+        }
+    }()
+
+    public static let enemyArchetypes: [String] = enemyRoster.map(\.archetypeID)
 
     public static func makeWorld() -> WorldState {
         let arena = ArenaSpecification.universal
@@ -87,13 +115,10 @@ public enum TrainingArenaFixture {
                         positionSubunits: Vec2i(x: playerSpawnCell.x * cell, y: playerSpawnCell.y * cell), facing: .up)
         world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 23 * cell),
                                durability: baseDurability, maxDurability: baseDurability)
-        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 12, enemyStartDelayTicks: 0,
+        world.stage = StageState(spawnQueue: [], maxAliveEnemies: 40, enemyStartDelayTicks: 0,
                                  spawnPointsCells: enemySpawnCells, telegraphTicks: 45,
                                  playerRespawnCell: playerSpawnCell, dropTable: [], dropChancePercent: 0)
-        // The parade: one tank per family on the open row, facing down.
-        for (i, archetype) in enemyArchetypes.enumerated() {
-            spawnEnemy(&world, archetype: archetype, at: Vec2i(x: 16 + i * 4, y: 7))
-        }
+        // No enemies until the training panel adds them.
         world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
         return world
     }

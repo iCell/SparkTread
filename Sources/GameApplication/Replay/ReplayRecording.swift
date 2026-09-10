@@ -18,6 +18,8 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         public let checksum: UInt64
     }
 
+    /// Format 7 (2026-09-10, ADR-0017): flames on foliage spread to the
+    /// neighbouring foliage and burn it away (hazards carry a spread tick).
     /// Format 6 (2026-09-10, ADR-0016): traversal profiles (water needs
     /// AmphiTank), ice inertia, mine launch/flight and the post-landing
     /// slow change movement and combat for the same inputs; the rulesets
@@ -43,7 +45,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 6
+    public static let currentFormatVersion = 7
 
     public let formatVersion: Int
     /// Campaign header (ADR-0013): the stage this recording plays and the

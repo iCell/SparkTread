@@ -50,6 +50,15 @@ public struct WorldState: Codable, Equatable, Sendable {
         playerIndex(id).map { players[$0] }
     }
 
+    /// Training-arena hook: removes a tank outright (no death, no drop,
+    /// no score); the owning player's tank link is cleared.
+    public mutating func removeTankForTraining(entityID: Int) {
+        guard let index = tanks.firstIndex(where: { $0.entityID == entityID }) else { return }
+        let owner = tanks[index].ownerPlayerID
+        tanks.remove(at: index)
+        if let owner { withPlayer(owner) { if $0.tankEntityID == entityID { $0.tankEntityID = nil } } }
+    }
+
     public mutating func withPlayer(_ id: PlayerID, _ body: (inout PlayerState) -> Void) {
         guard let i = playerIndex(id) else { return }
         body(&players[i])

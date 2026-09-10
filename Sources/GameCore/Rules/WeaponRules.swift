@@ -100,6 +100,12 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
     public var mineAirborneTicks: [Int]
     public var mineSlowTicks: [Int]
     public var mineLaunchEnabled: Bool
+    /// Foliage fire (ADR-0017, owner rule): a flame on a foliage cell
+    /// spreads to the neighbouring foliage cells after this many ticks
+    /// (0 disables spreading), and foliage a flame burns out on becomes
+    /// plain ground when `foliageBurnsAway`.
+    public var foliageSpreadDelayTicks: Int
+    public var foliageBurnsAway: Bool
 
     public init(weapons: [WeaponDefinition], projectileHalfExtentSubunits: Int, mineHalfExtentSubunits: Int,
                 mineArmingTicks: Int, fireDamageIntervalTicks: Int, chainDetonationWaveCap: Int,
@@ -107,7 +113,9 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
                 mineLaunchDistanceSubunits: [Int] = [0, 1024, 1536, 2048],
                 mineAirborneTicks: [Int] = [0, 18, 24, 30],
                 mineSlowTicks: [Int] = [0, 60, 90, 120],
-                mineLaunchEnabled: Bool = true) {
+                mineLaunchEnabled: Bool = true,
+                foliageSpreadDelayTicks: Int = 20,
+                foliageBurnsAway: Bool = true) {
         self.weapons = weapons
         self.projectileHalfExtentSubunits = projectileHalfExtentSubunits
         self.mineHalfExtentSubunits = mineHalfExtentSubunits
@@ -119,12 +127,15 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
         self.mineAirborneTicks = mineAirborneTicks
         self.mineSlowTicks = mineSlowTicks
         self.mineLaunchEnabled = mineLaunchEnabled
+        self.foliageSpreadDelayTicks = foliageSpreadDelayTicks
+        self.foliageBurnsAway = foliageBurnsAway
     }
 
     private enum CodingKeys: String, CodingKey {
         case weapons, projectileHalfExtentSubunits, mineHalfExtentSubunits, mineArmingTicks
         case fireDamageIntervalTicks, chainDetonationWaveCap, alliedBaseDamage
         case mineLaunchDistanceSubunits, mineAirborneTicks, mineSlowTicks, mineLaunchEnabled
+        case foliageSpreadDelayTicks, foliageBurnsAway
     }
 
     public init(from decoder: Decoder) throws {
@@ -140,6 +151,8 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
         mineAirborneTicks = try c.decodeIfPresent([Int].self, forKey: .mineAirborneTicks) ?? [0, 18, 24, 30]
         mineSlowTicks = try c.decodeIfPresent([Int].self, forKey: .mineSlowTicks) ?? [0, 60, 90, 120]
         mineLaunchEnabled = try c.decodeIfPresent(Bool.self, forKey: .mineLaunchEnabled) ?? true
+        foliageSpreadDelayTicks = try c.decodeIfPresent(Int.self, forKey: .foliageSpreadDelayTicks) ?? 20
+        foliageBurnsAway = try c.decodeIfPresent(Bool.self, forKey: .foliageBurnsAway) ?? true
     }
 
     public func weapon(_ id: String) -> WeaponDefinition? {
@@ -176,6 +189,9 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
         }
         if mineLaunchEnabled, zip(mineLaunchDistanceSubunits, mineAirborneTicks).contains(where: { $0 > 0 && $1 == 0 }) {
             issues.append("a launch distance needs airborne ticks")
+        }
+        if foliageSpreadDelayTicks < 0 || foliageSpreadDelayTicks > WeaponDefinition.maxTicks {
+            issues.append("foliage_spread_delay_ticks must be 0…\(WeaponDefinition.maxTicks)")
         }
         return issues
     }

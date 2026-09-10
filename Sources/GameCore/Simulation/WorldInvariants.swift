@@ -191,6 +191,7 @@ public enum WorldInvariants {
                 issues.append("fire hazard \(h.entityID) lifetime out of domain")
             }
             if h.damagePerTouch < 0 || h.damagePerTouch > 99 { issues.append("fire hazard \(h.entityID) damage out of domain") }
+            if let at = h.spreadsAtTicks, at < 0 || at > maxTicks { issues.append("fire hazard \(h.entityID) spread tick out of domain") }
             liveByOwner[h.ownerEntityID, default: [:]]["fire", default: 0] += 1
         }
         // Every live tank's stored counts equal its live entities over the

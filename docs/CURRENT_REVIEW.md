@@ -137,7 +137,7 @@ decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
 `Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
 architecture check, content validator, `Scripts/check-audio.sh` selftest
 and check (18 synthesized files match the generator, 8 excerpts match the
-manifest and the re-run extractor), `swift test` 319 tests / 80 suites (after M4 items 1–5),
+manifest and the re-run extractor), `swift test` 327 tests / 82 suites (after M4 items 1–5, the arena and ADR-0017),
 xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
 selftest and the smoke render itself; `git diff --check` is clean. This
 paragraph is the one current count; the handoff repeats it with the same
@@ -795,6 +795,16 @@ Owner (verbatim): "训练场应该有各种地形，所有类型的坦克，所�
   triangle, tinted per family, bright when ready to fire) — it was
   drawn floating above the tank at 0.7 scale, which read as a misplaced
   circle; it now encircles the tank on its ground pivot at full scale.
+
+## Owner rules of 2026-09-10 late evening (ADR-0017, accepted)
+
+Verbatim: "训练场还是改成我点击一个按钮增加一个类型的坦克吧，不同类型的坦克按照抵抗力从低到高排序
+让我选择"; "火焰弹打到草坪的时候，应该需要把相邻的草坪都点着"; "移除掉红圈这个设计，不需要警告".
+Applied: the arena starts empty and the panel adds one archetype per
+tap (24 buttons, resistance ascending, "清空敌人"); flames on foliage
+spread to the neighbouring foliage after 20 ticks and burn it to ground
+(ruleset data; ownerless spread patches; burned-grass decal; replay
+format 7); the §10.6 danger telegraph is removed. Tests 331 / 82.
 
 ## Remaining gaps / follow-up review
 

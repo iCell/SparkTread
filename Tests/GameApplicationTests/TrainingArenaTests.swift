@@ -21,15 +21,13 @@ import GameCore
         #expect(kinds == [.ground, .brick, .steel, .water, .ice, .foliage])
         #expect(brickMasks.count >= 8 && brickMasks.contains(0b1111))
         #expect(steelMasks.count >= 4 && steelMasks.contains(0b1111))
-        let enemies = world.tanks.filter { $0.ownerPlayerID == nil }
-        #expect(Set(enemies.map(\.archetypeID)) == Set(TrainingArenaFixture.enemyArchetypes) && enemies.count == 6)
-        #expect(Set(enemies.map { String($0.archetypeID.split(separator: "_").first!) })
-                == ["normal", "rapid", "fire", "ap", "explosion", "mine"]) // one per family
-        for enemy in enemies {
-            let attributes = EnemyArchetypes.attributes(for: enemy.archetypeID)
-            #expect(enemy.armor == attributes.armor && enemy.equipmentID == attributes.equipmentID)
-            #expect(enemy.specialWeaponID == String(enemy.archetypeID.split(separator: "_").first!))
-        }
+        #expect(world.tanks.filter { $0.ownerPlayerID == nil }.isEmpty) // enemies come from the panel
+        // The roster lists every archetype once, resistance (armour + shield) ascending.
+        let roster = TrainingArenaFixture.enemyRoster
+        #expect(roster.count == 24 && Set(roster.map(\.archetypeID)).count == 24)
+        #expect(zip(roster, roster.dropFirst()).allSatisfy { $0.resistance <= $1.resistance })
+        #expect(roster.first?.archetypeID == "normal_a" && roster.last?.archetypeID == "ap_d")
+        #expect(roster.first { $0.archetypeID == "ap_c" }?.resistance == 8) // 6 armour + 2 shield
         #expect(world.player(.one)?.lives == TrainingArenaFixture.playerLives)
         #expect(world.base?.durability == TrainingArenaFixture.baseDurability && world.stage?.phase == .playing)
         #expect(world.stage?.spawnQueue.isEmpty == true)
@@ -41,6 +39,17 @@ import GameCore
 
     @Test func enemiesDriveAndFireTheirFamilyWeapons() {
         var session = MovementLabSession.trainingArena()
+        for family in ["normal", "rapid", "fire", "ap", "explosion", "mine"] {
+            let spawned = session.debugSpawnEnemy("\(family)_a")
+            #expect(spawned)
+        }
+        let enemies = session.world.tanks.filter { $0.ownerPlayerID == nil }
+        #expect(enemies.count == 6)
+        for enemy in enemies {
+            let attributes = EnemyArchetypes.attributes(for: enemy.archetypeID)
+            #expect(enemy.armor == attributes.armor && enemy.equipmentID == attributes.equipmentID)
+            #expect(enemy.specialWeaponID == String(enemy.archetypeID.split(separator: "_").first!))
+        }
         var events: [DomainEvent] = []
         for _ in 0..<900 { events += session.advance(holding: nil) }
         let enemyShots = events.compactMap { e -> String? in
@@ -55,6 +64,8 @@ import GameCore
 
     @Test func aDestroyedEnemyReturnsAtOnceAndTheBaseAndLivesAreToppedUp() throws {
         var session = MovementLabSession.trainingArena()
+        let added = session.debugSpawnEnemy("ap_a")
+        #expect(added && !session.debugSpawnEnemy("dragon_z"))
         let victim = try #require(session.world.tanks.first { $0.archetypeID == "ap_a" })
         session.debugDestroyTank(victim.entityID)
         let events = session.advance(holding: nil)
@@ -62,7 +73,11 @@ import GameCore
         let survivors = session.world.tanks.filter { $0.archetypeID == "ap_a" }
         #expect(survivors.count == 1 && survivors[0].entityID != victim.entityID)
         #expect(survivors[0].armor == EnemyArchetypes.attributes(for: "ap_a").armor)
-        #expect(session.world.tanks.filter { $0.ownerPlayerID == nil }.count == 6)
+        #expect(session.world.tanks.filter { $0.ownerPlayerID == nil }.count == 1)
+        // Clearing removes every enemy and its respawn debt.
+        session.debugClearEnemies()
+        session.advance(holding: nil)
+        #expect(session.world.tanks.filter { $0.ownerPlayerID == nil }.isEmpty)
         // Base damage and lost lives are restored by the next tick.
         session = .trainingArena()
         let tank = try #require(session.world.player(.one)?.tankEntityID)

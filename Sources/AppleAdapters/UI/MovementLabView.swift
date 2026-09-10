@@ -574,6 +574,11 @@ public final class MovementLabController {
     public var pickupIDs: [String] { isLab ? TrainingArenaFixture.pickupIDs : [] }
     @discardableResult
     public func spawnPickup(_ id: String) -> Bool { isLab ? session.debugSpawnPickup(id) : false }
+    /// Training Arena: the enemy roster (resistance ascending) and spawner.
+    public var enemyRoster: [TrainingArenaFixture.RosterEntry] { isLab ? TrainingArenaFixture.enemyRoster : [] }
+    @discardableResult
+    public func spawnEnemy(_ archetype: String) -> Bool { isLab ? session.debugSpawnEnemy(archetype) : false }
+    public func clearEnemies() { if isLab { session.debugClearEnemies() } }
 
     public var playerTank: TankState? {
         session.world.player(.one)?.tankEntityID.flatMap { session.world.tank(entityID: $0) }
@@ -652,6 +657,15 @@ enum HUDLabels {
         case "player_eliminated": "全军覆没"
         default: "任务失败"
         }
+    }
+
+    /// Training roster label: family, tier and resistance, e.g. "普通A 1".
+    static func rosterEntry(_ entry: TrainingArenaFixture.RosterEntry) -> String {
+        let family: String = switch entry.family {
+        case "normal": "普通"
+        default: weapon(entry.family)
+        }
+        return "\(family)\(entry.tier) \(entry.resistance)"
     }
 
     /// Pickup names for the training panel (§12.2 Chinese UI).
@@ -1188,6 +1202,16 @@ public struct MovementLabView: View {
                                 }
                             }
                         }
+                        Text("敌人（抵抗力从低到高，点一下加一辆）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        let roster = controller.enemyRoster
+                        ForEach(Array(stride(from: 0, to: roster.count, by: 4)), id: \.self) { start in
+                            HStack(spacing: 4) {
+                                ForEach(roster[start..<min(start + 4, roster.count)], id: \.archetypeID) { entry in
+                                    panelButton(HUDLabels.rosterEntry(entry), selected: false) { controller.spawnEnemy(entry.archetypeID) }
+                                }
+                            }
+                        }
+                        panelButton("清空敌人", selected: false) { controller.clearEnemies() }
                         Text("掉落（出现在车前）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
                         let ids = controller.pickupIDs
                         ForEach(Array(stride(from: 0, to: ids.count, by: 3)), id: \.self) { start in
@@ -1200,7 +1224,7 @@ public struct MovementLabView: View {
                         panelButton("重置训练场", selected: false) { controller.restart() }
                     }
                 }
-                .frame(maxWidth: 300, maxHeight: 220)
+                .frame(maxWidth: 340, maxHeight: 260)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)

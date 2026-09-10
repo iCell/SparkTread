@@ -114,7 +114,7 @@ final class MovementLabScene: SKScene {
         pickupNodes.removeAll(); telegraphNodes.removeAll()
         tankFacings.removeAll(); tankTravel.removeAll(); tankPositions.removeAll()
         tankEquipment.removeAll()
-        transientEffects.removeAll(); scorchNodes.removeAll(); baseNode = nil; baseFlash = nil
+        transientEffects.removeAll(); scorchNodes.removeAll(); burnedGrassNodes.removeAll(); baseNode = nil; baseFlash = nil
         debugLabel = nil; collisionBox = nil
         curtainTiles.removeAll(); curtainStep = .some(nil)
         coverTiles.removeAll(); coverStep = .some(nil)
@@ -542,7 +542,6 @@ final class MovementLabScene: SKScene {
             }
             syncShieldRing(node, art: art, shieldHP: tank.shieldHP, tick: world.tick)
             syncStatusRings(node, art: art, tank: tank, tick: world.tick)
-            syncThreatMarker(node, art: art, tank: tank, tick: world.tick)
             // Carrier tanks flash (reference rule): the blink telegraphs
             // "kill this one for its treasure". Spawn protection and
             // invincibility use rings, not alpha, so the cues never merge.
@@ -637,45 +636,10 @@ final class MovementLabScene: SKScene {
                 frame: "px_status_freeze_\(tick / 10 % 5)", scale: 1.0, z: 10)
     }
 
-    /// Danger telegraph (§10.6): AP / Explosion / Fire / Mine enemies must
-    /// be recognizable as threats before they fire. The glyph is a dashed
-    /// ring with a warning triangle above it, drawn AROUND the tank on its
-    /// ground pivot (owner 2026-09-10: the floating placement read as a
-    /// misplaced circle), weapon-tinted, brightening when the weapon is off
-    /// cooldown (about to fire).
-    private func syncThreatMarker(_ node: PixelTankNode, art: PixelArt, tank: TankState, tick: Int) {
-        let name = "threat_marker"
-        let family = tank.ownerPlayerID == nil
-            ? String(tank.archetypeID.split(separator: "_").first ?? "") : ""
-        let dangerous = ["ap", "explosion", "fire", "mine"].contains(family)
-        guard dangerous else {
-            node.childNode(withName: name)?.removeFromParent()
-            return
-        }
-        let marker: SKSpriteNode
-        if let existing = node.childNode(withName: name) as? SKSpriteNode {
-            marker = existing
-        } else {
-            guard let created = try? art.sprite("px_status_danger_0", scale: artScale) else { return }
-            created.name = name
-            created.zPosition = 8
-            created.position = .zero // the ring encircles the footprint; the triangle sits above
-            let tint: SKColor = switch family {
-            case "ap": .systemPurple
-            case "explosion": .systemOrange
-            case "fire": .systemRed
-            default: .systemYellow // mine
-            }
-            created.color = tint
-            created.colorBlendFactor = 0.6
-            node.addChild(created)
-            marker = created
-        }
-        if let frame = try? art.texture("px_status_danger_\(tick / 8 % 5)") { marker.texture = frame }
-        // Bright when the family weapon is ready to fire; dim otherwise.
-        let ready = (tank.fireCooldowns[.normal] ?? 0) == 0 && (tank.fireCooldowns[.special] ?? 0) == 0
-        marker.alpha = ready ? 1.0 : 0.4
-    }
+    // The §10.6 danger telegraph (a tinted ring with a warning triangle over
+    // AP/Explosion/Fire/Mine enemies) was removed on the owner's decision of
+    // 2026-09-10 ("移除掉红圈这个设计，不需要警告"; ADR-0017). The
+    // px_status_danger frames stay in the atlas, unused.
 
     private func syncProjectiles(_ art: PixelArt, world: WorldState) {
         var seen = Set<Int>()
@@ -880,6 +844,20 @@ final class MovementLabScene: SKScene {
         }
     }
 
+    /// Burned grass where foliage burned away: a decal on the ground layer,
+    /// bounded like the scorch marks (oldest dropped first).
+    private var burnedGrassNodes: [SKSpriteNode] = []
+    private static let maxBurnedGrassDecals = 96
+
+    private func addBurnedGrass(_ art: PixelArt, cellX: Int, cellY: Int) {
+        guard let decal = try? art.sprite("px_foliage_burned", scale: artScale) else { return }
+        decal.position = cellCenter(x: cellX, y: cellY)
+        decal.zPosition = 10
+        addChild(decal)
+        burnedGrassNodes.append(decal)
+        if burnedGrassNodes.count > Self.maxBurnedGrassDecals { burnedGrassNodes.removeFirst().removeFromParent() }
+    }
+
     private func addScorch(_ art: PixelArt, world: WorldState, at position: Vec2i, index: Int) {
         let cell = SpatialUnits.subunitsPerCell
         let cx = position.x / cell, cy = position.y / cell
@@ -910,7 +888,12 @@ final class MovementLabScene: SKScene {
         for event in drained {
             switch event {
             case .terrainChanged(let cx, let cy, _):
+                let key = cy * world.arena.cellsWide + cx
+                let wasFoliage = foliageNodes[key] != nil
                 reconcileTerrainCell(art, world: world, cellX: cx, cellY: cy)
+                if wasFoliage, world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .ground {
+                    addBurnedGrass(art, cellX: cx, cellY: cy) // burned away (ADR-0017)
+                }
                 for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)]
                 where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy) {
                     refreshWallTexture(art, world: world, cellX: cx + dx, cellY: cy + dy)

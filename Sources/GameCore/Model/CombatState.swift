@@ -52,6 +52,23 @@ public struct FireHazardState: Codable, Equatable, Sendable {
     public var positionSubunits: Vec2i // center of a 1-cell patch
     public var lifetimeRemainingTicks: Int
     public let damagePerTouch: Int
+    /// Foliage fire (ADR-0017): when the remaining lifetime reaches this
+    /// value the flame spreads to the neighbouring foliage cells once; nil
+    /// on non-foliage cells and after spreading.
+    public var spreadsAtTicks: Int?
+
+    public init(entityID: Int, ownerEntityID: Int, ownerPlayerID: PlayerID?, teamID: Int, filter: FireTeamFilter,
+                positionSubunits: Vec2i, lifetimeRemainingTicks: Int, damagePerTouch: Int, spreadsAtTicks: Int? = nil) {
+        self.entityID = entityID
+        self.ownerEntityID = ownerEntityID
+        self.ownerPlayerID = ownerPlayerID
+        self.teamID = teamID
+        self.filter = filter
+        self.positionSubunits = positionSubunits
+        self.lifetimeRemainingTicks = lifetimeRemainingTicks
+        self.damagePerTouch = damagePerTouch
+        self.spreadsAtTicks = spreadsAtTicks
+    }
 }
 
 /// The defended base (§6.6). `topLeftSubunits` anchors a 2×2-cell structure.

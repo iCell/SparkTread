@@ -106,7 +106,7 @@ extension WorldState {
             c.mix(h.entityID); c.mix(h.ownerEntityID); c.mix(h.ownerPlayerID?.rawValue); c.mix(h.teamID)
             c.mix(h.filter.rawValue)
             c.mix(h.positionSubunits.x); c.mix(h.positionSubunits.y)
-            c.mix(h.lifetimeRemainingTicks); c.mix(h.damagePerTouch)
+            c.mix(h.lifetimeRemainingTicks); c.mix(h.damagePerTouch); c.mix(h.spreadsAtTicks)
         }
         if let base {
             c.mix(base.teamID)

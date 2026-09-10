@@ -219,6 +219,30 @@ public struct MovementLabSession: Sendable {
         return spawned
     }
 
+    /// Training Arena: adds one enemy of `archetype` at the next spawn cell
+    /// (nearest free footprint); it joins the roster, so it comes back
+    /// when destroyed. False when no cell within the scan is free.
+    @discardableResult
+    public mutating func debugSpawnEnemy(_ archetype: String) -> Bool {
+        guard isTrainingArena, TrainingArenaFixture.enemyArchetypes.contains(archetype) else { return false }
+        let origin = TrainingArenaFixture.enemySpawnCells[trainingSpawnCursor % TrainingArenaFixture.enemySpawnCells.count]
+        trainingSpawnCursor += 1
+        guard let cellPos = TrainingArenaFixture.freeCell(in: world, near: origin) else { return false }
+        let id = TrainingArenaFixture.spawnEnemy(&world, archetype: archetype, at: cellPos)
+        trainingRoster[id] = archetype
+        rebaseRecording()
+        return true
+    }
+
+    /// Training Arena: removes every enemy (and its respawn debt).
+    public mutating func debugClearEnemies() {
+        guard isTrainingArena else { return }
+        let enemies = world.tanks.filter { $0.ownerPlayerID == nil }.map(\.entityID)
+        for id in enemies { world.removeTankForTraining(entityID: id) }
+        trainingRoster.removeAll()
+        rebaseRecording()
+    }
+
     /// Training Arena test hook: destroys a tank outright (the next tick
     /// runs its death and the respawn rule).
     public mutating func debugDestroyTank(_ entityID: Int) {
@@ -232,8 +256,21 @@ public struct MovementLabSession: Sendable {
     /// free footprint), the base is repaired to full, the player's lives
     /// never run low. Each intervention rebases the recording (it is not
     /// part of the command stream).
-    private mutating func applyTrainingArenaRules(events: [DomainEvent]) {
+    private mutating func applyTrainingArenaRules(events: inout [DomainEvent]) {
         var changed = false
+        // The arena never ends: an objective that resolved (every enemy
+        // cleared, or destroyed in one tick) is put back into play and its
+        // outcome events are withheld from presentation.
+        if let phase = world.stage?.phase, phase != .playing {
+            world.stage?.phase = .playing
+            events.removeAll {
+                switch $0 {
+                case .stageWon, .stageLost, .stageClearBonus: return true
+                default: return false
+                }
+            }
+            changed = true
+        }
         for case .tankDestroyed(let id, nil, _) in events {
             guard let archetype = trainingRoster.removeValue(forKey: id) else { continue }
             let origin = TrainingArenaFixture.enemySpawnCells[trainingSpawnCursor % TrainingArenaFixture.enemySpawnCells.count]
@@ -271,14 +308,14 @@ public struct MovementLabSession: Sendable {
     @discardableResult
     public mutating func advance(commands: [PlayerCommand]) -> [DomainEvent] {
         recording.append(commands: commands, atTick: world.tick)
-        let events = Simulation.step(&world, commands: commands, ruleset: ruleset,
+        var events = Simulation.step(&world, commands: commands, ruleset: ruleset,
                                      weapons: weapons, pickups: pickups)
         if world.tick % Self.checksumInterval == 0 {
             recording.appendChecksum(tick: world.tick, checksum: world.checksum())
             assert(WorldInvariants.violations(in: world).isEmpty,
                    "invariants violated: \(WorldInvariants.violations(in: world))")
         }
-        if isTrainingArena { applyTrainingArenaRules(events: events) }
+        if isTrainingArena { applyTrainingArenaRules(events: &events) }
         return events
     }
 }

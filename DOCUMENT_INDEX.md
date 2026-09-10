@@ -39,6 +39,7 @@
 - `docs/decisions/ADR-0009-universal-arena-56x27.md`：V1 竞技场固定为 56×27 格。
 
 - `docs/decisions/ADR-0010-owner-combat-rules-and-fort-ring.md`：特殊弹药耗尽回退普通弹、基地护盾加固堡垒环与占用格策略（到期恢复为记录材质，所有者决定 B）、隐藏宝物揭示条件、地雷可见性。所有者 2026-09-10 接受。
+- `docs/decisions/ADR-0017-owner-rules-danger-telegraph-foliage-fire-arena.md`：所有者 2026-09-10 的三条指令——移除红圈危险预警；火焰点燃相邻草丛并烧毁（回放格式 7）；训练场按抵抗力排序逐个添加敌人。已接受。
 - `docs/decisions/ADR-0011-reference-sfx-and-stage-transitions.md`：参照原作的音效集（八段原作录音节选、原创开场曲、其余合成）、事件映射、关卡过场时间线（开场卡片/十字揭幕/任务完成/战斗成绩）。所有者 2026-09-10 接受，并记录了版权使用决定。
 
 - `docs/decisions/ADR-0012-results-table-and-stage-clear-bonuses.md`：参照原作结算画面的战斗成绩表（8 个奖励类别的坦克图标、4 行 ×1…×4、加权总计）与过关奖励（结算加分 + Reward，按关卡区间 200/330、600/660、1000/1000）。所有者 2026-09-10 接受（分档规则授权决定；不做 MaxHits/MaxCombos；用坦克图标）。
