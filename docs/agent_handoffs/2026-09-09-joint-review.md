@@ -150,10 +150,10 @@ environments or caches.
 
 ## Next steps
 
-1. Owner: look at the designed outro on the device (stamped title with
-   flash/shake, closing curtain, centred results card with tank icons;
-   the reward text rises over the card title on a win) and the stage-end
-   passage on both outcomes. Decided already: invincibility stays 10 s;
+1. Owner accepted the designed outro and the centred card on the device
+   (2026-09-10 late evening, "我觉得挺好"). Device acceptance for the
+   ADR-0011/0012 presentation is therefore recorded; the ADR-0006 gate
+   items (legibility, touch occlusion, HUD fit, mix) remain open. Decided already: invincibility stays 10 s;
    ADR-0012 accepted (brackets by delegation, no MaxHits/MaxCombos,
    icons). Every stage JSON needs `stageNumber`; the HUD score is paced
    during the outro (`controller.hud.score` vs the world's score).

@@ -628,8 +628,8 @@ Owner, on the device with the first icon panel (verbatim): "结束了不管是�
 - Tests: `StageFlowTests` (outro length 329 ticks; the cover advances
   monotonically during the fade and stays closed), `OutcomeTitleTests`
   (subtitles). The sequence was captured frame by frame in the simulator
-  on a loss; a won stage's reward rise was not captured (no automated
-  win) — owner check on the device.
+  on a loss; the owner accepted the transition and the card on the device
+  ("我觉得挺好", 2026-09-10 late evening).
 
 ## Remaining gaps / follow-up review
 
