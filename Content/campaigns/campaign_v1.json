@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "campaign_v1",
+  "displayNameKey": "campaign.v1.name",
+  "stageIDs": [
+    "frontier_01_first_defense",
+    "frontier_02_hidden_in_grass",
+    "frontier_03_desert_stairs"
+  ]
+}

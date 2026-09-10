@@ -64,13 +64,19 @@ private let vs01URL = repoRoot
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(2)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
+        // Format 3 (before the campaign header and the clear bonus) is
+        // refused the same way.
+        json["formatVersion"] = 3
+        #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(3)) {
+            try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
+        }
         // The same old shape with a current version number is a plain
         // schema error — the format number is the boundary, not the shape.
-        json["formatVersion"] = 3
+        json["formatVersion"] = 4
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        #expect(ReplayRecording.currentFormatVersion == 3)
+        #expect(ReplayRecording.currentFormatVersion == 4)
     }
 
     @Test func debugMutationsRebaseTheRecording() {

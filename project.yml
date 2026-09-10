@@ -22,6 +22,8 @@ targets:
         buildPhase: resources
       - path: Content/stages
         buildPhase: resources
+      - path: Content/campaigns
+        buildPhase: resources
     dependencies:
       - package: GoldenEagleKit
         product: AppleAdapters

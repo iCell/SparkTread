@@ -50,6 +50,27 @@ private let vs01URL = repoRoot
         #expect(WorldInvariants.violations(in: ra).isEmpty)
     }
 
+    /// Every shipped stage validates, builds, and builds the same world
+    /// twice; stage numbers are unique and contiguous from 1 (M4 campaign).
+    @Test func everyShippedStageValidatesBuildsAndNumbersContiguously() throws {
+        let dir = vs01URL.deletingLastPathComponent()
+        let urls = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        #expect(urls.count >= 3)
+        var numbers: [Int] = []
+        for url in urls {
+            let def = try StageLoader.decode(Data(contentsOf: url))
+            #expect(StageValidator.validate(def).isEmpty, "\(url.lastPathComponent): \(StageValidator.validate(def))")
+            let a = try StageLoader.loadWorld(at: url), b = try StageLoader.loadWorld(at: url)
+            #expect(a.checksum() == b.checksum(), "\(url.lastPathComponent)")
+            #expect(WorldInvariants.violations(in: a).isEmpty, "\(url.lastPathComponent)")
+            numbers.append(try #require(def.stageNumber))
+            #expect(a.stage?.clearBonus == ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 0))
+        }
+        #expect(numbers == Array(1...urls.count))
+    }
+
     /// ADR-0012: the campaign position is required content and selects the
     /// stage-clear bonus tier the builder writes into the stage.
     @Test func stageNumberIsRequiredAndSelectsTheClearBonus() throws {

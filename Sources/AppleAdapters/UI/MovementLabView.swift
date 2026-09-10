@@ -34,21 +34,76 @@ public final class MovementLabController {
     #endif
 
     /// The injected world, if any: restarts rebuild it instead of loading
-    /// the bundled stage (presentation and integration tests have no bundle).
+    /// a stage (presentation and integration tests have no bundle).
     private let injectedWorld: WorldState?
 
+    /// Where campaign stages come from (ADR-0013): the bundled content in
+    /// the app, an in-memory provider in tests.
+    public struct StageProvider {
+        public let load: (_ stageID: String, _ session: SessionState) throws -> WorldState
+        public init(load: @escaping (_ stageID: String, _ session: SessionState) throws -> WorldState) {
+            self.load = load
+        }
+        public static func bundled(_ bundle: Bundle = .main, rules: PickupRuleset = .provisional) -> StageProvider {
+            StageProvider { id, session in try StageLoader.loadWorld(id: id, bundle: bundle, rules: rules, session: session) }
+        }
+    }
+
+    /// The campaign this controller walks (nil in the lab and for injected
+    /// worlds) and its stage source.
+    public private(set) var campaignRun: CampaignRun?
+    private let stages: StageProvider?
+    /// Recordings of the stages completed in this run, in order — the
+    /// chained campaign replay (plan §16.3).
+    public private(set) var campaignRecordings: [ReplayRecording] = []
+    /// Set when the last stage's results have settled: the run is over and
+    /// the automatic continue stops.
+    public private(set) var campaignComplete = false
+
+    public static let bundledCampaignID = "campaign_v1"
+
+    /// The app's controller: the bundled campaign, or the free-play lab
+    /// with MOVEMENT_LAB=1. A missing or invalid bundled campaign is a
+    /// build error (§15.4 fail-fast).
+    public convenience init(audio: GameAudio? = nil) {
+        if ProcessInfo.processInfo.environment["MOVEMENT_LAB"] != nil {
+            self.init(world: nil, audio: audio)
+        } else {
+            let campaign: CampaignDefinition
+            do { campaign = try CampaignLoader.load(id: Self.bundledCampaignID, bundle: .main) }
+            catch { fatalError("bundled campaign failed to load: \(error)") }
+            self.init(campaign: CampaignRun(campaign: campaign), stages: .bundled(), audio: audio)
+        }
+    }
+
+    /// A campaign run from an explicit stage source.
+    public init(campaign: CampaignRun, stages: StageProvider, audio: GameAudio? = nil) {
+        injectedWorld = nil
+        isLab = false
+        campaignRun = campaign
+        self.stages = stages
+        session = Self.makeSession(for: campaign, stages: stages)
+        self.audio = audio ?? GameAudio()
+        self.haptics = GameHaptics()
+        flow = Self.makeFlow(for: session.world, lab: false)
+        #if canImport(GameController)
+        physicalInput = PhysicalInputAdapter(store: input)
+        #endif
+        input.isAcceptingInput = false
+        self.audio.suspend()
+        self.haptics.suspend()
+    }
+
+    /// An injected world (tests) or, with nil, the free-play lab world.
     public init(world: WorldState? = nil, audio: GameAudio? = nil) {
-        // An injected world allows presentation tests without app-bundle content.
-        // VS-01 is the app's playable stage; MOVEMENT_LAB=1 launches the
-        // free-play movement/combat lab world instead.
-        let useLab = ProcessInfo.processInfo.environment["MOVEMENT_LAB"] != nil
         injectedWorld = world
+        stages = nil
         if let world {
             session = MovementLabSession(world: world)
             isLab = false
         } else {
-            session = useLab ? MovementLabSession() : MovementLabSession(world: VS01Stage.makeWorld())
-            isLab = useLab
+            session = MovementLabSession()
+            isLab = true
         }
         self.audio = audio ?? GameAudio()
         self.haptics = GameHaptics()
@@ -69,7 +124,19 @@ public final class MovementLabController {
 
     /// The playable stage's content id (nil in the lab / injected worlds);
     /// the view derives the intro card's title from it.
-    public var stageID: String? { isLab || session.world.stage == nil ? nil : VS01Stage.stageID }
+    public var stageID: String? { campaignRun?.stageID }
+
+    /// Builds the run's current stage from its checkpoint. Stage content
+    /// that fails to build is a build error (§15.4): the campaign was
+    /// validated against its stages when it was loaded.
+    private static func makeSession(for run: CampaignRun, stages: StageProvider) -> MovementLabSession {
+        do {
+            let world = try stages.load(run.stageID, run.checkpoint)
+            return MovementLabSession(world: world, stageID: run.stageID, sessionState: run.checkpoint)
+        } catch {
+            fatalError("campaign stage '\(run.stageID)' failed to build: \(error)")
+        }
+    }
 
     /// Stage worlds open with the intro card; the lab and worlds without a
     /// stage go straight to play.
@@ -78,18 +145,53 @@ public final class MovementLabController {
         return StageFlow(arenaCellsWide: world.arena.cellsWide, arenaCellsHigh: world.arena.cellsHigh)
     }
 
-    /// Restart = the same stage again (a provisional prototype loop, not
-    /// campaign progression: lives and score reset with the world).
+    /// Retry = the current stage again from its checkpoint (ADR-0013: the
+    /// session state at the stage's start, so nothing from the failed
+    /// attempt carries); injected and lab worlds rebuild as they were.
     public func restart() {
         if flow.outcome != nil { lastCompletedRecording = session.recording }
+        if let campaignRun, let stages {
+            replaceSession(Self.makeSession(for: campaignRun, stages: stages))
+        } else if let injectedWorld {
+            replaceSession(MovementLabSession(world: injectedWorld, ruleset: session.ruleset,
+                                              weapons: session.weapons, pickups: session.pickups))
+        } else {
+            replaceSession(MovementLabSession())
+        }
+    }
+
+    /// A won stage's automatic continue: the next stage from the carried
+    /// state, or the end of the campaign (the results stay up).
+    private func continueCampaign() {
+        guard var run = campaignRun, let stages else { restart(); return }
+        campaignRecordings.append(session.recording)
+        lastCompletedRecording = session.recording
+        let exit = SessionState.carried(from: session.world) ?? run.checkpoint
+        if run.advance(exitState: exit) {
+            campaignRun = run
+            replaceSession(Self.makeSession(for: run, stages: stages))
+        } else {
+            campaignRun = run
+            campaignComplete = true
+            syncInputAdmission()
+        }
+    }
+
+    /// Starts the campaign over from its first stage and the campaign
+    /// start state.
+    public func restartCampaign() {
+        guard let campaignRun, let stages else { restart(); return }
+        let fresh = CampaignRun(campaign: campaignRun.campaign)
+        self.campaignRun = fresh
+        campaignRecordings.removeAll()
+        campaignComplete = false
+        replaceSession(Self.makeSession(for: fresh, stages: stages))
+    }
+
+    private func replaceSession(_ next: MovementLabSession) {
         pendingEvents.removeAll()
         audio.resetForNewWorld()
-        if let injectedWorld {
-            session = MovementLabSession(world: injectedWorld, ruleset: session.ruleset,
-                                         weapons: session.weapons, pickups: session.pickups)
-        } else {
-            session.restartStage()
-        }
+        session = next
         flow = Self.makeFlow(for: session.world, lab: isLab)
         tally = KillTally()
         clearBonus = .none
@@ -230,7 +332,7 @@ public final class MovementLabController {
         for cue in flow.advance() { play(cue) }
         if flow.allowsSimulation != wasPlaying { syncInputAdmission() }
         if flow.wantsAutomaticContinue {
-            restart() // a won stage continues by itself (the same stage again until more content lands)
+            if !campaignComplete { continueCampaign() } // a won stage moves the campaign on
             return
         }
         guard flow.allowsSimulation else { return }
@@ -375,6 +477,8 @@ enum HUDLabels {
         let name = parts.count > 2 ? parts[2...].joined(separator: "_") : ""
         let subtitle: String = switch name {
         case "first_defense": "首战防御"
+        case "hidden_in_grass": "隐于草丛"
+        case "desert_stairs": "沙漠阶梯"
         default: name.replacingOccurrences(of: "_", with: " ").capitalized
         }
         return (title, subtitle)
@@ -709,6 +813,20 @@ public struct MovementLabView: View {
                     .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                 Spacer()
+                if controller.campaignComplete {
+                    Text("战役完成")
+                        .font(.system(size: compact ? 15 : 17, weight: .heavy))
+                        .foregroundStyle(Color.yellow)
+                    Button {
+                        controller.restartCampaign()
+                    } label: {
+                        Text("再来一局")
+                            .font(.system(size: compact ? 15 : 17, weight: .bold))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 18).padding(.vertical, compact ? 6 : 8)
+                            .background(Capsule().fill(Color.white))
+                    }
+                }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
                     Button {
                         controller.restart()

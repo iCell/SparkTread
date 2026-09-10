@@ -6,7 +6,9 @@ import GameApplication
 public enum RegistryLoader {
     /// Top-level keys the registry document may carry. Unknown fields are
     /// rejected until the schema explicitly permits extension data (§15.5).
-    static let knownKeys: Set<String> = Set(["format_version", "notes"]).union(IDRegistryValidator.requiredCategories)
+    static let knownKeys: Set<String> = Set(["format_version", "notes"])
+        .union(IDRegistryValidator.requiredCategories)
+        .union(IDRegistryValidator.optionalCategories)
 
     public static func validateRegistry(at url: URL) -> [ContentIssue] {
         let file = url.lastPathComponent
@@ -38,7 +40,7 @@ public enum RegistryLoader {
         }
 
         var categories: [(name: String, ids: [String])] = []
-        for name in IDRegistryValidator.requiredCategories {
+        for name in IDRegistryValidator.requiredCategories + IDRegistryValidator.optionalCategories {
             guard let value = dictionary[name] else { continue } // reported as missing by the validator
             guard let ids = value as? [String] else {
                 issues.append(ContentIssue(file: file, field: name, message: "must be an array of strings"))
@@ -62,6 +64,39 @@ public enum RegistryLoader {
         }
         var issues = validateRegistry(at: registry)
         issues.append(contentsOf: validateStages(in: root))
+        issues.append(contentsOf: validateCampaigns(in: root))
+        return issues
+    }
+
+    /// Validates every campaign JSON under `Content/campaigns` against the
+    /// stages under `Content/stages` (ADR-0013: present, numbered by order).
+    public static func validateCampaigns(in root: URL) -> [ContentIssue] {
+        let dir = root.appendingPathComponent("campaigns")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil) else { return [] }
+        var stages: [String: StageDefinition] = [:]
+        if let stageFiles = try? FileManager.default.contentsOfDirectory(
+            at: root.appendingPathComponent("stages"), includingPropertiesForKeys: nil) {
+            for url in stageFiles where url.pathExtension == "json" {
+                if let data = try? Data(contentsOf: url), let def = try? StageLoader.decode(data) { stages[def.id] = def }
+            }
+        }
+        var issues: [ContentIssue] = []
+        for url in entries.filter({ $0.pathExtension == "json" }).sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            let file = "campaigns/" + url.lastPathComponent
+            guard let data = try? Data(contentsOf: url) else {
+                issues.append(ContentIssue(file: file, field: "-", message: "cannot read file"))
+                continue
+            }
+            do {
+                let def = try CampaignLoader.decode(data)
+                for message in CampaignValidator.validate(def, stages: stages) {
+                    issues.append(ContentIssue(file: file, field: def.id.isEmpty ? "-" : def.id, message: message))
+                }
+            } catch {
+                issues.append(ContentIssue(file: file, field: "-", message: "invalid campaign JSON: \(error)"))
+            }
+        }
         return issues
     }
 

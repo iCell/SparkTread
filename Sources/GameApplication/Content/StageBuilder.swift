@@ -10,8 +10,12 @@ public enum StageBuilder {
         case badTerrainKind(String), badSeed(String), invalidDefinition([String])
     }
 
-    public static func build(_ def: StageDefinition, rules: PickupRuleset = .provisional) throws -> WorldState {
-        let issues = StageValidator.validate(def)
+    /// `session` is the state carried into this stage (ADR-0013): lives,
+    /// score, ammunition and retained upgrades land on player one; the tank
+    /// spawns with the stage's armor and the retained upgrades applied.
+    public static func build(_ def: StageDefinition, rules: PickupRuleset = .provisional,
+                             session: SessionState = .campaignStart) throws -> WorldState {
+        let issues = StageValidator.validate(def) + session.validationIssues
         guard issues.isEmpty else { throw BuildError.invalidDefinition(issues) }
         let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
@@ -41,14 +45,24 @@ public enum StageBuilder {
 
         guard let seed = UInt64(def.seed) else { throw BuildError.badSeed(def.seed) }
         var world = WorldState(terrain: terrain, seed: seed)
-        world.addPlayer(PlayerState(playerID: .one))
+        var player = PlayerState(playerID: .one)
+        session.apply(to: &player)
+        world.addPlayer(player)
 
         let cell = SpatialUnits.subunitsPerCell
         // Player 1 only in V1 (§6.4); ignore any reserved player-2 spawn.
         let playerCell = def.playerSpawnsByID["1"] ?? [21, 24]
-        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
-                        positionSubunits: Vec2i(x: playerCell[0] * cell, y: playerCell[1] * cell),
-                        facing: .up)
+        let tankID = world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                                     positionSubunits: Vec2i(x: playerCell[0] * cell, y: playerCell[1] * cell),
+                                     facing: .up)
+        // Carried upgrades ride on the first tank of the stage (the same
+        // retention a respawn applies, §6.5); armor is the stage's.
+        world.withTank(entityID: tankID) {
+            $0.speedLevel = session.retainedSpeedLevel
+            $0.powerLevel = session.retainedPowerLevel
+            $0.equipmentID = session.retainedEquipmentID
+            $0.specialWeaponID = session.retainedSpecialWeaponID
+        }
         world.base = BaseState(teamID: 1,
                                topLeftSubunits: Vec2i(x: def.baseSpawn[0] * cell,
                                                       y: def.baseSpawn[1] * cell))

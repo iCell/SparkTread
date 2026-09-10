@@ -361,6 +361,75 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         #expect(!controller.input.isAcceptingInput)
     }
 
+    /// ADR-0013: a won stage continues into the next stage of the campaign
+    /// with the carried state; the last stage ends the run; a lost stage
+    /// retries from its checkpoint.
+    @Test func theCampaignAdvancesCarriesStateAndRetriesFromTheCheckpoint() throws {
+        let campaign = CampaignDefinition(id: "test", displayNameKey: "k", stageIDs: ["one", "two", "three"])
+        // Stage worlds: "one" and "three" are won at once; "two" is lost at once (base down) unless retried
+        // after the flag flips — a provider closure sees every request.
+        var loseTwo = true
+        var requests: [(String, SessionState)] = []
+        let provider = MovementLabController.StageProvider { id, session in
+            requests.append((id, session))
+            var world = makeOpenWorld()
+            world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 12 * cell, y: 20 * cell))
+            world.stage = StageState(spawnQueue: id == "two" && loseTwo ? ["normal_a"] : [], maxAliveEnemies: 1,
+                                     enemyStartDelayTicks: 600, spawnPointsCells: [Vec2i(x: 1, y: 1)],
+                                     playerRespawnCell: Vec2i(x: 3, y: 3), dropTable: [],
+                                     clearBonus: .init(tally: 200, reward: 330))
+            world.withPlayer(.one) { session.apply(to: &$0) }
+            if id == "two", loseTwo { world.base?.durability = 0 }
+            return world
+        }
+        let backend = CountingBackend()
+        let clock = FakeClock()
+        backend.clock = { clock.now }
+        let controller = MovementLabController(campaign: CampaignRun(campaign: campaign), stages: provider,
+                                               audio: GameAudio(backend: backend, clock: { clock.now }))
+        controller.start()
+        #expect(controller.stageID == "one" && controller.campaignRun?.stageNumber == 1)
+        var steps = 0
+        func runToOutcome() { while controller.flow.outcome == nil, steps < 4000 { frame(controller, clock: clock); steps += 1 } }
+        func runToNextCard() { while controller.flow.phase != .card, steps < 6000 { frame(controller, clock: clock); steps += 1 } }
+        runToOutcome()
+        #expect(controller.flow.outcome == .won)
+        runToNextCard()
+        #expect(controller.stageID == "two" && controller.campaignRun?.stageNumber == 2)
+        #expect(requests.last?.1.score == 530) // stage one's exit state built stage two
+        #expect(controller.session.world.player(.one)?.score == 530)
+        #expect(controller.campaignRecordings.count == 1 && controller.campaignRecordings[0].stageID == "one")
+        // Stage two is lost: retry rebuilds it from the checkpoint (score 530, not the attempt's state).
+        frame(controller, clock: clock, count: introTicks)
+        runToOutcome()
+        #expect(controller.flow.outcome == .lost && controller.stageID == "two")
+        while controller.flow.phase != .finished, steps < 8000 { frame(controller, clock: clock); steps += 1 }
+        #expect(!controller.campaignComplete)
+        loseTwo = false
+        controller.restart()
+        #expect(controller.stageID == "two" && controller.flow.phase == .card)
+        #expect(requests.last?.0 == "two" && requests.last?.1.score == 530)
+        frame(controller, clock: clock, count: introTicks)
+        runToOutcome()
+        #expect(controller.flow.outcome == .won)
+        runToNextCard()
+        #expect(controller.stageID == "three" && controller.session.world.player(.one)?.score == 1060)
+        frame(controller, clock: clock, count: introTicks)
+        runToOutcome()
+        #expect(controller.flow.outcome == .won && controller.campaignRun?.isLastStage == true)
+        while controller.flow.phase != .finished, steps < 12000 { frame(controller, clock: clock); steps += 1 }
+        frame(controller, clock: clock, count: 5) // the automatic continue fires once and stops
+        #expect(controller.campaignComplete && controller.campaignRun?.isComplete == true)
+        #expect(controller.flow.phase == .finished && controller.stageID == "three")
+        #expect(controller.campaignRecordings.count == 3)
+        #expect(controller.campaignRecordings.map(\.stageID) == ["one", "two", "three"])
+        #expect(controller.campaignRecordings[2].sessionState?.score == 1060)
+        #expect(!controller.input.isAcceptingInput)
+        controller.restartCampaign()
+        #expect(controller.stageID == "one" && !controller.campaignComplete && controller.campaignRecordings.isEmpty)
+        #expect(controller.session.world.player(.one)?.score == 0 && controller.flow.phase == .card)
+    }
+
     /// ADR-0012: the world pays the clear bonuses on the deciding tick; the
     /// HUD withholds them until the panel's total line (tally bonus) and
     /// reward line (reward) the way the reference counts them in, and the

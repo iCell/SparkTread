@@ -18,10 +18,14 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         public let checksum: UInt64
     }
 
-    /// Format 3 (2026-09-10): the embedded rulesets gained
-    /// `PickupRuleset.dropsSpawnAtRandomCells`, and the EnemyBrain moved to
-    /// cost-field navigation with new base-focus values. Earlier recordings
-    /// (format 2) embed a rules shape and an AI this build no longer
+    /// Format 4 (2026-09-10, ADR-0013): the header gained the campaign
+    /// fields `stageID` and `sessionState` (plan §16.3 `initial_session_state`)
+    /// so a campaign replay can verify that each stage's exit state equals
+    /// the next stage's initial state; the stage clear bonus (ADR-0012)
+    /// changed the score surface. Format 3 (2026-09-10): the embedded
+    /// rulesets gained `PickupRuleset.dropsSpawnAtRandomCells`, and the
+    /// EnemyBrain moved to cost-field navigation with new base-focus values.
+    /// Earlier recordings embed a rules shape and an AI this build no longer
     /// reproduces, so they are rejected as `unsupportedFormat` rather than
     /// replayed into a different game.
     ///
@@ -31,9 +35,13 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 3
+    public static let currentFormatVersion = 4
 
     public let formatVersion: Int
+    /// Campaign header (ADR-0013): the stage this recording plays and the
+    /// session state it started from; nil for lab and ad-hoc worlds.
+    public let stageID: String?
+    public let sessionState: SessionState?
     public let initialWorld: WorldState
     public let movement: MovementRuleset
     public let weapons: WeaponRuleset
@@ -45,8 +53,11 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     public init(initialWorld: WorldState,
                 movement: MovementRuleset = .provisional,
                 weapons: WeaponRuleset = .provisional,
-                pickups: PickupRuleset = .provisional) {
+                pickups: PickupRuleset = .provisional,
+                stageID: String? = nil, sessionState: SessionState? = nil) {
         self.formatVersion = Self.currentFormatVersion
+        self.stageID = stageID
+        self.sessionState = sessionState
         self.initialWorld = initialWorld
         self.movement = movement
         self.weapons = weapons
@@ -57,7 +68,8 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case formatVersion, initialWorld, movement, weapons, pickups, startChecksum, commandLog, checksums
+        case formatVersion, stageID, sessionState, initialWorld, movement, weapons, pickups
+        case startChecksum, commandLog, checksums
     }
 
     /// Decoding reads the format number FIRST and rejects a foreign format
@@ -74,6 +86,8 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
             throw ReplayPlayer.ReplayError.unsupportedFormat(version)
         }
         formatVersion = version
+        stageID = try container.decodeIfPresent(String.self, forKey: .stageID)
+        sessionState = try container.decodeIfPresent(SessionState.self, forKey: .sessionState)
         initialWorld = try container.decode(WorldState.self, forKey: .initialWorld)
         movement = try container.decode(MovementRuleset.self, forKey: .movement)
         weapons = try container.decode(WeaponRuleset.self, forKey: .weapons)
@@ -95,11 +109,27 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     }
 }
 
+/// A campaign replay is an ordered list of stage recordings (plan §16.3);
+/// the harness verifies that each stage's exit state equals the next
+/// stage's initial session state before replaying it.
+public struct CampaignReplay: Codable, Equatable, Sendable {
+    public var stages: [ReplayRecording]
+    public init(stages: [ReplayRecording]) { self.stages = stages }
+}
+
 /// Deterministic playback: restores the recorded initial world and re-feeds
 /// the recorded command stream tick by tick with the recorded rulesets.
 public enum ReplayPlayer {
     public enum ReplayError: Error, Equatable {
         case unsupportedFormat(Int)
+        /// The carried session state in a recording's header fails its
+        /// domain checks or does not match the player it built.
+        case invalidSessionState([String])
+        /// Chained campaign replay (ADR-0013): stage `index` starts from a
+        /// session state that is not the previous stage's exit state.
+        case sessionStateChainBroken(stage: Int)
+        /// A campaign replay stage never reached an outcome in its ticks.
+        case stageUndecided(stage: Int)
         /// The embedded rulesets fail their own validation — a decodable
         /// recording is not a runnable one (weapon arrays, timers, shapes).
         case invalidRules([String])
@@ -134,6 +164,15 @@ public enum ReplayPlayer {
         guard ruleIssues.isEmpty else { throw ReplayError.invalidRules(ruleIssues) }
         let worldIssues = WorldInvariants.violations(in: recording.initialWorld)
         guard worldIssues.isEmpty else { throw ReplayError.invalidInitialWorld(worldIssues) }
+        if let header = recording.sessionState {
+            let issues = header.validationIssues
+            guard issues.isEmpty else { throw ReplayError.invalidSessionState(issues) }
+            // The header is the state the stage was BUILT from: the world's
+            // player must carry exactly it (the builder applies it verbatim).
+            guard SessionState.carried(from: recording.initialWorld) == header else {
+                throw ReplayError.invalidSessionState(["header does not match the initial world's player"])
+            }
+        }
         let actual = recording.initialWorld.checksum()
         guard actual == recording.startChecksum else {
             throw ReplayError.startChecksumMismatch(expected: recording.startChecksum, actual: actual)
@@ -148,6 +187,14 @@ public enum ReplayPlayer {
         for entry in recording.commandLog where !seenTicks.insert(entry.tick).inserted {
             throw ReplayError.duplicateCommandTick(tick: entry.tick)
         }
+        return try replayWorld(recording, ticks: tickCount).points
+    }
+
+    /// `replay` plus the final world (a campaign stage's exit state lives
+    /// in it).
+    static func replayWorld(
+        _ recording: ReplayRecording, ticks tickCount: Int
+    ) throws -> (points: [ReplayRecording.ChecksumPoint], world: WorldState) {
         var world = recording.initialWorld
         var points: [ReplayRecording.ChecksumPoint] = []
         var byTick: [Int: [PlayerCommand]] = [:]
@@ -160,6 +207,32 @@ public enum ReplayPlayer {
                 points.append(.init(tick: world.tick, checksum: world.checksum()))
             }
         }
-        return points
+        return (points, world)
+    }
+
+    /// Chained campaign playback (plan §16.3, ADR-0013): every stage is
+    /// validated and replayed for its recorded tick span (`ticks[i]`); a
+    /// stage must reach an outcome, and the state its player carries out
+    /// (`SessionState.carried`) must equal the next recording's header.
+    /// Returns each stage's checksum points and exit state.
+    public static func replayCampaign(
+        _ campaign: CampaignReplay, ticks: [Int]
+    ) throws -> [(points: [ReplayRecording.ChecksumPoint], exitState: SessionState)] {
+        guard ticks.count == campaign.stages.count else { throw ReplayError.invalidTickCount(ticks.count) }
+        var results: [(points: [ReplayRecording.ChecksumPoint], exitState: SessionState)] = []
+        var previousExit: SessionState?
+        for (index, stage) in campaign.stages.enumerated() {
+            if let previousExit {
+                guard stage.sessionState == previousExit else { throw ReplayError.sessionStateChainBroken(stage: index) }
+            }
+            let run = try replayWorld(stage, ticks: ticks[index])
+            // `replay` validated the format, rules, world and header first.
+            _ = try replay(stage, ticks: 0)
+            guard let phase = run.world.stage?.phase, phase != .playing else { throw ReplayError.stageUndecided(stage: index) }
+            guard let exit = SessionState.carried(from: run.world) else { throw ReplayError.stageUndecided(stage: index) }
+            results.append((run.points, exit))
+            previousExit = exit
+        }
+        return results
     }
 }

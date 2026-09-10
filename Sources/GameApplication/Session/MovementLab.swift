@@ -68,6 +68,10 @@ public struct MovementLabSession: Sendable {
     public let ruleset: MovementRuleset
     public let weapons: WeaponRuleset
     public let pickups: PickupRuleset
+    /// Campaign header for the recording (ADR-0013): the stage id and the
+    /// session state the world was built from; nil for lab/ad-hoc worlds.
+    public let stageID: String?
+    public let sessionState: SessionState?
     public static let checksumInterval = 60
 
     /// Configuration rejected at the session boundary.
@@ -89,10 +93,13 @@ public struct MovementLabSession: Sendable {
     public static func make(world: WorldState = MovementLabFixture.makeWorld(),
                             ruleset: MovementRuleset = .provisional,
                             weapons: WeaponRuleset = .provisional,
-                            pickups: PickupRuleset = .provisional) throws -> MovementLabSession {
+                            pickups: PickupRuleset = .provisional,
+                            stageID: String? = nil, sessionState: SessionState? = nil) throws -> MovementLabSession {
         let issues = configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
+            + (sessionState?.validationIssues ?? [])
         guard issues.isEmpty else { throw ConfigurationError.invalidRules(issues) }
-        return MovementLabSession(world: world, ruleset: ruleset, weapons: weapons, pickups: pickups)
+        return MovementLabSession(world: world, ruleset: ruleset, weapons: weapons, pickups: pickups,
+                                  stageID: stageID, sessionState: sessionState)
     }
 
     /// Trusted-code initializer: ALL THREE rulesets are preconditioned
@@ -101,15 +108,20 @@ public struct MovementLabSession: Sendable {
     public init(world: WorldState = MovementLabFixture.makeWorld(),
                 ruleset: MovementRuleset = .provisional,
                 weapons: WeaponRuleset = .provisional,
-                pickups: PickupRuleset = .provisional) {
+                pickups: PickupRuleset = .provisional,
+                stageID: String? = nil, sessionState: SessionState? = nil) {
         let issues = Self.configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
+            + (sessionState?.validationIssues ?? [])
         precondition(issues.isEmpty, "session configuration rejected: \(issues)")
         self.world = world
         self.ruleset = ruleset
         self.weapons = weapons
         self.pickups = pickups
+        self.stageID = stageID
+        self.sessionState = sessionState
         self.recording = ReplayRecording(initialWorld: world, movement: ruleset,
-                                         weapons: weapons, pickups: pickups)
+                                         weapons: weapons, pickups: pickups,
+                                         stageID: stageID, sessionState: sessionState)
     }
 
     /// Debug hooks mutate the world outside the recorded command stream, so
@@ -117,7 +129,8 @@ public struct MovementLabSession: Sendable {
     /// before is no longer reproducible from the old start.
     private mutating func rebaseRecording() {
         recording = ReplayRecording(initialWorld: world, movement: ruleset,
-                                    weapons: weapons, pickups: pickups)
+                                    weapons: weapons, pickups: pickups,
+                                    stageID: stageID, sessionState: sessionState)
     }
 
     /// Advances one tick with the local player's held direction and fire
@@ -164,12 +177,6 @@ public struct MovementLabSession: Sendable {
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3 * cell, y: 3 * cell), facing: .down)
         rebaseRecording()
-    }
-
-    /// Stage flow: restart rebuilds the world from the VS-01 fixture.
-    public mutating func restartStage() {
-        self = MovementLabSession(world: VS01Stage.makeWorld(rules: pickups), ruleset: ruleset,
-                                  weapons: weapons, pickups: pickups)
     }
 
     @discardableResult

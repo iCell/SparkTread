@@ -41,6 +41,9 @@ public enum IDRegistryValidator {
     public static let requiredCategories = [
         "rulesets", "difficulties", "weapons", "equipment", "pickups", "enemies", "themes", "stages",
     ]
+    /// Optional categories the schema permits (ADR-0013 campaigns); any
+    /// other field is still rejected as extension data (§15.5).
+    public static let optionalCategories = ["campaigns"]
 
     public static func validate(_ registry: IDRegistry, file: String) -> [ContentIssue] {
         var issues: [ContentIssue] = []

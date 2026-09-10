@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "id": "frontier_03_desert_stairs",
+  "stageNumber": 3,
+  "displayNameKey": "stage.vs03.name",
+  "themeID": "frontier",
+  "arenaSpecID": "universal",
+  "seed": "9834120051123687705",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            8,
+            3,
+            13,
+            4
+          ],
+          [
+            6,
+            3,
+            7,
+            9
+          ],
+          [
+            2,
+            8,
+            5,
+            9
+          ],
+          [
+            22,
+            3,
+            27,
+            4
+          ],
+          [
+            20,
+            3,
+            21,
+            9
+          ],
+          [
+            16,
+            8,
+            19,
+            9
+          ],
+          [
+            36,
+            3,
+            41,
+            4
+          ],
+          [
+            34,
+            3,
+            35,
+            9
+          ],
+          [
+            30,
+            8,
+            33,
+            9
+          ],
+          [
+            50,
+            3,
+            55,
+            4
+          ],
+          [
+            48,
+            3,
+            49,
+            9
+          ],
+          [
+            44,
+            8,
+            47,
+            9
+          ],
+          [
+            8,
+            15,
+            13,
+            16
+          ],
+          [
+            6,
+            15,
+            7,
+            21
+          ],
+          [
+            2,
+            20,
+            5,
+            21
+          ],
+          [
+            22,
+            15,
+            27,
+            16
+          ],
+          [
+            20,
+            15,
+            21,
+            21
+          ],
+          [
+            16,
+            20,
+            19,
+            21
+          ],
+          [
+            36,
+            15,
+            41,
+            16
+          ],
+          [
+            34,
+            15,
+            35,
+            21
+          ],
+          [
+            30,
+            20,
+            33,
+            21
+          ],
+          [
+            50,
+            15,
+            55,
+            16
+          ],
+          [
+            48,
+            15,
+            49,
+            21
+          ],
+          [
+            44,
+            20,
+            47,
+            21
+          ],
+          [
+            26,
+            11,
+            29,
+            11
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            12,
+            11,
+            15,
+            12
+          ],
+          [
+            40,
+            11,
+            43,
+            12
+          ],
+          [
+            26,
+            23,
+            29,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_a",
+      "count": 6
+    },
+    {
+      "archetype": "normal_c",
+      "count": 4
+    },
+    {
+      "archetype": "rapid_a",
+      "count": 4
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 2
+    },
+    {
+      "archetype": "explosion_a",
+      "count": 4
+    },
+    {
+      "archetype": "ap_a",
+      "count": 2
+    },
+    {
+      "archetype": "ap_c",
+      "count": 2
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 5,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 3,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 9,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 15,
+      "pickup": "bomb"
+    },
+    {
+      "queueIndex": 21,
+      "pickup": "invincibility"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        13,
+        11
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        41,
+        11
+      ]
+    }
+  ]
+}

@@ -631,6 +631,32 @@ Owner, on the device with the first icon panel (verbatim): "结束了不管是�
   on a loss; the owner accepted the transition and the card on the device
   ("我觉得挺好", 2026-09-10 late evening).
 
+## M4 item 1 — campaign progression (2026-09-10 late evening; ADR-0013 proposed)
+
+Owner: "把前 5 项给做完吧" and, for the maps, "按照原来地图，但是适配新的屏幕比例，允许你在
+原版基础上按照你认为最合适的方式自由发挥". Landed:
+
+- Content: `frontier_02_hidden_in_grass` (water channels, foliage cover,
+  brick blocks, steel plates; 22 enemies: Normal A/C, Rapid A/B, Fire A)
+  and `frontier_03_desert_stairs` (steel staircases on open sand; 24
+  enemies incl. Explosion A, AP A/C), both read from the reference
+  recording's play-start frames and re-drawn for 56×27 with the owner's
+  latitude; `Content/campaigns/campaign_v1.json`; the registry's seeded
+  placeholder ids replaced; the content validator checks campaigns
+  against stages (existence, number = position).
+- `SessionState` (carried lives/score/ammo/retained upgrades; armor
+  resets), `CampaignRun` (stage index + checkpoint), builder/loader
+  `session:` parameter with domain checks, replay format 4 with the
+  campaign header and `ReplayPlayer.replayCampaign` (chain check,
+  outcome required), controller campaign walk (automatic advance with
+  the exit state, retry from the checkpoint, "战役完成 / 再来一局" after the
+  last stage, completed recordings kept as the run's campaign replay).
+- Tests (272 / 67): `SessionStateTests`, `CampaignRunTests`,
+  `CampaignReplayTests` (three real stages chained; tampered header and
+  undecided stage refused), the controller campaign test (advance, carry,
+  retry from checkpoint, completion, restart), every shipped stage
+  validated/built/numbered, replay format 4 boundary.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -653,4 +679,5 @@ Do not interpret green tests as product completion:
   A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
   icons; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
-  is the next milestone and has not started.
+  is in progress: item 1 (campaign progression) landed (ADR-0013
+  proposed), items 2–5 follow.

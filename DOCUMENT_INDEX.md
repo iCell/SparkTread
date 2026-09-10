@@ -45,6 +45,7 @@
 
 ## 提议中的 ADR（待所有者接受，尚不具备权威）
 
+- `docs/decisions/ADR-0013-campaign-progression-and-session-state.md`：战役推进——三关顺序内容（VS-02 隐于草丛、VS-03 沙漠阶梯，按原作地图适配 56×27）、跨关携带状态（生命、分数、弹药、保留升级；护甲不携带）、胜利自动进入下一关、失败从关卡起点检查点重来、回放格式 4 与链式战役回放。
 - `Tools/reference_measure/README.md`：参照原作录像的测量流程与脚本（不含媒体），复现 ADR-0011 / CURRENT_REVIEW 中的音效与过场数据。
 
 ## 当前固定摘要
