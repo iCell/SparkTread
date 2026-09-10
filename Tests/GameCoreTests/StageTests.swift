@@ -53,10 +53,10 @@ private func tick(_ world: inout WorldState, _ n: Int,
         let rapidD = EnemyArchetypes.attributes(for: "rapid_d")
         #expect(rapidD.speedLevel == 2) // fastest tier
         #expect(rapidD.equipmentID == "memory_of_sea")
-        #expect(rapidD.baseFocusPercent == 30) // hunts the player
+        #expect(rapidD.baseFocusPercent == 50) // hunts the player half the time
 
         let apA = EnemyArchetypes.attributes(for: "ap_a")
-        #expect(apA.baseFocusPercent == 70) // sieges the base
+        #expect(apA.baseFocusPercent == 90) // sieges the base
     }
 
     /// Enemy speed level 0 is 0.6× the player base, and the curve spans
@@ -102,6 +102,12 @@ private func tick(_ world: inout WorldState, _ n: Int,
         let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
         for x in 0..<w { terrain[x, 0] = TerrainCell(kind: .steel); terrain[x, h - 1] = TerrainCell(kind: .steel) }
         for y in 0..<h { terrain[0, y] = TerrainCell(kind: .steel); terrain[w - 1, y] = TerrainCell(kind: .steel) }
+        // Steel corridor pinning both tanks to rows 10-11: the roaming brain
+        // can only pick left/right, so alignment windows reliably land.
+        for x in 3..<25 {
+            terrain[x, 9] = TerrainCell(kind: .steel)
+            terrain[x, 12] = TerrainCell(kind: .steel)
+        }
         var world = WorldState(terrain: terrain, seed: 3)
         world.addPlayer(PlayerState(playerID: .one))
         // Player to the LEFT of the enemy, same row, so a left-facing enemy aligns.
@@ -121,28 +127,43 @@ private func tick(_ world: inout WorldState, _ n: Int,
         return world
     }
 
-    private func run(_ world: inout WorldState, _ n: Int) {
-        for _ in 0..<n { Simulation.step(&world, commands: [PlayerCommand(playerID: .one, targetTick: world.tick)]) }
+    /// Runs `n` ticks and returns the accumulated events — the enemy now
+    /// roams and throttles its fire, so tests assert on what was FIRED over
+    /// the window, not on projectiles still in flight at the end.
+    @discardableResult
+    private func run(_ world: inout WorldState, _ n: Int) -> [DomainEvent] {
+        var events: [DomainEvent] = []
+        for _ in 0..<n {
+            events += Simulation.step(&world, commands: [PlayerCommand(playerID: .one, targetTick: world.tick)])
+        }
+        return events
+    }
+
+    private func fired(_ events: [DomainEvent], weaponID: String, by entityID: Int) -> Bool {
+        events.contains {
+            if case .weaponFired(let id, _, let weapon, _, _, _) = $0 { return id == entityID && weapon == weaponID }
+            return false
+        }
     }
 
     @Test func apEnemyLaunchesAPShells() {
         var world = fireWorld(archetype: "ap_a")
-        run(&world, 20)
-        #expect(world.projectiles.contains { $0.weaponID == "ap" && $0.teamID == 2 })
+        let events = run(&world, 120) // covers a full fire-cadence window
+        #expect(fired(events, weaponID: "ap", by: 2))
     }
 
     @Test func explosionEnemyLaunchesExplosionShells() {
         var world = fireWorld(archetype: "explosion_a")
-        run(&world, 20)
-        #expect(world.projectiles.contains { $0.weaponID == "explosion" && $0.teamID == 2 })
+        let events = run(&world, 120)
+        #expect(fired(events, weaponID: "explosion", by: 2))
     }
 
     @Test func fireEnemyLaysFlameThatDamagesPlayerNotItself() {
         var world = fireWorld(archetype: "fire_a")
         // Move the player adjacent so it stands in the flame lane.
         world.withTank(entityID: 1) { $0.positionSubunits = Vec2i(x: 18 * 1024, y: 10 * 1024) }
-        run(&world, 40)
-        #expect(world.fireHazards.contains { $0.teamID == 2 })
+        let events = run(&world, 600) // roaming brain: give alignment windows time to land
+        #expect(fired(events, weaponID: "fire", by: 2))
         // The enemy (team 2) is never hurt by its own team-2 flame.
         let enemy = world.tanks.first { $0.teamID == 2 }
         #expect(enemy != nil)
@@ -150,14 +171,14 @@ private func tick(_ world: inout WorldState, _ n: Int,
 
     @Test func normalEnemyStillUsesNormalChannel() {
         var world = fireWorld(archetype: "normal_c")
-        run(&world, 20)
-        #expect(world.projectiles.contains { $0.weaponID == "normal" && $0.teamID == 2 })
+        let events = run(&world, 120)
+        #expect(fired(events, weaponID: "normal", by: 2))
     }
 
     @Test func mineEnemyLaysMinesWhileDriving() {
         var world = fireWorld(archetype: "mine_a")
         world.withTank(entityID: 2) { $0.movementIntent = .down } // give it somewhere to go
-        run(&world, 200)
+        run(&world, 600) // 1-in-5 roll every 24 ticks: cover plenty of chances
         #expect(!world.mines.isEmpty)
         #expect(world.mines.allSatisfy { $0.teamID == 2 })
     }
@@ -369,6 +390,58 @@ private func tick(_ world: inout WorldState, _ n: Int,
         tick(&world, 160, direction: .right, events: &events)
         #expect(world.player(.one)?.lives == 4)
         #expect((world.base?.shieldRemainingTicks ?? 0) > 0)
+        // Shovel rule: the fort ring hardens to steel while shielded…
+        #expect(world.terrain[39, 21].kind == .steel)
+        #expect(world.terrain[42, 24].kind == .steel)
+        // …and is rebuilt as brick once the shield expires.
+        tick(&world, 1300, events: &events)
+        #expect(world.base?.shieldRemainingTicks == 0)
+        #expect(world.terrain[39, 21].kind == .brick)
+        #expect(world.terrain[42, 24].kind == .brick)
+    }
+
+    @Test func carrierEnemyDropsItsItemSomewhereOnTheMap() {
+        var world = makeStageWorld(enemies: ["normal_a"], maxAlive: 1, startDelay: 1) { w in
+            w.stage?.carriedPickupQueue = ["base_shield"]
+            w.stage?.dropTable = [] // carriers are the only drop source here
+        }
+        var events: [DomainEvent] = []
+        tick(&world, 60, events: &events)
+        guard let enemy = world.tanks.first(where: { $0.teamID != 1 }) else {
+            Issue.record("enemy never spawned"); return
+        }
+        #expect(enemy.carriedPickupID == "base_shield")
+        world.withTank(entityID: enemy.entityID) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+        tick(&world, 2, events: &events)
+        #expect(world.pickups.contains { $0.pickupID == "base_shield" })
+    }
+
+    @Test func nonCarrierDropsNothingWithEmptyDropTable() {
+        var world = makeStageWorld(enemies: ["normal_a"], maxAlive: 1, startDelay: 1) { w in
+            w.stage?.dropTable = []
+        }
+        var events: [DomainEvent] = []
+        tick(&world, 60, events: &events)
+        guard let enemy = world.tanks.first(where: { $0.teamID != 1 }) else {
+            Issue.record("enemy never spawned"); return
+        }
+        world.withTank(entityID: enemy.entityID) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+        tick(&world, 2, events: &events)
+        #expect(world.pickups.isEmpty)
+    }
+
+    @Test func hiddenTreasureRevealsWhenItsBrickFalls() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999) { w in
+            w.terrain[10, 10] = TerrainCell(kind: .brick)
+            w.stage?.hiddenPickups = [HiddenPickup(cell: Vec2i(x: 10, y: 10), pickupID: "extra_life")]
+        }
+        var events: [DomainEvent] = []
+        tick(&world, 5, events: &events)
+        #expect(world.pickups.isEmpty) // still covered by brick
+        world.terrain[10, 10] = TerrainCell(kind: .ground) // brick destroyed
+        tick(&world, 2, events: &events)
+        #expect(world.pickups.contains { $0.pickupID == "extra_life" })
+        #expect(world.stage?.hiddenPickups.isEmpty == true)
     }
 
     @Test func weaponPickupSwitchesAndRefillsWithoutErasingStoredAmmo() {

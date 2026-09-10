@@ -30,6 +30,42 @@ public struct WeaponDefinition: Codable, Equatable, Sendable {
     public func level(_ array: [Int], _ power: Int) -> Int {
         array[max(0, min(3, power))]
     }
+
+    /// Documented domains (§15.3) so validation is total over decoded
+    /// integers and the simulation's arithmetic stays far from overflow.
+    public static let maxTicks = 216_000
+    public static let maxCount = 1_000_000
+    public static let maxDamage = 99
+    public static let maxRadiusSubunits = 65_536
+
+    /// §8.4: every per-level array has exactly four entries; every value
+    /// sits inside its domain; per-tick displacement never exceeds the §7.4
+    /// cap.
+    public func validationIssues() -> [String] {
+        var issues: [String] = []
+        func check(_ name: String, _ values: [Int], max upper: Int) {
+            if values.count != 4 { issues.append("\(id).\(name) must have exactly 4 entries") }
+            if values.contains(where: { $0 < 0 || $0 > upper }) { issues.append("\(id).\(name) must be 0…\(upper)") }
+        }
+        check("cooldown_ticks", cooldownTicks, max: Self.maxTicks)
+        check("max_active", maxActive, max: Self.maxCount)
+        check("initial_speed_subunits_per_tick", initialSpeedSubunitsPerTick, max: SpatialUnits.maxPerTickDisplacementSubunits)
+        check("acceleration_subunits_per_tick2", accelerationSubunitsPerTick2, max: SpatialUnits.maxPerTickDisplacementSubunits)
+        check("max_speed_subunits_per_tick", maxSpeedSubunitsPerTick, max: SpatialUnits.maxPerTickDisplacementSubunits)
+        check("lifetime_ticks", lifetimeTicks, max: Self.maxTicks)
+        check("tank_damage", tankDamage, max: Self.maxDamage)
+        check("brick_damage", brickDamage, max: Self.maxDamage)
+        check("steel_damage", steelDamage, max: Self.maxDamage)
+        check("projectile_durability", projectileDurability, max: Self.maxCount)
+        check("penetration_count", penetrationCount, max: Self.maxCount)
+        check("explosion_radius_subunits", explosionRadiusSubunits, max: Self.maxRadiusSubunits)
+        check("mine_trigger_radius_subunits", mineTriggerRadiusSubunits, max: Self.maxRadiusSubunits)
+        for (name, value) in [("ammo_cost", ammoCost), ("refill_amount", refillAmount), ("max_ammo", maxAmmo)]
+        where value < 0 || value > Self.maxCount {
+            issues.append("\(id).\(name) must be 0…\(Self.maxCount)")
+        }
+        return issues
+    }
 }
 
 public enum WeaponFamily: String, Codable, Sendable {
@@ -58,6 +94,27 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
 
     public func weapon(_ id: String) -> WeaponDefinition? {
         weapons.first { $0.id == id }
+    }
+
+    /// Ruleset-wide validation (§15.3): unique IDs, the `normal` weapon
+    /// present, geometry inside a cell, cadence values inside their domains.
+    public func validationIssues() -> [String] {
+        var issues = weapons.flatMap { $0.validationIssues() }
+        if Set(weapons.map(\.id)).count != weapons.count { issues.append("weapon ids must be unique") }
+        if weapon("normal") == nil { issues.append("the normal weapon is required") }
+        let cell = SpatialUnits.subunitsPerCell
+        if projectileHalfExtentSubunits < 1 || projectileHalfExtentSubunits > cell {
+            issues.append("projectile_half_extent_subunits must be 1…\(cell)")
+        }
+        if mineHalfExtentSubunits < 1 || mineHalfExtentSubunits > cell {
+            issues.append("mine_half_extent_subunits must be 1…\(cell)")
+        }
+        if mineArmingTicks < 0 || mineArmingTicks > WeaponDefinition.maxTicks { issues.append("mine_arming_ticks must be 0…\(WeaponDefinition.maxTicks)") }
+        if fireDamageIntervalTicks < 1 || fireDamageIntervalTicks > WeaponDefinition.maxTicks {
+            issues.append("fire_damage_interval_ticks must be 1…\(WeaponDefinition.maxTicks)")
+        }
+        if chainDetonationWaveCap < 1 || chainDetonationWaveCap > 64 { issues.append("chain_detonation_wave_cap must be 1…64") }
+        return issues
     }
 
     public static let provisional = WeaponRuleset(

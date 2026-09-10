@@ -16,14 +16,19 @@ public struct SpawnTelegraph: Codable, Equatable, Sendable {
     public var ticksRemaining: Int
     public var deferTicks: Int
 
+    /// Pickup carried by the tank this telegraph will spawn (carrier rule).
+    public var carriedPickupID: String?
+
     public init(entityID: Int, archetypeID: String, spawnPointIndex: Int,
-                positionSubunits: Vec2i, ticksRemaining: Int) {
+                positionSubunits: Vec2i, ticksRemaining: Int,
+                carriedPickupID: String? = nil) {
         self.entityID = entityID
         self.archetypeID = archetypeID
         self.spawnPointIndex = spawnPointIndex
         self.positionSubunits = positionSubunits
         self.ticksRemaining = ticksRemaining
         self.deferTicks = 0
+        self.carriedPickupID = carriedPickupID
     }
 }
 
@@ -49,11 +54,28 @@ public struct PickupState: Codable, Equatable, Sendable {
 /// Stage composition and objective state. `remaining` counts enemies not yet
 /// telegraphed; alive/spawning are tracked through the world's tanks and the
 /// telegraph list (§18.2: remaining + alive + spawning = expected total).
+/// A pickup hidden under destructible terrain (the reference editor's
+/// hidden-treasure layer): revealed when the covering brick is destroyed.
+public struct HiddenPickup: Codable, Equatable, Sendable {
+    public var cell: Vec2i
+    public var pickupID: String
+    public init(cell: Vec2i, pickupID: String) {
+        self.cell = cell
+        self.pickupID = pickupID
+    }
+}
+
 public struct StageState: Codable, Equatable, Sendable {
     public var phase: StagePhase
     /// Ordered archetype queue (spawn order is stage data, not dictionary
     /// order — §14.3).
     public var spawnQueue: [String]
+    /// Parallel to `spawnQueue`: the pickup each queued enemy carries (nil
+    /// for non-carriers). Empty means no carriers. Dequeued together with
+    /// `spawnQueue` so the pairing survives spawning.
+    public var carriedPickupQueue: [String?]
+    /// Treasures hidden under bricks, revealed on destruction (§11).
+    public var hiddenPickups: [HiddenPickup]
     public var maxAliveEnemies: Int
     public var enemyStartDelayTicks: Int
     /// Spawn points as tank top-left cell coordinates.
@@ -68,9 +90,12 @@ public struct StageState: Codable, Equatable, Sendable {
 
     public init(spawnQueue: [String], maxAliveEnemies: Int, enemyStartDelayTicks: Int = 240,
                 spawnPointsCells: [Vec2i], telegraphTicks: Int = 45,
-                playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 45) {
+                playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 45,
+                carriedPickupQueue: [String?] = [], hiddenPickups: [HiddenPickup] = []) {
         self.phase = .playing
         self.spawnQueue = spawnQueue
+        self.carriedPickupQueue = carriedPickupQueue
+        self.hiddenPickups = hiddenPickups
         self.maxAliveEnemies = maxAliveEnemies
         self.enemyStartDelayTicks = enemyStartDelayTicks
         self.spawnPointsCells = spawnPointsCells
@@ -140,10 +165,13 @@ public enum EnemyArchetypes {
         // damage shields — the archetype that teaches "switch to explosives".
         let shield = archetypeID == "ap_c" ? 2 : archetypeID == "ap_d" ? 3 : 0
         // Rapid family hunts the player; AP/explosion lean into the base.
+        // Tuned up 2026-09-08 and again 2026-09-09 (owner: enemies must
+        // come for the base) — with cost-field navigation the focus roll
+        // now translates into an actual approach.
         let baseFocus = switch family {
-        case "rapid": 30
-        case "ap", "explosion": 70
-        default: 50
+        case "rapid": 50
+        case "ap", "explosion": 90
+        default: 80
         }
         return Attributes(armor: row.0, speedLevel: row.1, powerLevel: row.2,
                           score: row.4, shieldHP: shield, baseFocusPercent: baseFocus,
@@ -153,11 +181,14 @@ public enum EnemyArchetypes {
 
 extension WorldState {
     /// Spawns a pickup at (or ring-scanned near) a cell — used by stage
-    /// authoring for visible starter pickups and by kill drops.
+    /// authoring for visible starter pickups and by kill drops. Returns
+    /// false when no cell within the scan radius can hold it.
+    @discardableResult
     public mutating func spawnStagePickup(
-        _ pickupID: String, nearCell cell: Vec2i, events: inout [DomainEvent]
-    ) {
-        Stage.spawnPickup(&self, pickupID: pickupID, nearCell: cell, events: &events)
+        _ pickupID: String, nearCell cell: Vec2i, rules: PickupRuleset = .provisional,
+        events: inout [DomainEvent]
+    ) -> Bool {
+        Stage.spawnPickup(&self, pickupID: pickupID, nearCell: cell, rules: rules, events: &events)
     }
 }
 

@@ -61,6 +61,32 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
 }
 
 @Suite struct ProjectileMatrixTests {
+    @Test func explosiveBaseContactDealsOnlyOneBlastOfDamage() {
+        var world = makeCombatWorld()
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 9 * 1024, y: 3 * 1024))
+        _ = injectProjectile(&world, weaponID: "explosion", team: 2,
+                             at: Vec2i(x: 9 * 1024 - 100, y: 4 * 1024), direction: .right)
+        let events = Simulation.step(&world, commands: [])
+        #expect(world.base?.durability == 1) // 3 - 2, not contact plus blast
+        #expect(events.filter { if case .baseDamaged = $0 { true } else { false } }.count == 1)
+    }
+
+    @Test func lethalDamageCannotBeUndoneBySameTickArmorPickup() {
+        var world = makeCombatWorld()
+        let playerID = world.player(.one)!.tankEntityID!
+        world.withTank(entityID: playerID) { $0.armor = 1 }
+        let pickupID = world.claimEntityID()
+        world.pickups.append(PickupState(entityID: pickupID, pickupID: "armor_up",
+                                         positionSubunits: Vec2i(x: 4096, y: 4096),
+                                         graceTicksRemaining: 0))
+        _ = injectProjectile(&world, weaponID: "normal", team: 2,
+                             at: Vec2i(x: 3072 - 100, y: 4096), direction: .right)
+        let events = Simulation.step(&world, commands: [])
+        #expect(world.tank(entityID: playerID) == nil)
+        #expect(world.pickups.contains { $0.entityID == pickupID })
+        #expect(!events.contains { if case .pickupCollected = $0 { true } else { false } })
+    }
+
     @Test func projectileVsEnemyTankDamagesAndDespawns() {
         var world = makeCombatWorld()
         let enemy = spawnEnemy(&world, cellX: 9, cellY: 3)
@@ -69,7 +95,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         tickAll(&world, 30, events: &events)
         #expect(world.tank(entityID: enemy)?.armor == 2) // 3 − 1
         #expect(world.projectiles.isEmpty)
-        #expect(events.contains { if case .tankDamaged(enemy, 1, "normal") = $0 { true } else { false } })
+        #expect(events.contains { if case .tankDamaged(enemy, _, 1, "normal", _) = $0 { true } else { false } })
         // Active count returned: the player can fire again.
         #expect(world.tanks[0].activeProjectileCounts["normal", default: 0] == 0)
     }
@@ -133,6 +159,36 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         // Second shot: fragments fully removed, cells revert to ground.
         #expect(world.terrain[9, 3].kind == .ground)
         #expect(world.terrain[9, 4].kind == .ground)
+    }
+
+    /// Depleted special ammo must not leave a dead trigger (owner request):
+    /// the special press falls back to the normal round.
+    @Test func depletedSpecialFallsBackToNormalRound() {
+        var world = makeCombatWorld()
+        giveSpecial(&world, "rapid", ammo: 0)
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, special: true, events: &events)
+        #expect(world.projectiles.contains { $0.weaponID == "normal" })
+        #expect(!events.contains { if case .dryFire = $0 { true } else { false } })
+    }
+
+    /// Regression (owner-reported): an off-lane shot must carve the same
+    /// tank-wide 2-cell notch as a seam-centered one — free-position tanks
+    /// must never leave half-height brick slivers.
+    @Test func offLaneShotStillCarvesTankWideNotch() {
+        var world = makeCombatWorld { w in
+            w.terrain[9, 3] = TerrainCell(kind: .brick)
+            w.terrain[9, 4] = TerrainCell(kind: .brick)
+            if let id = w.player(.one)?.tankEntityID {
+                // 400 subunits off the lane seam.
+                w.withTank(entityID: id) { $0.positionSubunits = Vec2i(x: 3072, y: 3472) }
+            }
+        }
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 34, events: &events)
+        #expect(world.terrain[9, 3].quadrantMask == 0b1010)
+        #expect(world.terrain[9, 4].quadrantMask == 0b1010)
     }
 
     @Test func normalCannotHurtSteelButAPCan() {
@@ -212,7 +268,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         var events: [DomainEvent] = []
         tickAll(&world, 20, events: &events)
         #expect(world.base?.durability == 2)
-        #expect(events.contains { if case .baseDamaged(1, 2) = $0 { true } else { false } })
+        #expect(events.contains { if case .baseDamaged(1, 2, _) = $0 { true } else { false } })
     }
 
     @Test func alliedBaseDamageGatedByDifficultyFlag() {
@@ -259,7 +315,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         giveSpecial(&world, "mine", power: power)
         var events: [DomainEvent] = []
         tickAll(&world, 1, special: true, events: &events)
-        for event in events { if case .minePlaced(let id, _, _) = event { return id } }
+        for event in events { if case .minePlaced(let id, _, _, _) = event { return id } }
         return nil
     }
 
@@ -489,13 +545,15 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(events.contains { if case .terrainChanged(5, 3, 0) = $0 { true } else { false } })
     }
 
-    @Test func dryFireOnEmptyAmmo() {
+    /// Empty special ammo no longer dry-fires: the press falls back to the
+    /// normal round (owner request), so the special weapon itself never fires.
+    @Test func emptySpecialAmmoNeverFiresTheSpecialWeapon() {
         var world = makeCombatWorld()
         giveSpecial(&world, "rapid", ammo: 0)
         var events: [DomainEvent] = []
         tickAll(&world, 1, special: true, events: &events)
-        #expect(events.contains { if case .dryFire(_, "rapid") = $0 { true } else { false } })
-        #expect(world.projectiles.isEmpty)
+        #expect(!world.projectiles.contains { $0.weaponID == "rapid" })
+        #expect(world.player(.one)?.specialAmmoByWeapon["rapid"] == 0) // nothing consumed
     }
 
     /// Owner-directed resistance model: shields chip under normal fire but
@@ -510,7 +568,7 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         tickAll(&world, 25, events: &events)
         #expect(world.tank(entityID: enemy)?.shieldHP == 1)
         #expect(world.tank(entityID: enemy)?.armor == 4)
-        #expect(events.contains { if case .tankShieldHit(enemy, 1) = $0 { true } else { false } })
+        #expect(events.contains { if case .tankShieldHit(enemy, _, 1, _) = $0 { true } else { false } })
         // Second shell: shield gone; third finally damages armor.
         tickAll(&world, 1, normal: true, events: &events)
         tickAll(&world, 25, events: &events)

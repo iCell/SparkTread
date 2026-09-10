@@ -84,6 +84,11 @@ public struct TankState: Codable, Equatable, Sendable {
     public var fireCooldowns: [FireChannel: Int]
     public var activeProjectileCounts: [String: Int]
     public var spawnProtectionTicks: Int
+    /// Reference carrier rule (§11): a flashing enemy holds this pickup and
+    /// drops it when it dies — at a random interior cell by default
+    /// (`PickupRuleset.dropsSpawnAtRandomCells`, ADR-0010 item 7), near the
+    /// death cell when that flag is off. Nil for non-carriers and players.
+    public var carriedPickupID: String?
 
     public init(entityID: Int, teamID: Int, ownerPlayerID: PlayerID?, archetypeID: String,
                 positionSubunits: Vec2i, facing: Direction) {
@@ -110,5 +115,6 @@ public struct TankState: Codable, Equatable, Sendable {
         self.fireCooldowns = [:]
         self.activeProjectileCounts = [:]
         self.spawnProtectionTicks = 120
+        self.carriedPickupID = nil
     }
 }

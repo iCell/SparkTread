@@ -120,7 +120,7 @@ final class TouchControlsUIView: UIView {
             dx = point.x - stickOrigin.x
             dy = point.y - stickOrigin.y
         }
-        store?.updateFromAnalog(dx: dx, dy: dy, deadZone: 12)
+        store?.updateFromAnalog(dx: dx, dy: dy, deadZone: 12, from: .touch)
         updateStickVisual(offset: CGPoint(x: dx, y: dy))
     }
 
@@ -136,7 +136,7 @@ final class TouchControlsUIView: UIView {
         for touch in touches {
             if touch == stickTouch {
                 stickTouch = nil
-                store?.releaseAll()
+                store?.release(from: .touch)
                 ringLayer.isHidden = true
                 knobLayer.isHidden = true
             }
@@ -171,9 +171,14 @@ struct TouchControlsView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> TouchControlsUIView {
         let view = TouchControlsUIView(frame: .zero)
-        view.store = controller.input
-        view.onNormalFire = { [weak controller] pressed in if pressed { controller?.pressNormalFire() } }
-        view.onSpecialFire = { [weak controller] held in controller?.specialFireHeld = held }
+        let store = controller.input
+        view.store = store
+        view.onNormalFire = { pressed in
+            pressed ? store.pressNormalFire(from: .touch) : store.releaseNormalFire(from: .touch)
+        }
+        view.onSpecialFire = { held in
+            held ? store.pressSpecialFire(from: .touch) : store.releaseSpecialFire(from: .touch)
+        }
         return view
     }
 

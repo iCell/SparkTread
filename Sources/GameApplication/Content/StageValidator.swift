@@ -35,6 +35,11 @@ public enum StageValidator {
             terrainKinds: Set(["ground", "brick", "steel", "water", "ice", "foliage", "base"]))
     }
 
+    /// Content budget: the most enemies one stage may schedule (per entry
+    /// and in total). The reference schedules about twenty; the budget is
+    /// generous but finite so the loader never admits an unbounded queue.
+    public static let maxEnemiesPerStage = 500
+
     public static func validate(_ def: StageDefinition, known: KnownIDs = .reference) -> [String] {
         var issues: [String] = []
         let arena = ArenaSpecification.universal
@@ -55,8 +60,15 @@ public enum StageValidator {
             if !known.terrainKinds.contains(layer.kind) {
                 issues.append("unknown terrain kind '\(layer.kind)'")
             }
-            for rect in layer.rects ?? [] where rect.count != 4 || rect[0] > rect[2] || rect[1] > rect[3] {
-                issues.append("malformed rect \(rect) in layer '\(layer.kind)'")
+            for rect in layer.rects ?? [] {
+                if rect.count != 4 || rect[0] > rect[2] || rect[1] > rect[3] {
+                    issues.append("malformed rect \(rect) in layer '\(layer.kind)'")
+                } else if !inBounds([rect[0], rect[1]]) || !inBounds([rect[2], rect[3]]) {
+                    issues.append("rect \(rect) in layer '\(layer.kind)' out of bounds")
+                }
+            }
+            for cell in layer.cells ?? [] where !inBounds(cell) {
+                issues.append("cell \(cell) in layer '\(layer.kind)' malformed or out of bounds")
             }
         }
 
@@ -65,38 +77,89 @@ public enum StageValidator {
         // THROUGH brick (enemies break it) but not steel/water/base.
         let spawnSolid = solidCells(def, brickIsSolid: true)
         let hardWalls = solidCells(def, brickIsSolid: false)
-        func blocked(_ c: [Int]) -> Bool { spawnSolid.contains(c[0] * 100 + c[1]) }
+        func footprintInBounds(_ c: [Int]) -> Bool {
+            inBounds(c) && c[0] < arena.cellsWide - 1 && c[1] < arena.cellsHigh - 1
+        }
+        func blocked(_ c: [Int]) -> Bool {
+            for dy in 0..<2 { for dx in 0..<2 {
+                let x = c[0] + dx, y = c[1] + dy
+                if spawnSolid.contains(x * 100 + y) { return true }
+                if footprintInBounds(def.baseSpawn),
+                   x >= def.baseSpawn[0], x < def.baseSpawn[0] + 2,
+                   y >= def.baseSpawn[1], y < def.baseSpawn[1] + 2 { return true }
+            } }
+            return false
+        }
 
-        if !inBounds(def.baseSpawn) { issues.append("base_spawn \(def.baseSpawn) out of bounds") }
+        if !footprintInBounds(def.baseSpawn) { issues.append("base_spawn \(def.baseSpawn) footprint out of bounds") }
         guard let playerCell = def.playerSpawnsByID["1"] else {
             issues.append("player_spawns_by_id missing player 1")
             return issues
         }
-        if !inBounds(playerCell) { issues.append("player 1 spawn \(playerCell) out of bounds") }
+        if !footprintInBounds(playerCell) { issues.append("player 1 spawn \(playerCell) footprint out of bounds") }
         else if blocked(playerCell) { issues.append("player 1 spawn \(playerCell) inside blocking terrain") }
 
         if def.enemySpawns.isEmpty { issues.append("enemy_spawns is empty") }
         for spawn in def.enemySpawns {
-            if !inBounds(spawn) { issues.append("enemy spawn \(spawn) out of bounds") }
+            if !footprintInBounds(spawn) { issues.append("enemy spawn \(spawn) footprint out of bounds") }
             else if blocked(spawn) { issues.append("enemy spawn \(spawn) inside blocking terrain") }
         }
 
         var totalEnemies = 0
+        // Content budget (R15-02): a count the builder would turn into an
+        // effectively unbounded queue is rejected per entry, before any sum
+        // or allocation — an overflow check on the total is not enough.
+        for entry in def.enemyComposition where entry.count > maxEnemiesPerStage {
+            issues.append("enemy '\(entry.archetype)' count \(entry.count) exceeds the stage budget of \(maxEnemiesPerStage)")
+        }
         for entry in def.enemyComposition {
             if !known.enemies.contains(entry.archetype) {
                 issues.append("unknown enemy archetype '\(entry.archetype)'")
             }
             if entry.count <= 0 { issues.append("enemy '\(entry.archetype)' count \(entry.count) must be positive") }
-            totalEnemies += max(0, entry.count)
+            let (sum, overflow) = totalEnemies.addingReportingOverflow(max(0, entry.count))
+            if overflow { issues.append("enemy_composition total count overflows") }
+            else { totalEnemies = sum }
         }
         if totalEnemies == 0 { issues.append("enemy_composition is empty") }
+        if totalEnemies > maxEnemiesPerStage { issues.append("enemy_composition total \(totalEnemies) exceeds the stage budget of \(maxEnemiesPerStage)") }
         if def.maxAliveEnemies <= 0 { issues.append("max_alive_enemies must be positive") }
+        if def.maxAliveEnemies > WorldInvariants.maxCount { issues.append("max_alive_enemies \(def.maxAliveEnemies) out of domain") }
         if def.initialEnemyDelayTicks < 0 { issues.append("initial_enemy_delay_ticks negative") }
+        if def.initialEnemyDelayTicks > WorldInvariants.maxTicks { issues.append("initial_enemy_delay_ticks \(def.initialEnemyDelayTicks) out of domain") }
         if def.telegraphTicks < 45 { issues.append("telegraph_ticks \(def.telegraphTicks) below the 45-tick fairness floor") }
+        if def.telegraphTicks > WorldInvariants.maxTicks { issues.append("telegraph_ticks \(def.telegraphTicks) out of domain") }
 
         for pickup in def.pickupSpawns {
             if !known.pickups.contains(pickup.id) { issues.append("unknown pickup '\(pickup.id)'") }
             if !inBounds(pickup.cell) { issues.append("pickup \(pickup.id) at \(pickup.cell) out of bounds") }
+        }
+
+        // Carrier drops index into the interleaved spawn queue (§11).
+        var seenCarrierIndices = Set<Int>()
+        for drop in def.carriedDrops ?? [] {
+            if !known.pickups.contains(drop.pickup) {
+                issues.append("carried drop references unknown pickup '\(drop.pickup)'")
+            }
+            if drop.queueIndex < 0 || drop.queueIndex >= totalEnemies {
+                issues.append("carried drop queue_index \(drop.queueIndex) outside 0..<\(totalEnemies)")
+            }
+            if !seenCarrierIndices.insert(drop.queueIndex).inserted {
+                issues.append("duplicate carried drop queue_index \(drop.queueIndex)")
+            }
+        }
+
+        // Hidden treasures must sit under authored brick (§11): a hidden
+        // pickup on open ground would reveal itself on the first tick.
+        for hidden in def.hiddenPickups ?? [] {
+            if !known.pickups.contains(hidden.id) {
+                issues.append("hidden pickup references unknown pickup '\(hidden.id)'")
+            }
+            if !inBounds(hidden.cell) {
+                issues.append("hidden pickup \(hidden.id) at \(hidden.cell) out of bounds")
+            } else if authoredKind(def, at: hidden.cell) != "brick" {
+                issues.append("hidden pickup \(hidden.id) at \(hidden.cell) is not covered by brick")
+            }
         }
         for drop in def.dropTable where !known.pickups.contains(drop) {
             issues.append("drop_table references unknown pickup '\(drop)'")
@@ -124,28 +187,39 @@ public enum StageValidator {
         return issues
     }
 
+    /// The final authored terrain kind at a cell, replaying layers in order
+    /// (later layers overwrite, mirroring StageBuilder).
+    private static func authoredKind(_ def: StageDefinition, at c: [Int]) -> String {
+        let arena = ArenaSpecification.universal
+        var kind = c[0] == 0 || c[1] == 0 || c[0] == arena.cellsWide - 1
+            || c[1] == arena.cellsHigh - 1 ? def.terrain.border : "ground"
+        for layer in def.terrain.layers {
+            for rect in layer.rects ?? []
+            where rect.count == 4 && c[0] >= rect[0] && c[0] <= rect[2]
+                && c[1] >= rect[1] && c[1] <= rect[3] {
+                kind = layer.kind
+            }
+            for cell in layer.cells ?? [] where cell == c {
+                kind = layer.kind
+            }
+        }
+        return kind
+    }
+
     private static func solidCells(_ def: StageDefinition, brickIsSolid: Bool) -> Set<Int> {
         let arena = ArenaSpecification.universal
         var solid = Set<Int>()
         let solidKinds = brickIsSolid
             ? ["brick", "steel", "water", "base"]
             : ["steel", "water", "base"]
-        func markIfSolid(_ x: Int, _ y: Int, _ kindName: String) {
-            if solidKinds.contains(kindName) { solid.insert(x * 100 + y) }
-        }
-        for x in 0..<arena.cellsWide {
-            markIfSolid(x, 0, def.terrain.border)
-            markIfSolid(x, arena.cellsHigh - 1, def.terrain.border)
-        }
+        // Sample the bounded arena rather than iterating untrusted ranges.
+        // Later layers can clear walls, exactly as in StageBuilder.
         for y in 0..<arena.cellsHigh {
-            markIfSolid(0, y, def.terrain.border)
-            markIfSolid(arena.cellsWide - 1, y, def.terrain.border)
-        }
-        for layer in def.terrain.layers {
-            for rect in layer.rects ?? [] where rect.count == 4 {
-                for cy in rect[1]...rect[3] { for cx in rect[0]...rect[2] { markIfSolid(cx, cy, layer.kind) } }
+            for x in 0..<arena.cellsWide {
+                if solidKinds.contains(authoredKind(def, at: [x, y])) {
+                    solid.insert(x * 100 + y)
+                }
             }
-            for cell in layer.cells ?? [] where cell.count == 2 { markIfSolid(cell[0], cell[1], layer.kind) }
         }
         return solid
     }
@@ -165,7 +239,10 @@ public enum StageValidator {
         let arena = ArenaSpecification.universal
         var reachable = Set<Int>()
         var frontier: [[Int]] = []
-        for spawn in def.enemySpawns where spawn.count == 2 && !hardWalls.contains(spawn[0] * 100 + spawn[1]) {
+        for spawn in def.enemySpawns
+        where spawn.count == 2 && spawn[0] >= 0 && spawn[0] < arena.cellsWide
+            && spawn[1] >= 0 && spawn[1] < arena.cellsHigh
+            && !hardWalls.contains(spawn[0] * 100 + spawn[1]) {
             let key = spawn[0] * 100 + spawn[1]
             if reachable.insert(key).inserted { frontier.append(spawn) }
         }

@@ -15,23 +15,26 @@ public enum StageLoader {
 
     /// Loads a stage by id from a bundle's `Content/stages` (or bundle root),
     /// validates it, and builds the world.
-    public static func loadWorld(id: String, bundle: Bundle) throws -> WorldState {
+    public static func loadWorld(id: String, bundle: Bundle,
+                                 rules: PickupRuleset = .provisional) throws -> WorldState {
         guard let url = bundle.url(forResource: id, withExtension: "json", subdirectory: "Content/stages")
             ?? bundle.url(forResource: id, withExtension: "json", subdirectory: "stages")
             ?? bundle.url(forResource: id, withExtension: "json") else {
             throw LoadError.notFound(id)
         }
-        return try loadWorld(at: url)
+        return try loadWorld(at: url, rules: rules)
     }
 
-    public static func loadWorld(at url: URL) throws -> WorldState {
+    /// The configuration boundary (§15.3): the stage definition AND the
+    /// pickup rules it will run under are validated before a world exists.
+    public static func loadWorld(at url: URL, rules: PickupRuleset = .provisional) throws -> WorldState {
         let data: Data
         do { data = try Data(contentsOf: url) }
         catch { throw LoadError.notFound(url.lastPathComponent) }
         let def = try decode(data)
-        let issues = StageValidator.validate(def)
+        let issues = StageValidator.validate(def) + rules.validationIssues()
         if !issues.isEmpty { throw LoadError.build(issues.joined(separator: "; ")) }
-        do { return try StageBuilder.build(def) }
+        do { return try StageBuilder.build(def, rules: rules) }
         catch { throw LoadError.build(String(describing: error)) }
     }
 }

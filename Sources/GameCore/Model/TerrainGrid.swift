@@ -17,6 +17,17 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
         case .ground, .ice, .foliage: false
         }
     }
+
+    /// Whether a pickup may sit on this kind (§9.3 placement legality). The
+    /// same predicate decides when a hidden treasure's covering cell counts
+    /// as destroyed: destruction normalizes an emptied brick/steel cell to
+    /// `.ground`, so "final quadrant destroyed" and "can hold a pickup" agree.
+    public var canHoldPickup: Bool {
+        switch self {
+        case .ground, .ice, .foliage: true
+        case .brick, .steel, .water, .base: false
+        }
+    }
 }
 
 /// One terrain cell. Destructible kinds carry a four-bit quadrant mask

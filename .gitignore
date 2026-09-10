@@ -8,3 +8,5 @@ DerivedData/
 .swiftpm/
 xcuserdata/
 .DS_Store
+__pycache__/
+*.pyc

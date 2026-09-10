@@ -30,7 +30,8 @@ let package = Package(
         .target(
             name: "AppleAdapters",
             dependencies: ["GameApplication", "GameCore"],
-            path: "Sources/AppleAdapters"
+            path: "Sources/AppleAdapters",
+            resources: [.copy("Resources/Audio")]
         ),
         // Content tooling: may import Foundation and application/core code;
         // production core code must not import tools (§14.1).

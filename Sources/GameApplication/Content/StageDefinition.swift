@@ -24,6 +24,11 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public var pickupSpawns: [PickupSpawn]
     public var dropTable: [String]
     public var dropChancePercent: Int
+    /// Carrier drops (reference rule): the enemy at `queueIndex` in the
+    /// interleaved spawn queue carries `pickup` and drops it on death.
+    public var carriedDrops: [CarriedDrop]?
+    /// Treasures hidden under brick cells, revealed on destruction.
+    public var hiddenPickups: [PickupSpawn]?
 
     public struct TerrainSpec: Codable, Equatable, Sendable {
         public var border: String            // terrain kind for the arena border
@@ -46,5 +51,10 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public struct PickupSpawn: Codable, Equatable, Sendable {
         public var id: String
         public var cell: [Int]
+    }
+
+    public struct CarriedDrop: Codable, Equatable, Sendable {
+        public var queueIndex: Int
+        public var pickup: String
     }
 }

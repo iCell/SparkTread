@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.0.app || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
-      - name: Install xcodegen
-        run: brew install xcodegen
+      - name: Install xcodegen and ffmpeg
+        # ffmpeg: pixel statistics for Scripts/smoke-render.sh (required under CI)
+        run: brew install xcodegen ffmpeg
       - name: Run CI gate
         run: sh Scripts/ci.sh

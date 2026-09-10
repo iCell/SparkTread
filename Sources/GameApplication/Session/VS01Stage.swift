@@ -9,9 +9,9 @@ public enum VS01Stage {
 
     /// Builds the VS-01 world from the bundled canonical stage JSON. A
     /// missing/invalid bundled stage is a build error (§15.4 fail-fast).
-    public static func makeWorld(bundle: Bundle = .main) -> WorldState {
+    public static func makeWorld(bundle: Bundle = .main, rules: PickupRuleset = .provisional) -> WorldState {
         do {
-            return try StageLoader.loadWorld(id: stageID, bundle: bundle)
+            return try StageLoader.loadWorld(id: stageID, bundle: bundle, rules: rules)
         } catch {
             fatalError("VS-01 stage content failed to load: \(error)")
         }

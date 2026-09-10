@@ -1,8 +1,9 @@
 import GameCore
 
-/// The M1 Movement Lab: a fixed, deterministic arena fixture with one player
-/// tank, plus the session workflow that feeds tick commands into the kernel.
-/// This is a lab fixture, not an authored campaign stage.
+/// The free-play lab fixture (`MOVEMENT_LAB=1`): a fixed, deterministic
+/// arena with one player tank, used by the movement/combat lab and by tests.
+/// `MovementLabSession` below is the session workflow for EVERY world — this
+/// fixture or an authored stage — feeding tick commands into the kernel.
 public enum MovementLabFixture {
     public static let seed: UInt64 = 0x5041_524B_5452_4541 // stable lab seed
 
@@ -65,13 +66,58 @@ public struct MovementLabSession: Sendable {
     public private(set) var world: WorldState
     public private(set) var recording: ReplayRecording
     public let ruleset: MovementRuleset
+    public let weapons: WeaponRuleset
+    public let pickups: PickupRuleset
     public static let checksumInterval = 60
 
+    /// Configuration rejected at the session boundary.
+    public enum ConfigurationError: Error, Equatable {
+        case invalidRules([String])
+    }
+
+    /// Every issue the three rulesets report — the same checks the replay
+    /// player applies to a decoded recording, so a session never runs a
+    /// configuration a recording of it would be refused for.
+    public static func configurationIssues(ruleset: MovementRuleset, weapons: WeaponRuleset,
+                                           pickups: PickupRuleset) -> [String] {
+        ruleset.validationIssues() + weapons.validationIssues() + pickups.validationIssues()
+    }
+
+    /// Admission for configurations that come from data: throws instead of
+    /// trapping. The initializer below is the trusted-code path and
+    /// preconditions the same checks.
+    public static func make(world: WorldState = MovementLabFixture.makeWorld(),
+                            ruleset: MovementRuleset = .provisional,
+                            weapons: WeaponRuleset = .provisional,
+                            pickups: PickupRuleset = .provisional) throws -> MovementLabSession {
+        let issues = configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
+        guard issues.isEmpty else { throw ConfigurationError.invalidRules(issues) }
+        return MovementLabSession(world: world, ruleset: ruleset, weapons: weapons, pickups: pickups)
+    }
+
+    /// Trusted-code initializer: ALL THREE rulesets are preconditioned
+    /// (R15-04: the session never appears to validate only one of them);
+    /// data-driven callers use `make(...)`.
     public init(world: WorldState = MovementLabFixture.makeWorld(),
-                ruleset: MovementRuleset = .provisional) {
+                ruleset: MovementRuleset = .provisional,
+                weapons: WeaponRuleset = .provisional,
+                pickups: PickupRuleset = .provisional) {
+        let issues = Self.configurationIssues(ruleset: ruleset, weapons: weapons, pickups: pickups)
+        precondition(issues.isEmpty, "session configuration rejected: \(issues)")
         self.world = world
         self.ruleset = ruleset
-        self.recording = ReplayRecording(seed: MovementLabFixture.seed, startChecksum: world.checksum())
+        self.weapons = weapons
+        self.pickups = pickups
+        self.recording = ReplayRecording(initialWorld: world, movement: ruleset,
+                                         weapons: weapons, pickups: pickups)
+    }
+
+    /// Debug hooks mutate the world outside the recorded command stream, so
+    /// the recording restarts from the mutated world: what was recorded
+    /// before is no longer reproducible from the old start.
+    private mutating func rebaseRecording() {
+        recording = ReplayRecording(initialWorld: world, movement: ruleset,
+                                    weapons: weapons, pickups: pickups)
     }
 
     /// Advances one tick with the local player's held direction and fire
@@ -91,7 +137,7 @@ public struct MovementLabSession: Sendable {
 
     /// Weapon debug panel: switches the player's special weapon and tops up
     /// its ammunition. Switching never erases stored ammunition (§8.1).
-    public mutating func debugSelectSpecialWeapon(_ weaponID: String, weapons: WeaponRuleset = .provisional) {
+    public mutating func debugSelectSpecialWeapon(_ weaponID: String) {
         guard let weapon = weapons.weapon(weaponID), weapon.fireChannel == .special else { return }
         if let tankID = world.player(.one)?.tankEntityID {
             world.withTank(entityID: tankID) { $0.specialWeaponID = weaponID }
@@ -100,12 +146,14 @@ public struct MovementLabSession: Sendable {
             let current = $0.specialAmmoByWeapon[weaponID, default: 0]
             $0.specialAmmoByWeapon[weaponID] = max(current, weapon.refillAmount)
         }
+        rebaseRecording()
     }
 
     /// Weapon debug panel: adjusts the player tank's power level (0–3).
     public mutating func debugSetPowerLevel(_ level: Int) {
         guard let tankID = world.player(.one)?.tankEntityID else { return }
         world.withTank(entityID: tankID) { $0.powerLevel = max(0, min(3, level)) }
+        rebaseRecording()
     }
 
     /// Lab convenience only: instantly respawns the player when no stage is
@@ -115,17 +163,20 @@ public struct MovementLabSession: Sendable {
         let cell = SpatialUnits.subunitsPerCell
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3 * cell, y: 3 * cell), facing: .down)
+        rebaseRecording()
     }
 
     /// Stage flow: restart rebuilds the world from the VS-01 fixture.
     public mutating func restartStage() {
-        self = MovementLabSession(world: VS01Stage.makeWorld(), ruleset: ruleset)
+        self = MovementLabSession(world: VS01Stage.makeWorld(rules: pickups), ruleset: ruleset,
+                                  weapons: weapons, pickups: pickups)
     }
 
     @discardableResult
     public mutating func advance(commands: [PlayerCommand]) -> [DomainEvent] {
         recording.append(commands: commands, atTick: world.tick)
-        let events = Simulation.step(&world, commands: commands, ruleset: ruleset)
+        let events = Simulation.step(&world, commands: commands, ruleset: ruleset,
+                                     weapons: weapons, pickups: pickups)
         if world.tick % Self.checksumInterval == 0 {
             recording.appendChecksum(tick: world.tick, checksum: world.checksum())
             assert(WorldInvariants.violations(in: world).isEmpty,

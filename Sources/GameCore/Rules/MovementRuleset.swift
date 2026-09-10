@@ -21,9 +21,11 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
 
     /// Maximum travel-axis distance the tank may be nudged onto a movement
     /// lane (multiples of 512/1024 subunits) when turning perpendicular
-    /// (§6.3). 256 covers every half-cell lane phase, giving reference-style
-    /// instant grid turns; assistance never teleports through collision and
-    /// never changes tactical speed.
+    /// (§6.3). 512 covers every FULL-cell lane phase — 2-cell corridors
+    /// only admit 1024-multiple lanes, and a 256 window left tanks 256–512
+    /// off-lane unable to turn in (owner report). 512 subunits is the
+    /// reference's half-tile snap; assistance never teleports through
+    /// collision and never changes tactical speed.
     public var alignmentAssistWindowSubunits: Int
 
     /// Collision inset per side of the nominal 2048×2048 footprint (§6.1).
@@ -33,7 +35,7 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
                 speedMultipliersPermille: [Int] = [1000, 1260, 1588, 2000],
                 enemySpeedMultipliersPermille: [Int] = [150, 216, 300, 432, 600, 864, 1200, 1728, 2400],
                 turnBufferTicks: Int = 10,
-                alignmentAssistWindowSubunits: Int = 256,
+                alignmentAssistWindowSubunits: Int = 512,
                 collisionInsetSubunits: Int = 64) {
         self.baseSpeedSubunitsPerSecond = baseSpeedSubunitsPerSecond
         self.speedMultipliersPermille = speedMultipliersPermille
@@ -60,4 +62,43 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
     }
 
     public static let accumulatorUnitsPerSubunit = 1000 * ticksPerSecond
+
+    /// Documented domains (§15.3): every field is range-checked BEFORE any
+    /// arithmetic, so validation is total over decoded integers.
+    public static let maxBaseSpeedSubunitsPerSecond = 1_000_000
+    public static let maxMultiplierPermille = 100_000
+    public static let maxTicks = 216_000
+
+    /// §15.3: array shapes (4 player levels, 9 enemy levels), speeds and
+    /// multipliers inside their domains, a collision inset that leaves a
+    /// box, and per-tick movement under the §7.4 displacement cap at the
+    /// fastest level. Never traps: comparisons precede multiplication.
+    public func validationIssues() -> [String] {
+        var issues: [String] = []
+        if baseSpeedSubunitsPerSecond < 1 || baseSpeedSubunitsPerSecond > Self.maxBaseSpeedSubunitsPerSecond {
+            issues.append("base_speed_subunits_per_second must be 1…\(Self.maxBaseSpeedSubunitsPerSecond)")
+        }
+        if speedMultipliersPermille.count != 4 { issues.append("speed_multipliers_permille must have 4 entries") }
+        if enemySpeedMultipliersPermille.count != 9 { issues.append("enemy_speed_multipliers_permille must have 9 entries") }
+        let multipliers = speedMultipliersPermille + enemySpeedMultipliersPermille
+        if multipliers.contains(where: { $0 < 1 || $0 > Self.maxMultiplierPermille }) {
+            issues.append("speed multipliers must be 1…\(Self.maxMultiplierPermille) permille")
+        }
+        if turnBufferTicks < 0 || turnBufferTicks > Self.maxTicks { issues.append("turn_buffer_ticks must be 0…\(Self.maxTicks)") }
+        if alignmentAssistWindowSubunits < 0 || alignmentAssistWindowSubunits > SpatialUnits.subunitsPerCell {
+            issues.append("alignment_assist_window_subunits must be 0…\(SpatialUnits.subunitsPerCell)")
+        }
+        // Half the footprint minus one leaves at least a 2-subunit box.
+        if collisionInsetSubunits < 0 || collisionInsetSubunits >= SpatialUnits.standardTankFootprintSubunits / 2 {
+            issues.append("collision_inset_subunits must leave a collision box")
+        }
+        if issues.isEmpty, let fastest = multipliers.max() {
+            // Both factors are bounded above, so the product cannot overflow.
+            let perTick = baseSpeedSubunitsPerSecond * fastest / (1000 * Self.ticksPerSecond)
+            if perTick > SpatialUnits.maxPerTickDisplacementSubunits {
+                issues.append("fastest tank exceeds the per-tick displacement cap")
+            }
+        }
+        return issues
+    }
 }

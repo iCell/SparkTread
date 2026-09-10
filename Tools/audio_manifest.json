@@ -1,0 +1,218 @@
+{
+  "creative_decision": "owner, 2026-09-10: the game's sounds are to be the original \u51b3\u6218\u5766\u514b sounds; excerpts of the public recording are used wherever it holds an isolated instance (attribution 'excerpt'); the rest is synthesized and provisional (ADR-0011, accepted by the owner 2026-09-10)",
+  "extractor": "Tools/extract_reference_audio.py",
+  "extractor_sha256": "75cc81e4307783062866d0157fb1fb80fe4a398425ef171379aeecec41fc093e",
+  "files": {
+    "sfx_base_destroyed.wav": {
+      "attribution": "derived",
+      "milliseconds": 1150,
+      "sha256": "87ec7098f381cdee44a8dfe2aff5ddb842203994fab21b79b700d68beceb78cd"
+    },
+    "sfx_base_hit.wav": {
+      "attribution": "provisional",
+      "milliseconds": 440,
+      "sha256": "5993a88b6126557798ac6a3528438d0b154b5e44d6d652a55d48a9807f350cec"
+    },
+    "sfx_base_own_hit.wav": {
+      "attribution": "provisional",
+      "milliseconds": 200,
+      "sha256": "6376e7da9e387f8b6d35d74acdba96dd1aa21146fd3f3743274e043e3e6502d7"
+    },
+    "sfx_base_shield_on.wav": {
+      "attribution": "provisional",
+      "milliseconds": 320,
+      "sha256": "8aacbfaf2774d777906356092250935f6e53d430e8969976848aff190b32257b"
+    },
+    "sfx_deflect.wav": {
+      "attribution": "derived",
+      "milliseconds": 70,
+      "sha256": "e4a0fc7c9cdd91d7a694ded39506996c39fcd471804327d88c85f3777ab8fd97"
+    },
+    "sfx_dry_fire.wav": {
+      "attribution": "provisional",
+      "milliseconds": 35,
+      "sha256": "4a9ff00430167072fa07f60a94d2ef511ce6e7166f8342a099f335ae482890e6"
+    },
+    "sfx_explosion_blast.wav": {
+      "attribution": "provisional",
+      "milliseconds": 380,
+      "sha256": "6cd91f6d81ee3eec0822fb9967e7ca1e326ef7ee178313387634ab3492aa1346"
+    },
+    "sfx_fire_ap.wav": {
+      "attribution": "provisional",
+      "milliseconds": 380,
+      "sha256": "70e5e03d408ce2a2e651a2184a140a4ce22e58520e66bacb28a18c4047f87993"
+    },
+    "sfx_fire_explosion.wav": {
+      "attribution": "provisional",
+      "milliseconds": 210,
+      "sha256": "77705b0e8e0ea6356508e43287145b176b2f5eec65df07830359972627a4bd56"
+    },
+    "sfx_fire_flame.wav": {
+      "attribution": "provisional",
+      "milliseconds": 380,
+      "sha256": "812fbffa57f8bdd24a7dbe26c0b4bb4aa9cb780980fb45840075394b5bf5a815"
+    },
+    "sfx_fire_normal.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 340,
+      "note": "shot glide: isolated instance, silence before and after",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
+      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        185.29,
+        185.63
+      ]
+    },
+    "sfx_fire_rapid.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 340,
+      "note": "the same isolated shot instance; whether the reference has other launch sounds is not established",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
+      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        185.29,
+        185.63
+      ]
+    },
+    "sfx_fire_special.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 340,
+      "note": "the same isolated shot instance; whether the reference has other launch sounds is not established",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
+      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        185.29,
+        185.63
+      ]
+    },
+    "sfx_flame_loop.wav": {
+      "attribution": "provisional",
+      "milliseconds": 1200,
+      "sha256": "85d9f630ac68c5e657a91c4dabce10f0e80dd618ff50005752894903d8d9a2dd"
+    },
+    "sfx_hit_brick.wav": {
+      "attribution": "derived",
+      "milliseconds": 120,
+      "sha256": "a8a26c9ff65f5a9756d094c799c4ed244e7b66ae2caaa9894cda0a75d0483714"
+    },
+    "sfx_hit_steel.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 220,
+      "note": "click: isolated instance, assigned to steel/boundary",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/15 ms, peak 0.8",
+      "sha256": "059a9c7a15d33d86135c807d178a8aaaeaae2abe1193692340738e00625ef7a7",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        102.26,
+        102.48
+      ]
+    },
+    "sfx_hit_tank.wav": {
+      "attribution": "provisional",
+      "milliseconds": 130,
+      "sha256": "d912e51575fbbd59dde027ce5b1afefe229c5fa26b205a788551d2d55aacab6d"
+    },
+    "sfx_mine_place.wav": {
+      "attribution": "provisional",
+      "milliseconds": 140,
+      "sha256": "88ac31798c0bb05f9824243c888c3f9f2e3f322bb934d80b42e0e8c63610a28a"
+    },
+    "sfx_pickup_collect.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 740,
+      "note": "pickup jingle: isolated instance (cut before its repeat)",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/30 ms, peak 0.8",
+      "sha256": "4ee2832b298a0adaa577da971c0841c7422bc2a27e8f4e7596b615f8e151dadc",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        104.74,
+        105.48
+      ]
+    },
+    "sfx_pickup_spawn.wav": {
+      "attribution": "derived",
+      "milliseconds": 300,
+      "sha256": "46b16e7e8d5ab35f478d01b1e2bd749c50ab88b0348e6fcccd1d07b27c730e23"
+    },
+    "sfx_player_explode.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 800,
+      "note": "heavy explosion: isolated instance, silence before and after",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
+      "sha256": "959db6646d5995861b60eeefaaa44f92d03693c22c5abb80da08072fc65e4da2",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        100.2,
+        101.0
+      ]
+    },
+    "sfx_spawn_warp.wav": {
+      "attribution": "provisional",
+      "milliseconds": 160,
+      "sha256": "d7f84bd04591aa57ec81a51b60aa46171e5921e4957cda20b9b2d40726c2a489"
+    },
+    "sfx_stage_card.wav": {
+      "attribution": "inspired",
+      "inspiration": {
+        "modelled_on": "NES Battle City (Namco, 1985) stage-start jingle",
+        "reference": "https://www.youtube.com/watch?v=_vgaq3LmVak at 2.63-7.2 s (Tools/reference_measure/README.md, second reference)",
+        "relationship": "original composition following the reference's direction: same key/mode (C minor), tempo (~103 bpm), rhythmic skeleton, register, instrumentation and length; its own note sequences and contours; no note run of the reference reproduced; no audio of the reference used (owner's choice 2026-09-10 after declining a near-copy)",
+        "rights_note": "independence of every musical element is for the pending rights review, not asserted here"
+      },
+      "milliseconds": 4659,
+      "sha256": "8d52287b99162f78d9cc39a687be1f648c64918287f4014792bd040308ef59aa"
+    },
+    "sfx_stage_lose.wav": {
+      "attribution": "invented",
+      "milliseconds": 3602,
+      "sha256": "1be6d76938366473f8a84811ffb0ae6bbd39a540613edbbf6d47d2f46d23937d"
+    },
+    "sfx_stage_win.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 4200,
+      "note": "end-of-stage passage: the results-screen drum loop from its rise to the next card (continuous; faded)",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 5/60 ms, peak 0.8",
+      "sha256": "4a714a63573ed56e60f0e8f706484e782484c0412028a9a28d5eef6205561ebb",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        74.0,
+        78.2
+      ]
+    },
+    "sfx_tally_tick.wav": {
+      "attribution": "derived",
+      "milliseconds": 90,
+      "sha256": "e29e2f514b8ed5ebbd35d93a9682e9d7352d52951d025d8e03ba5e1c7ee525c8"
+    },
+    "sfx_tank_explode.wav": {
+      "attribution": "excerpt",
+      "milliseconds": 860,
+      "note": "enemy destroyed: the kill with the score roll (confirmed), isolated",
+      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
+      "sha256": "6e55539dc1fb3fa2db7b015664d9ee878e6a65fbe2a511834acf5545504589d5",
+      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
+      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
+      "window_seconds": [
+        21.86,
+        22.72
+      ]
+    }
+  },
+  "generator": "Tools/build_audio_assets.py",
+  "generator_sha256": "3679446f5a6e4b4105e1e0f545f3e0348541c55c2ce68ed816aa4d17e2fd3e1e",
+  "native_rate_hz": 8363,
+  "output_rate_hz": 22050,
+  "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",
+  "source": "measurements of the public reference gameplay recording BV14b411K7bv, 2026-09-10; procedure in Tools/reference_measure/"
+}

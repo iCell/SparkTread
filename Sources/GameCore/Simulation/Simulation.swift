@@ -11,7 +11,8 @@ public enum Simulation {
         _ world: inout WorldState,
         commands: [PlayerCommand],
         ruleset: MovementRuleset = .provisional,
-        weapons: WeaponRuleset = .provisional
+        weapons: WeaponRuleset = .provisional,
+        pickups: PickupRuleset = .provisional
     ) -> [DomainEvent] {
         var events: [DomainEvent] = []
 
@@ -50,10 +51,20 @@ public enum Simulation {
                 tank.statusEffects[status] = remaining > 1 ? remaining - 1 : nil
             }
         }
-        if var base = world.base, base.shieldRemainingTicks > 0 {
-            base.shieldRemainingTicks -= 1
-            if base.shieldRemainingTicks == 0 { events.append(.baseShieldChanged(active: false)) }
+        if var base = world.base {
+            if base.burnCooldownTicks > 0 { base.burnCooldownTicks -= 1 }
+            var expired = false
+            if base.shieldRemainingTicks > 0 {
+                base.shieldRemainingTicks -= 1
+                expired = base.shieldRemainingTicks == 0
+            }
             world.base = base
+            if expired {
+                events.append(.baseShieldChanged(active: false))
+                // Shovel expiry (§6.6, ADR-0010): the hardened fort ring is
+                // restored from the activation record, skipping occupied cells.
+                Stage.restoreBaseFortRing(&world, weapons: weapons, rules: pickups, events: &events)
+            }
         }
 
         // 3. AI intents from the pre-movement world query (EnemyBrain).
@@ -75,7 +86,10 @@ public enum Simulation {
         // 6–12. Combat (fire, spawning, advancement, collisions, pickups,
         // deaths — Stage handles pickups/deaths inside the combat pass).
         Combat.run(&world, firePressed: firePressed, aiFire: aiFire,
-                   movement: ruleset, weapons: weapons, events: &events)
+                   movement: ruleset, weapons: weapons, pickups: pickups, events: &events)
+
+        // 12b. Hidden treasures whose covering brick fell this tick (§11).
+        Stage.revealHiddenPickups(&world, rules: pickups, events: &events)
 
         // 13. EnemyDirector: telegraphs and finite spawns.
         Stage.runDirector(&world, events: &events)
@@ -293,8 +307,20 @@ public enum Simulation {
         distance: Int = 1
     ) -> Bool {
         let target = position + direction.vector * distance
+        if leavesArena(from: position, to: target, arena: field.terrain.arena) { return false }
         let box = sweptBox(from: position, to: target, ruleset: ruleset)
         return !field.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY)
+    }
+
+    /// Arena-boundary contract (R15-03): the NOMINAL footprint stays inside
+    /// the arena — the collision inset applies to obstacles only, so a tank
+    /// on an open edge (no solid border) cannot poke `inset` subunits past
+    /// the boundary and fail the world invariants.
+    private static func leavesArena(from: Vec2i, to: Vec2i, arena: ArenaSpecification) -> Bool {
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        let minX = min(from.x, to.x), minY = min(from.y, to.y)
+        let maxX = max(from.x, to.x) + footprint, maxY = max(from.y, to.y) + footprint
+        return minX < 0 || minY < 0 || maxX > arena.widthSubunits || maxY > arena.heightSubunits
     }
 
     /// A turn is only "collision-free" (§7.1) when the tank can actually
@@ -327,7 +353,8 @@ public enum Simulation {
             let mid = (lo + hi + 1) / 2
             let candidate = Vec2i(x: start.x + vector.x * mid, y: start.y + vector.y * mid)
             let box = sweptBox(from: start, to: candidate, ruleset: ruleset)
-            if field.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY) {
+            if leavesArena(from: start, to: candidate, arena: field.terrain.arena)
+                || field.blocksTank(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY) {
                 hi = mid - 1
             } else {
                 lo = mid

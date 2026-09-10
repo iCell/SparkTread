@@ -1,13 +1,18 @@
 import GameCore
 
-/// Builds an authoritative `WorldState` from a validated `StageDefinition`.
+/// Builds an authoritative `WorldState` from a `StageDefinition`.
 /// Pure: construction order is fixed so entity IDs (and thus checksums) are
-/// stable across loads. Validation is a separate concern (StageValidator);
-/// this assumes a valid definition and traps on gross schema errors.
+/// stable across loads. The definition is validated FIRST (R15-02): a
+/// rejected definition never reaches the allocation of its spawn queue —
+/// the validator's budget is what bounds that allocation.
 public enum StageBuilder {
-    public enum BuildError: Error, Equatable { case badTerrainKind(String), badSeed(String) }
+    public enum BuildError: Error, Equatable {
+        case badTerrainKind(String), badSeed(String), invalidDefinition([String])
+    }
 
-    public static func build(_ def: StageDefinition) throws -> WorldState {
+    public static func build(_ def: StageDefinition, rules: PickupRuleset = .provisional) throws -> WorldState {
+        let issues = StageValidator.validate(def)
+        guard issues.isEmpty else { throw BuildError.invalidDefinition(issues) }
         let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
 
@@ -58,6 +63,15 @@ public enum StageBuilder {
             }
         }
 
+        // Carrier assignments index into the interleaved queue.
+        var carriedQueue: [String?] = []
+        if let drops = def.carriedDrops, !drops.isEmpty {
+            carriedQueue = Array(repeating: nil, count: queue.count)
+            for drop in drops where drop.queueIndex >= 0 && drop.queueIndex < queue.count {
+                carriedQueue[drop.queueIndex] = drop.pickup
+            }
+        }
+
         world.stage = StageState(
             spawnQueue: queue,
             maxAliveEnemies: def.maxAliveEnemies,
@@ -66,12 +80,16 @@ public enum StageBuilder {
             telegraphTicks: def.telegraphTicks,
             playerRespawnCell: Vec2i(x: playerCell[0], y: playerCell[1]),
             dropTable: def.dropTable,
-            dropChancePercent: def.dropChancePercent)
+            dropChancePercent: def.dropChancePercent,
+            carriedPickupQueue: carriedQueue,
+            hiddenPickups: (def.hiddenPickups ?? []).map {
+                HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id)
+            })
 
         var events: [DomainEvent] = []
         for pickup in def.pickupSpawns {
             world.spawnStagePickup(pickup.id, nearCell: Vec2i(x: pickup.cell[0], y: pickup.cell[1]),
-                                   events: &events)
+                                   rules: rules, events: &events)
         }
         return world
     }

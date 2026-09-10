@@ -25,40 +25,44 @@ enum M1MovementGolden {
     static let tickCount = 1800
 
     /// Expected checksums at tick 60, 120, …, 1800.
-    /// Regenerated 2026-09-04: checksum surface gained TankState.shieldHP
-    /// (owner-directed shield resistance model). Movement behavior unchanged
-    /// from the wall-facing regeneration earlier the same day.
+    /// Regenerated 2026-09-09 (joint review, batch 1): checksum surface
+    /// gained BaseState.fortRingRestore / burnCooldownTicks (the lab fixture
+    /// carries a base) plus ProjectileState.hitTankIDs and
+    /// FireHazardState.ownerEntityID (absent from this movement-only run).
+    /// No projectile is ever fired here and movement code is untouched, so
+    /// only the checksum surface moved. Previous regeneration 2026-09-08
+    /// (reference drop channels).
     static let expectedChecksums: [UInt64] = [
-        17583284604056582623,
-        18260055849462118734,
-        561997548960210401,
-        9859516617248313513,
-        2224897988836858112,
-        5357791282718719940,
-        13313955160955747045,
-        12616633719743422206,
-        8524789971571172086,
-        9106615379872771189,
-        10534414606633079956,
-        5710980495297210003,
-        6128235380038150655,
-        28809721358555443,
-        10221229875546441799,
-        13237362225756583872,
-        854694205370897411,
-        1595406911242715709,
-        14895657903944733730,
-        8742550020181042875,
-        2505124702762091975,
-        4706214844332087070,
-        7756826004472930666,
-        5000091183190978182,
-        3498766808486158130,
-        11935128787726118832,
-        8485643959421577430,
-        4668294445692285056,
-        2995929039876339876,
-        15415659199873484909,
+        6508903943244204425,
+        16864347844189187712,
+        13210481412500585027,
+        3860192783540104939,
+        7638081656561312586,
+        10799961910510879262,
+        13150152850379409975,
+        4664461216949394160,
+        13889321090074331720,
+        7837395418827238279,
+        7161482697113056814,
+        9468835705284178733,
+        6538002491864687913,
+        11917242649273594829,
+        10704438917131669777,
+        11239148211524507146,
+        4905692039835354525,
+        17541632555893126447,
+        16952540740029952228,
+        9121229674845828085,
+        17558946178542102673,
+        1674773680863539984,
+        5401361521211181068,
+        14164405916821171800,
+        16375042646932094196,
+        9781398832051472826,
+        2483302849247394088,
+        8010083759241252042,
+        14528596449182028030,
+        18240655918099470687,
     ]
 }
 
@@ -76,9 +80,9 @@ enum M1MovementGolden {
         #expect(recording.checksums.map(\.checksum) == M1MovementGolden.expectedChecksums)
     }
 
-    @Test func replayReproducesTheRecording() {
+    @Test func replayReproducesTheRecording() throws {
         let recording = recordRun()
-        let replayed = ReplayPlayer.replay(recording, ticks: M1MovementGolden.tickCount)
+        let replayed = try ReplayPlayer.replay(recording, ticks: M1MovementGolden.tickCount)
         #expect(replayed == recording.checksums)
     }
 }

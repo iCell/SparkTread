@@ -80,6 +80,7 @@ extension WorldState {
             }
             for (k, v) in t.activeProjectileCounts.sorted(by: { $0.key < $1.key }) { c.mix(k); c.mix(v) }
             c.mix(t.spawnProtectionTicks)
+            c.mix(t.carriedPickupID ?? "")
         }
         c.mix(projectiles.count)
         for p in projectiles { // sorted by entityID
@@ -88,6 +89,8 @@ extension WorldState {
             c.mix(p.positionSubunits.x); c.mix(p.positionSubunits.y)
             c.mix(p.direction.rawValue); c.mix(p.speedSubunitsPerTick)
             c.mix(p.lifetimeRemainingTicks); c.mix(p.penetrationRemaining); c.mix(p.durability)
+            c.mix(p.hitTankIDs.count)
+            for id in p.hitTankIDs { c.mix(id) }
         }
         c.mix(mines.count)
         for m in mines {
@@ -99,7 +102,7 @@ extension WorldState {
         }
         c.mix(fireHazards.count)
         for h in fireHazards {
-            c.mix(h.entityID); c.mix(h.ownerPlayerID?.rawValue); c.mix(h.teamID)
+            c.mix(h.entityID); c.mix(h.ownerEntityID); c.mix(h.ownerPlayerID?.rawValue); c.mix(h.teamID)
             c.mix(h.filter.rawValue)
             c.mix(h.positionSubunits.x); c.mix(h.positionSubunits.y)
             c.mix(h.lifetimeRemainingTicks); c.mix(h.damagePerTouch)
@@ -108,6 +111,9 @@ extension WorldState {
             c.mix(base.teamID)
             c.mix(base.topLeftSubunits.x); c.mix(base.topLeftSubunits.y)
             c.mix(base.durability); c.mix(base.maxDurability); c.mix(base.shieldRemainingTicks)
+            c.mix(base.fortRingRestore.count)
+            for kind in base.fortRingRestore { c.mix(kind.rawValue) }
+            c.mix(base.burnCooldownTicks)
         } else {
             c.mix(-1)
         }
@@ -122,6 +128,7 @@ extension WorldState {
             c.mix(t.entityID); c.mix(t.archetypeID); c.mix(t.spawnPointIndex)
             c.mix(t.positionSubunits.x); c.mix(t.positionSubunits.y)
             c.mix(t.ticksRemaining); c.mix(t.deferTicks)
+            c.mix(t.carriedPickupID ?? "")
         }
         if let stage {
             c.mix(stage.phase.rawValue)
@@ -133,6 +140,10 @@ extension WorldState {
             c.mix(stage.playerRespawnCell.x); c.mix(stage.playerRespawnCell.y)
             for id in stage.dropTable { c.mix(id) }
             c.mix(stage.dropChancePercent)
+            c.mix(stage.carriedPickupQueue.count)
+            for id in stage.carriedPickupQueue { c.mix(id ?? "") }
+            c.mix(stage.hiddenPickups.count)
+            for h in stage.hiddenPickups { c.mix(h.cell.x); c.mix(h.cell.y); c.mix(h.pickupID) }
         } else {
             c.mix(-1)
         }
