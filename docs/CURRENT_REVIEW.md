@@ -651,5 +651,6 @@ Do not interpret green tests as product completion:
 - Reachability validation is a cell flood approximation.
 - Owner decisions: none open after 2026-09-10 late evening (invincibility
   A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
-  icons). The owner still has to look at the redesigned panel on the
-  device.
+  icons; the designed outro and the centred card accepted on the device).
+  M3's slice is complete at the owner's acceptance level; M4 (plan §19)
+  is the next milestone and has not started.
