@@ -18,6 +18,10 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         public let checksum: UInt64
     }
 
+    /// Format 6 (2026-09-10, ADR-0016): traversal profiles (water needs
+    /// AmphiTank), ice inertia, mine launch/flight and the post-landing
+    /// slow change movement and combat for the same inputs; the rulesets
+    /// gained their tunables.
     /// Format 5 (2026-09-10, ADR-0015): the enemy brain reads its cadence,
     /// focus, fire windows and mine roll from `StageState.enemyBehavior`
     /// (the mine roll draws differently), the director runs authored
@@ -39,7 +43,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 5
+    public static let currentFormatVersion = 6
 
     public let formatVersion: Int
     /// Campaign header (ADR-0013): the stage this recording plays and the

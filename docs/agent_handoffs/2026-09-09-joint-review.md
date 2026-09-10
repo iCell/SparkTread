@@ -63,7 +63,7 @@ sh Scripts/check-audio.sh selftest   # corruption / builder-refusal cases on tem
 sh Scripts/check-audio.sh       # synthesized WAVs == generator; excerpts' hashes + extractor hash == manifest (re-extracted and metadata-compared if SPARKTREAD_REFERENCE_WAV is set)
 sh Scripts/smoke-render.sh selftest   # classifier + failure-path checks, no simulator
 sh Scripts/smoke-render.sh      # simulator: the SKView actually presents the PLAYFIELD (terrain occupancy, stage + lab); needs ffmpeg
-swift test                      # 2026-09-10 evening after ADR-0012: 258 tests / 63 suites (Claude's run; PI was unavailable)
+swift test                      # 2026-09-10 late evening after M4 items 1–5: 319 tests / 80 suites (Claude's run; PI was unavailable)
 xcodegen generate && xcodebuild test -project SparkTread.xcodeproj -scheme SparkTread \
   -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/DerivedData
 python3 Tools/build_audio_assets.py   # regenerates the SYNTHESIZED voices and their manifest entries; originals are untouched
@@ -159,7 +159,17 @@ environments or caches.
    during the outro (`controller.hud.score` vs the world's score).
 2. When PI is back (usage limit, ≈5 days from 2026-09-10): hand it
    rounds 28+ — the jingle revision, the owner's decisions, ADR-0012,
-   the icons/panel and the stinger removal — for its own probes.
+   the icons/panel, the stinger removal, and the whole M4 batch
+   (ADR-0013…0016: campaign, screen flow, persistence, difficulty and
+   director phases, traversal/ice/foliage/mine launch) for its own
+   probes; none of it has a second reviewer yet.
+3. Owner: the ADR-0013…0016 questions (post-win auto-advance vs a
+   choice, a continue after game over, the difficulty and launch
+   numbers, foliage AI perception) — all implemented with provisional
+   defaults under the "自由发挥" delegation.
+4. M4 remainder: settings/accessibility/controller options (item 6),
+   the external playtest build, the final visual language, performance
+   and export targets, a PLAYED three-stage golden replay.
 3. Physical-device pass (ADR-0006 gate): legibility, touch occlusion, HUD
    fit, audio mix; large-results-panel layout.
 4. M4 work per plan §19 (VS-02/VS-03, traversal, difficulty, lifecycle

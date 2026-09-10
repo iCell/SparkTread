@@ -25,6 +25,14 @@ enum M1MovementGolden {
     static let tickCount = 1800
 
     /// Expected checksums at tick 60, 120, …, 1800.
+    /// Regenerated 2026-09-10 (ADR-0016, M4 item 5): the lab fixture's ice
+    /// patch (cells x 4–8, y 21–24) now SLIDES the tank — this script drives
+    /// down through it and turns right at tick 240, which converts the
+    /// remaining momentum into a 1.5-cell slide before the turn takes the
+    /// tank on; the checksum surface also gained TankState.landingSubunits
+    /// (nil here) and the rulesets' ice/slow/launch tunables. Movement off
+    /// the ice is unchanged; the first checksums that move are the ones
+    /// after the turn.
     /// Regenerated 2026-09-09 (joint review, batch 1): checksum surface
     /// gained BaseState.fortRingRestore / burnCooldownTicks (the lab fixture
     /// carries a base) plus ProjectileState.hitTankIDs and
@@ -33,36 +41,36 @@ enum M1MovementGolden {
     /// only the checksum surface moved. Previous regeneration 2026-09-08
     /// (reference drop channels).
     static let expectedChecksums: [UInt64] = [
-        6508903943244204425,
-        16864347844189187712,
-        13210481412500585027,
-        3860192783540104939,
-        7638081656561312586,
-        10799961910510879262,
-        13150152850379409975,
-        4664461216949394160,
-        13889321090074331720,
-        7837395418827238279,
-        7161482697113056814,
-        9468835705284178733,
-        6538002491864687913,
-        11917242649273594829,
-        10704438917131669777,
-        11239148211524507146,
-        4905692039835354525,
-        17541632555893126447,
-        16952540740029952228,
-        9121229674845828085,
-        17558946178542102673,
-        1674773680863539984,
-        5401361521211181068,
-        14164405916821171800,
-        16375042646932094196,
-        9781398832051472826,
-        2483302849247394088,
-        8010083759241252042,
-        14528596449182028030,
-        18240655918099470687,
+        5668269986311696585,
+        11100556701688470720,
+        17280348166696732739,
+        17281319969935509867,
+        12120924855084471946,
+        1790670045228110430,
+        558921934199204281,
+        9087147459684298042,
+        16919115778607916744,
+        17147599900235775239,
+        10507608599644819118,
+        6346874872467267885,
+        4726769161074256617,
+        598545145388091085,
+        1297414567329749713,
+        7078062044781086538,
+        2736099874078328925,
+        17510131009610234863,
+        1004799034346523172,
+        12581458991700484661,
+        7858390716014186065,
+        2788312973125963664,
+        16124508951822854156,
+        3937182598834009240,
+        2043568356382216692,
+        13247686546510162362,
+        13223891259454147112,
+        11292669235816487434,
+        12884807697727415230,
+        6034940492331759839,
     ]
 }
 

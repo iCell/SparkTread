@@ -30,6 +30,13 @@ final class MovementLabScene: SKScene {
     /// Liquid tiles keyed by cell index; re-tiled every frame from the
     /// live terrain so melting ice heals edges automatically.
     private var liquidNodes: [Int: (node: SKSpriteNode, kind: String)] = [:]
+    /// Foliage overlay per cell (plan §7.3 "occludes tanks/projectiles
+    /// visually"; ADR-0016): above tanks, below mines and projectiles so
+    /// ordnance stays readable (§12.3); cells over the player's footprint
+    /// fade so the player stays readable (vendor guidance).
+    private var foliageNodes: [Int: SKSpriteNode] = [:]
+    static let foliageZPosition: CGFloat = 520
+    static let foliageFadedAlpha: CGFloat = 0.45
     private var layout: ArenaLayout?
 
     // Dynamic mirrors keyed by entity ID.
@@ -111,6 +118,7 @@ final class MovementLabScene: SKScene {
         debugLabel = nil; collisionBox = nil
         curtainTiles.removeAll(); curtainStep = .some(nil)
         coverTiles.removeAll(); coverStep = .some(nil)
+        foliageNodes.removeAll()
         let world = controller.session.world
         wasShielded = (world.base?.shieldRemainingTicks ?? 0) > 0
         shieldActivatedTick = nil
@@ -149,6 +157,8 @@ final class MovementLabScene: SKScene {
         guard let art else { return }
         syncTanks(art, world: world)
         syncBase(art, world: world)
+        animateLiquids(art, world: world)
+        animateFoliage(art, world: world)
     }
 
     /// Test seam: one presentation frame of `elapsed` seconds — drains the
@@ -224,6 +234,59 @@ final class MovementLabScene: SKScene {
         } else if let existing = liquidNodes.removeValue(forKey: key) {
             existing.node.removeFromParent()
         }
+        if kind == .foliage {
+            if foliageNodes[key] == nil, let n = try? art.sprite("px_foliage_000_0", scale: artScale) {
+                n.position = cellCenter(x: cellX, y: cellY)
+                n.zPosition = Self.foliageZPosition
+                addChild(n)
+                foliageNodes[key] = n
+            }
+        } else if let existing = foliageNodes.removeValue(forKey: key) {
+            existing.removeFromParent()
+        }
+    }
+
+    /// Per-frame foliage pass: the 8-neighbour joint mask and a slow frame
+    /// cycle, and the local fade over the player's footprint.
+    private func animateFoliage(_ art: PixelArt, world: WorldState) {
+        guard !foliageNodes.isEmpty else { return }
+        let frame = (world.tick / 20) % 3
+        let width = world.arena.cellsWide
+        let cell = SpatialUnits.subunitsPerCell, footprint = SpatialUnits.standardTankFootprintSubunits
+        // The mirrored world's own player (not the controller's): the scene
+        // draws what it is handed, as every other mirror here does.
+        let player = world.player(.one)?.tankEntityID.flatMap { world.tank(entityID: $0) }
+        for (key, node) in foliageNodes {
+            let cx = key % width, cy = key / width
+            guard world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .foliage else {
+                node.removeFromParent()
+                foliageNodes[key] = nil
+                continue
+            }
+            var mask = 0
+            let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
+                           (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
+            for (bit, dx, dy) in offsets
+            where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy)
+                && world.terrain[cx + dx, cy + dy].kind == .foliage { mask |= bit }
+            for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
+            where mask & a == 0 || mask & b == 0 { mask &= ~diag }
+            if let texture = try? art.texture(String(format: "px_foliage_%03d_%d", mask, frame)) {
+                node.texture = texture
+            }
+            var faded = false
+            if let player {
+                let p = player.positionSubunits
+                faded = cx * cell < p.x + footprint && (cx + 1) * cell > p.x
+                    && cy * cell < p.y + footprint && (cy + 1) * cell > p.y
+            }
+            node.alpha = faded ? Self.foliageFadedAlpha : 1
+        }
+    }
+
+    /// Test seam: the foliage node of a cell and its alpha.
+    func foliageNodeForTests(cellX: Int, cellY: Int, world: WorldState) -> SKSpriteNode? {
+        foliageNodes[cellY * world.arena.cellsWide + cellX]
     }
 
     func refreshWallTexture(_ art: PixelArt, world: WorldState, cellX: Int, cellY: Int) {
@@ -320,6 +383,7 @@ final class MovementLabScene: SKScene {
         syncCover(world: world)
         processEvents(art, world: world)
         animateLiquids(art, world: world)
+        animateFoliage(art, world: world)
         updateDebugOverlay(world: world)
     }
 
@@ -889,6 +953,20 @@ final class MovementLabScene: SKScene {
                     let state = max(0, min(3, (world.base?.maxDurability ?? 3) - remaining))
                     flashBase(art, allied: allied, damageState: state)
                     spawnEffect(art, kind: .baseHit, at: baseNode.position, scale: 1.0, z: 690)
+                }
+            case .tankLaunched(let entityID, _, _, _):
+                // Mine launch (§8.6): the tank lifts (scale) for its flight; the
+                // landing resets it. SKActions park with the scene on pause.
+                if let node = tankNodes[entityID] {
+                    node.removeAction(forKey: "flight")
+                    let up = SKAction.scale(to: 1.35, duration: 0.18)
+                    let down = SKAction.scale(to: 1.0, duration: 0.22)
+                    node.run(SKAction.sequence([up, down]), withKey: "flight")
+                }
+            case .tankLanded(let entityID, _, _):
+                if let node = tankNodes[entityID] {
+                    node.removeAction(forKey: "flight")
+                    node.setScale(1)
                 }
             case .tankSpawned(_, let owner, let position, _) where owner != nil:
                 spawnEffect(art, kind: .spawnComplete, at: centerPoint(position, size: footprint))

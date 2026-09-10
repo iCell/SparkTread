@@ -73,6 +73,13 @@ public enum WorldInvariants {
                 issues.append("tank \(id) outside arena bounds at (\(p.x),\(p.y))")
             }
             if tank.maxArmor < 1 || tank.maxArmor > maxArmor { issues.append("tank \(id) max armor \(tank.maxArmor) out of domain") }
+            if let landing = tank.landingSubunits,
+               landing.x < 0 || landing.y < 0 || landing.x > width - footprint || landing.y > height - footprint {
+                issues.append("tank \(id) landing target outside arena bounds")
+            }
+            if (tank.landingSubunits == nil) != (tank.statusEffects["airborne"] == nil) {
+                issues.append("tank \(id) airborne status and landing target disagree")
+            }
             if tank.shieldHP > maxArmor { issues.append("tank \(id) shield out of domain") }
             ticks(tank.bufferedDirectionRemainingTicks, "tank \(id) buffer ticks")
             ticks(tank.spawnProtectionTicks, "tank \(id) spawn protection")

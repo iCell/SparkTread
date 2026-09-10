@@ -81,6 +81,7 @@ extension WorldState {
             for (k, v) in t.activeProjectileCounts.sorted(by: { $0.key < $1.key }) { c.mix(k); c.mix(v) }
             c.mix(t.spawnProtectionTicks)
             c.mix(t.carriedPickupID ?? "")
+            c.mix(t.landingSubunits?.x); c.mix(t.landingSubunits?.y)
         }
         c.mix(projectiles.count)
         for p in projectiles { // sorted by entityID

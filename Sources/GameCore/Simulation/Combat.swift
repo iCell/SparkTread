@@ -61,10 +61,12 @@ enum Combat {
         var destroyedProjectiles = Set<Int>()
         resolveContacts(&world, motions: motions, weapons: weapons,
                         explosions: &explosionQueue, destroyed: &destroyedProjectiles, events: &events)
-        resolveMineTriggers(&world, weapons: weapons, explosions: &explosionQueue, events: &events)
+        var launches: [(tankID: Int, level: Int)] = []
+        resolveMineTriggers(&world, weapons: weapons, explosions: &explosionQueue, launches: &launches, events: &events)
         resolveFireHazardDamage(&world, weapons: weapons, events: &events)
         resolveExplosions(&world, queue: explosionQueue, weapons: weapons,
                           destroyedProjectiles: &destroyedProjectiles, events: &events)
+        applyMineLaunches(&world, launches: launches, weapons: weapons, events: &events)
 
         // Lifetime expiry: explosion-family projectiles detonate; others
         // fade. Expiry goes through the same exactly-once removal path as an
@@ -113,7 +115,7 @@ enum Combat {
         var spawned = Set<Int>()
         for index in world.tanks.indices {
             let tank = world.tanks[index]
-            guard isAlive(tank) else { continue }
+            guard isAlive(tank), tank.statusEffects["airborne"] == nil else { continue } // no fire in flight
             // External commands for player tanks, internal intents for AI.
             let pressed: (normal: Bool, special: Bool)
             if let owner = tank.ownerPlayerID {
@@ -757,6 +759,7 @@ enum Combat {
         let footprint = SpatialUnits.standardTankFootprintSubunits
         for tank in world.tanks
         where tank.teamID != projectile.teamID && isAlive(tank)
+            && tank.statusEffects["airborne"] == nil // in flight: untargetable (§8.6)
             && !projectile.hitTankIDs.contains(tank.entityID) {
             let p = tank.positionSubunits
             if let t = boxEntry(from: from, vector: vector, remaining: remaining, half: half,
@@ -989,14 +992,16 @@ enum Combat {
 
     private static func resolveMineTriggers(
         _ world: inout WorldState, weapons: WeaponRuleset,
-        explosions: inout [Explosion], events: inout [DomainEvent]
+        explosions: inout [Explosion], launches: inout [(tankID: Int, level: Int)], events: inout [DomainEvent]
     ) {
         guard let mineWeapon = weapons.weapon("mine") else { return }
         let footprint = SpatialUnits.standardTankFootprintSubunits
         var triggered: [Int] = []
+        var triggeringTank: [Int: Int] = [:] // mine → the tank that set it off
         var removedByMoon: [Int] = []
         for mine in world.mines where mine.phase == .armed {
-            for tank in world.tanks where tank.teamID != mine.teamID && isAlive(tank) {
+            for tank in world.tanks where tank.teamID != mine.teamID && isAlive(tank)
+                && tank.statusEffects["airborne"] == nil {
                 let p = tank.positionSubunits
                 // ShieldOfMoon sweeps enemy level-0 mines on contact (§8.6).
                 if tank.equipmentID == "shield_of_moon" && mine.level == 0 {
@@ -1016,6 +1021,7 @@ enum Combat {
                 let r = mine.triggerRadiusSubunits
                 if dx * dx + dy * dy <= r * r {
                     triggered.append(mine.entityID)
+                    triggeringTank[mine.entityID] = tank.entityID
                     break
                 }
             }
@@ -1033,7 +1039,51 @@ enum Combat {
                 decrementActiveCount(&world, ownerEntityID: mine.ownerEntityID, weaponID: "mine")
                 events.append(.mineTriggered(entityID: id, position: mine.positionSubunits))
                 explosions.append(Explosion(fromMine: mine, weapon: mineWeapon))
+                if let tankID = triggeringTank[id] { launches.append((tankID, mine.level)) }
             }
+        }
+    }
+
+    /// Mine launch/flight (§8.6, ADR-0016), applied after the blast: a
+    /// triggering tank that survived (or deflected) the blast and does not
+    /// carry Memory of Sea is thrown along its travel direction (its
+    /// movement intent, else its facing) by the level's distance and goes
+    /// airborne for the level's ticks; it lands when the status expires
+    /// (Simulation step 2). Level 0 and a disabled ruleset launch nothing.
+    private static func applyMineLaunches(
+        _ world: inout WorldState, launches: [(tankID: Int, level: Int)], weapons: WeaponRuleset,
+        events: inout [DomainEvent]
+    ) {
+        guard weapons.mineLaunchEnabled else { return }
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        for (tankID, level) in launches.sorted(by: { $0.tankID < $1.tankID }) {
+            guard let index = world.tanks.firstIndex(where: { $0.entityID == tankID }) else { continue }
+            var tank = world.tanks[index]
+            guard isAlive(tank), tank.statusEffects["airborne"] == nil,
+                  tank.equipmentID != "memory_of_sea" else { continue }
+            let clamped = max(0, min(3, level))
+            let distance = weapons.mineLaunchDistanceSubunits[clamped]
+            let ticks = weapons.mineAirborneTicks[clamped]
+            guard distance > 0, ticks > 0 else { continue }
+            let direction = tank.movementIntent ?? tank.facing
+            let from = tank.positionSubunits
+            let nominal = from + direction.vector * distance
+            let target = Vec2i(x: max(0, min(world.arena.widthSubunits - footprint, nominal.x)),
+                               y: max(0, min(world.arena.heightSubunits - footprint, nominal.y)))
+            tank.statusEffects["airborne"] = ticks
+            // The slow (§8.6) is one status set now: it has no effect while
+            // airborne (no movement) and runs on for the level's ticks
+            // after landing — no extra state to carry into the landing.
+            let slow = weapons.mineSlowTicks[clamped]
+            if slow > 0 { tank.statusEffects["slowed"] = ticks + slow }
+            tank.landingSubunits = target
+            tank.movementIntent = nil
+            tank.bufferedDirection = nil
+            tank.bufferedDirectionRemainingTicks = 0
+            tank.slideDirection = nil
+            tank.slideMomentumSubunits = 0
+            world.tanks[index] = tank
+            events.append(.tankLaunched(entityID: tankID, ownerPlayerID: tank.ownerPlayerID, from: from, to: target))
         }
     }
 
@@ -1052,7 +1102,7 @@ enum Combat {
                 case .alliedOnly: if tank.teamID != hazard.teamID { continue }
                 case .enemyOnly: if tank.teamID == hazard.teamID { continue }
                 }
-                guard isAlive(tank), !isProtected(tank) else { continue }
+                guard isAlive(tank), !isProtected(tank), tank.statusEffects["airborne"] == nil else { continue }
                 // One burn cadence per TANK across all patches: overlapping
                 // flames never multiply damage (documented; status timer is
                 // authoritative state and decrements in step 2).
@@ -1120,7 +1170,8 @@ enum Combat {
 
         // Tanks: enemy only (allied damage disabled, D-010); protection
         // deflects inside applyTankDamage.
-        for i in world.tanks.indices where world.tanks[i].teamID != explosion.teamID {
+        for i in world.tanks.indices where world.tanks[i].teamID != explosion.teamID
+            && world.tanks[i].statusEffects["airborne"] == nil {
             let p = world.tanks[i].positionSubunits
             if circleTouchesBox(p.x, p.y, p.x + footprint, p.y + footprint) {
                 applyTankDamage(&world, tankIndex: i, damage: explosion.tankDamage,

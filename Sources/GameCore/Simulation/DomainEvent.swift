@@ -38,6 +38,11 @@ public enum DomainEvent: Codable, Equatable, Sendable {
                      sourceWeaponID: String, position: Vec2i)
     case tankShieldHit(entityID: Int, ownerPlayerID: PlayerID?, remaining: Int, position: Vec2i)
     case tankDestroyed(entityID: Int, ownerPlayerID: PlayerID?, position: Vec2i)
+    /// Mine launch (§8.6): the tank left the ground at `from` heading for
+    /// `to` (nominal landing point); it is suspended from all interactions
+    /// until `tankLanded`.
+    case tankLaunched(entityID: Int, ownerPlayerID: PlayerID?, from: Vec2i, to: Vec2i)
+    case tankLanded(entityID: Int, ownerPlayerID: PlayerID?, position: Vec2i)
     case minePlaced(entityID: Int, ownerPlayerID: PlayerID?, level: Int, position: Vec2i)
     case mineTriggered(entityID: Int, position: Vec2i)
     /// A mine removed without detonating (disarmed by a shot, swept by

@@ -91,6 +91,56 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
     public var chainDetonationWaveCap: Int
     /// Difficulty-scoped allied base damage (ADR-0005); Standard default.
     public var alliedBaseDamage: Bool
+    /// Mine launch/flight (§8.6, ADR-0016), per mine level 0…3: how far
+    /// the triggering tank is thrown along its travel direction, how long
+    /// it stays airborne (uncontrollable, untargetable, suspended from all
+    /// interactions), and how long it is slowed after landing. Level 0
+    /// launches nothing. `mineLaunchEnabled` disables the whole effect.
+    public var mineLaunchDistanceSubunits: [Int]
+    public var mineAirborneTicks: [Int]
+    public var mineSlowTicks: [Int]
+    public var mineLaunchEnabled: Bool
+
+    public init(weapons: [WeaponDefinition], projectileHalfExtentSubunits: Int, mineHalfExtentSubunits: Int,
+                mineArmingTicks: Int, fireDamageIntervalTicks: Int, chainDetonationWaveCap: Int,
+                alliedBaseDamage: Bool,
+                mineLaunchDistanceSubunits: [Int] = [0, 1024, 1536, 2048],
+                mineAirborneTicks: [Int] = [0, 18, 24, 30],
+                mineSlowTicks: [Int] = [0, 60, 90, 120],
+                mineLaunchEnabled: Bool = true) {
+        self.weapons = weapons
+        self.projectileHalfExtentSubunits = projectileHalfExtentSubunits
+        self.mineHalfExtentSubunits = mineHalfExtentSubunits
+        self.mineArmingTicks = mineArmingTicks
+        self.fireDamageIntervalTicks = fireDamageIntervalTicks
+        self.chainDetonationWaveCap = chainDetonationWaveCap
+        self.alliedBaseDamage = alliedBaseDamage
+        self.mineLaunchDistanceSubunits = mineLaunchDistanceSubunits
+        self.mineAirborneTicks = mineAirborneTicks
+        self.mineSlowTicks = mineSlowTicks
+        self.mineLaunchEnabled = mineLaunchEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case weapons, projectileHalfExtentSubunits, mineHalfExtentSubunits, mineArmingTicks
+        case fireDamageIntervalTicks, chainDetonationWaveCap, alliedBaseDamage
+        case mineLaunchDistanceSubunits, mineAirborneTicks, mineSlowTicks, mineLaunchEnabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        weapons = try c.decode([WeaponDefinition].self, forKey: .weapons)
+        projectileHalfExtentSubunits = try c.decode(Int.self, forKey: .projectileHalfExtentSubunits)
+        mineHalfExtentSubunits = try c.decode(Int.self, forKey: .mineHalfExtentSubunits)
+        mineArmingTicks = try c.decode(Int.self, forKey: .mineArmingTicks)
+        fireDamageIntervalTicks = try c.decode(Int.self, forKey: .fireDamageIntervalTicks)
+        chainDetonationWaveCap = try c.decode(Int.self, forKey: .chainDetonationWaveCap)
+        alliedBaseDamage = try c.decode(Bool.self, forKey: .alliedBaseDamage)
+        mineLaunchDistanceSubunits = try c.decodeIfPresent([Int].self, forKey: .mineLaunchDistanceSubunits) ?? [0, 1024, 1536, 2048]
+        mineAirborneTicks = try c.decodeIfPresent([Int].self, forKey: .mineAirborneTicks) ?? [0, 18, 24, 30]
+        mineSlowTicks = try c.decodeIfPresent([Int].self, forKey: .mineSlowTicks) ?? [0, 60, 90, 120]
+        mineLaunchEnabled = try c.decodeIfPresent(Bool.self, forKey: .mineLaunchEnabled) ?? true
+    }
 
     public func weapon(_ id: String) -> WeaponDefinition? {
         weapons.first { $0.id == id }
@@ -114,6 +164,19 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
             issues.append("fire_damage_interval_ticks must be 1…\(WeaponDefinition.maxTicks)")
         }
         if chainDetonationWaveCap < 1 || chainDetonationWaveCap > 64 { issues.append("chain_detonation_wave_cap must be 1…64") }
+        for (name, values) in [("mine_launch_distance_subunits", mineLaunchDistanceSubunits),
+                               ("mine_airborne_ticks", mineAirborneTicks), ("mine_slow_ticks", mineSlowTicks)] {
+            if values.count != 4 { issues.append("\(name) must have 4 entries") }
+        }
+        if mineLaunchDistanceSubunits.contains(where: { $0 < 0 || $0 > 8 * SpatialUnits.subunitsPerCell }) {
+            issues.append("mine_launch_distance_subunits must be 0…\(8 * SpatialUnits.subunitsPerCell)")
+        }
+        if (mineAirborneTicks + mineSlowTicks).contains(where: { $0 < 0 || $0 > WeaponDefinition.maxTicks }) {
+            issues.append("mine airborne/slow ticks must be 0…\(WeaponDefinition.maxTicks)")
+        }
+        if mineLaunchEnabled, zip(mineLaunchDistanceSubunits, mineAirborneTicks).contains(where: { $0 > 0 && $1 == 0 }) {
+            issues.append("a launch distance needs airborne ticks")
+        }
         return issues
     }
 

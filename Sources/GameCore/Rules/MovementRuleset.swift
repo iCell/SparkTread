@@ -30,19 +30,49 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
 
     /// Collision inset per side of the nominal 2048×2048 footprint (§6.1).
     public var collisionInsetSubunits: Int
+    /// Ice inertia (§7.3, ADR-0016): the distance a tank keeps sliding in
+    /// its last travel direction when it releases or changes direction
+    /// with its centre on ice (0 disables sliding); AntiSkid never slides.
+    public var iceSlideDistanceSubunits: Int
+    /// Mine launch slow (§8.6): movement speed percent while "slowed".
+    public var slowedSpeedPercent: Int
 
     public init(baseSpeedSubunitsPerSecond: Int = 2880,
                 speedMultipliersPermille: [Int] = [1000, 1260, 1588, 2000],
                 enemySpeedMultipliersPermille: [Int] = [150, 216, 300, 432, 600, 864, 1200, 1728, 2400],
                 turnBufferTicks: Int = 10,
                 alignmentAssistWindowSubunits: Int = 512,
-                collisionInsetSubunits: Int = 64) {
+                collisionInsetSubunits: Int = 64,
+                iceSlideDistanceSubunits: Int = 1536,
+                slowedSpeedPercent: Int = 50) {
         self.baseSpeedSubunitsPerSecond = baseSpeedSubunitsPerSecond
         self.speedMultipliersPermille = speedMultipliersPermille
         self.enemySpeedMultipliersPermille = enemySpeedMultipliersPermille
         self.turnBufferTicks = turnBufferTicks
         self.alignmentAssistWindowSubunits = alignmentAssistWindowSubunits
         self.collisionInsetSubunits = collisionInsetSubunits
+        self.iceSlideDistanceSubunits = iceSlideDistanceSubunits
+        self.slowedSpeedPercent = slowedSpeedPercent
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case baseSpeedSubunitsPerSecond, speedMultipliersPermille, enemySpeedMultipliersPermille
+        case turnBufferTicks, alignmentAssistWindowSubunits, collisionInsetSubunits
+        case iceSlideDistanceSubunits, slowedSpeedPercent
+    }
+
+    /// Rules recorded before the ice/slow fields existed decode with the
+    /// defaults (the replay format bump already separates them).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        baseSpeedSubunitsPerSecond = try c.decode(Int.self, forKey: .baseSpeedSubunitsPerSecond)
+        speedMultipliersPermille = try c.decode([Int].self, forKey: .speedMultipliersPermille)
+        enemySpeedMultipliersPermille = try c.decode([Int].self, forKey: .enemySpeedMultipliersPermille)
+        turnBufferTicks = try c.decode(Int.self, forKey: .turnBufferTicks)
+        alignmentAssistWindowSubunits = try c.decode(Int.self, forKey: .alignmentAssistWindowSubunits)
+        collisionInsetSubunits = try c.decode(Int.self, forKey: .collisionInsetSubunits)
+        iceSlideDistanceSubunits = try c.decodeIfPresent(Int.self, forKey: .iceSlideDistanceSubunits) ?? 1536
+        slowedSpeedPercent = try c.decodeIfPresent(Int.self, forKey: .slowedSpeedPercent) ?? 50
     }
 
     public static let provisional = MovementRuleset()
@@ -92,6 +122,10 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
         if collisionInsetSubunits < 0 || collisionInsetSubunits >= SpatialUnits.standardTankFootprintSubunits / 2 {
             issues.append("collision_inset_subunits must leave a collision box")
         }
+        if iceSlideDistanceSubunits < 0 || iceSlideDistanceSubunits > 8 * SpatialUnits.subunitsPerCell {
+            issues.append("ice_slide_distance_subunits must be 0…\(8 * SpatialUnits.subunitsPerCell)")
+        }
+        if slowedSpeedPercent < 0 || slowedSpeedPercent > 100 { issues.append("slowed_speed_percent must be 0…100") }
         if issues.isEmpty, let fastest = multipliers.max() {
             // Both factors are bounded above, so the product cannot overflow.
             let perTick = baseSpeedSubunitsPerSecond * fastest / (1000 * Self.ticksPerSecond)

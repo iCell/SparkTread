@@ -68,6 +68,38 @@ import GameCore
         #expect(scene.children.first?.name == "px_ice_000_0")
     }
 
+    /// ADR-0016: foliage is drawn above tanks (below mines/projectiles),
+    /// jointed to its neighbours, and fades where it covers the player.
+    @Test func foliageOverlaysTanksAndFadesOverThePlayer() throws {
+        var (art, scene, world) = try makeScene()
+        for y in 9...11 { for x in 9...11 { world.terrain[x, y] = TerrainCell(kind: .foliage) } }
+        let cell = SpatialUnits.subunitsPerCell
+        world.addPlayer(PlayerState(playerID: .one))
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 9 * cell, y: 9 * cell), facing: .up)
+        scene.installForTests(art: art, world: world)
+        for y in 9...11 { for x in 9...11 { scene.reconcileTerrainCell(art, world: world, cellX: x, cellY: y) } }
+        scene.syncForTests(world: world) // the per-frame pass joints and fades
+        let centre = try #require(scene.foliageNodeForTests(cellX: 10, cellY: 10, world: world))
+        #expect(centre.zPosition == MovementLabScene.foliageZPosition)
+        #expect(MovementLabScene.foliageZPosition > 500 && MovementLabScene.foliageZPosition < 600) // tanks < foliage < mines
+        #expect(centre.texture === (try art.texture("px_foliage_255_0"))) // fully surrounded joint, frame 0
+        let corner = try #require(scene.foliageNodeForTests(cellX: 9, cellY: 9, world: world))
+        #expect(corner.texture === (try art.texture("px_foliage_038_0"))) // right + down + the diagonal between
+        // The player's 2×2 footprint covers cells 9–10 × 9–10: those fade, the
+        // rest stay opaque (SpriteKit stores alpha as Float: compare loosely).
+        func faded(_ node: SKSpriteNode) -> Bool { abs(node.alpha - MovementLabScene.foliageFadedAlpha) < 0.001 }
+        #expect(faded(corner) && faded(centre))
+        let far = try #require(scene.foliageNodeForTests(cellX: 11, cellY: 11, world: world))
+        #expect(abs(far.alpha - 1) < 0.001)
+        // Foliage removed from the world disappears from the scene.
+        world.terrain[10, 10] = TerrainCell(kind: .ground)
+        scene.reconcileTerrainCell(art, world: world, cellX: 10, cellY: 10)
+        #expect(scene.foliageNodeForTests(cellX: 10, cellY: 10, world: world) == nil)
+        scene.syncForTests(world: world)
+        #expect(scene.foliageNodeForTests(cellX: 9, cellY: 9, world: world)?.texture === (try art.texture("px_foliage_006_0")))
+    }
+
     @Test func equipmentIDsMapToDeliveryAttachmentNames() {
         #expect(MovementLabScene.equipmentArtName("amphi_tank") == "amphi")
         #expect(MovementLabScene.equipmentArtName("anti_skid") == "anti_skid")

@@ -25,12 +25,12 @@ enum Stage {
         var fire: [Int: (normal: Bool, special: Bool)] = [:]
         let playerTank = world.players.first.flatMap { p in
             p.tankEntityID.flatMap { id in world.tank(entityID: id) }
-        }
+        }.flatMap { $0.statusEffects["airborne"] == nil ? $0 : nil } // untargetable in flight (§8.6)
         let footprint = SpatialUnits.standardTankFootprintSubunits
         for index in world.tanks.indices where world.tanks[index].ownerPlayerID == nil {
             var tank = world.tanks[index]
             guard tank.teamID != 1 else { continue }
-            if tank.statusEffects["frozen"] != nil {
+            if tank.statusEffects["frozen"] != nil || tank.statusEffects["airborne"] != nil {
                 tank.movementIntent = nil
                 world.tanks[index] = tank
                 continue
@@ -46,18 +46,19 @@ enum Stage {
                 // Flame cannot break brick (weapon data), so the fire family
                 // routes around it; every other family digs.
                 let canDig = enemyFamily(tank.archetypeID) != "fire"
+                let traversal = TraversalProfile(equipmentID: tank.equipmentID) // same rules as players (§7.5)
                 let targetCenter: Vec2i
                 let goals: [Vec2i]
                 let baseFocus = min(100, attributes.baseFocusPercent * profile.baseFocusPercent / 100)
                 if let base = world.base, roll < baseFocus || playerTank == nil {
                     targetCenter = Vec2i(x: base.topLeftSubunits.x + base.sizeSubunits / 2,
                                          y: base.topLeftSubunits.y + base.sizeSubunits / 2)
-                    goals = Navigation.baseApproachGoals(world, canDig: canDig)
+                    goals = Navigation.baseApproachGoals(world, canDig: canDig, profile: traversal)
                 } else if let player = playerTank {
                     targetCenter = Vec2i(x: player.positionSubunits.x + footprint / 2,
                                          y: player.positionSubunits.y + footprint / 2)
                     goals = Navigation.nearGoals(world, around: Navigation.anchor(of: player.positionSubunits),
-                                                 canDig: canDig)
+                                                 canDig: canDig, profile: traversal)
                 } else {
                     targetCenter = Vec2i(x: world.arena.widthSubunits / 2,
                                          y: world.arena.heightSubunits / 2)
@@ -147,10 +148,10 @@ enum Stage {
                 // is free, or brick to dig through; a neighbour blocked by
                 // another tank yields to the next-best, then to steering.
                 let selfAnchor = Navigation.anchor(of: tank.positionSubunits)
-                let costField = goals.isEmpty ? [] : Navigation.distanceField(world, goals: goals, canDig: canDig)
+                let costField = goals.isEmpty ? [] : Navigation.distanceField(world, goals: goals, canDig: canDig, profile: traversal)
                 let descent = costField.isEmpty ? []
                     : Navigation.descent(field: costField, world: world, anchor: selfAnchor,
-                                         preferred: tank.facing, canDig: canDig)
+                                         preferred: tank.facing, canDig: canDig, profile: traversal)
                 // Permissive digging heuristic: a neighbour that is free, or
                 // brick this family can dig through, is taken; a neighbour
                 // blocked only by another tank yields to the next option.
@@ -318,7 +319,8 @@ enum Stage {
             // Only player-owned tanks collect in V1 (§9.3; the Memory-of-Sea
             // enemy-collection reference behavior is ruleset-off). A tank
             // killed earlier this tick collects nothing.
-            for tank in world.tanks where tank.ownerPlayerID != nil && tank.armor > 0 {
+            for tank in world.tanks where tank.ownerPlayerID != nil && tank.armor > 0
+                && tank.statusEffects["airborne"] == nil {
                 let p = tank.positionSubunits
                 let hx = pickup.positionSubunits.x - cell / 2, hy = pickup.positionSubunits.y - cell / 2
                 guard p.x < hx + cell && p.x + footprint > hx

@@ -89,6 +89,10 @@ public struct TankState: Codable, Equatable, Sendable {
     /// (`PickupRuleset.dropsSpawnAtRandomCells`, ADR-0010 item 7), near the
     /// death cell when that flag is off. Nil for non-carriers and players.
     public var carriedPickupID: String?
+    /// Mine launch (§8.6, ADR-0016): the nominal landing point while the
+    /// "airborne" status runs; the tank lands at the nearest legal cell to
+    /// it when the status expires. Nil on the ground.
+    public var landingSubunits: Vec2i?
 
     public init(entityID: Int, teamID: Int, ownerPlayerID: PlayerID?, archetypeID: String,
                 positionSubunits: Vec2i, facing: Direction) {
@@ -110,6 +114,7 @@ public struct TankState: Codable, Equatable, Sendable {
         self.speedLevel = 0
         self.powerLevel = 0
         self.specialWeaponID = "rapid"
+        self.landingSubunits = nil
         self.equipmentID = nil
         self.statusEffects = [:]
         self.fireCooldowns = [:]

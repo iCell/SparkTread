@@ -9,8 +9,8 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
     case foliage = 5
     case base = 6
 
-    /// Whether the kind can block a tank at all (before quadrant masks and
-    /// equipment traversal profiles).
+    /// Whether the kind blocks a `normal`-profile tank (before quadrant
+    /// masks); `blocksTank(profile:)` applies the equipment profile.
     public var blocksTanksByDefault: Bool {
         switch self {
         case .brick, .steel, .water, .base: true
@@ -73,7 +73,8 @@ public struct TerrainGrid: Codable, Equatable, Sendable {
     /// Whether an axis-aligned rectangle in subunits (top-left origin,
     /// exclusive max edge) intersects any tank-blocking geometry. Damaged
     /// destructible cells block only through their remaining quadrants.
-    public func blocksTank(minX: Int, minY: Int, maxX: Int, maxY: Int) -> Bool {
+    public func blocksTank(minX: Int, minY: Int, maxX: Int, maxY: Int,
+                           profile: TraversalProfile = .normal) -> Bool {
         if minX < 0 || minY < 0 || maxX > arena.widthSubunits || maxY > arena.heightSubunits {
             return true // outside the arena is always solid (§ M1 exit: never leave bounds)
         }
@@ -84,7 +85,7 @@ public struct TerrainGrid: Codable, Equatable, Sendable {
         for cy in firstCellY...lastCellY {
             for cx in firstCellX...lastCellX {
                 let c = self[cx, cy]
-                guard c.kind.blocksTanksByDefault else { continue }
+                guard c.kind.blocksTank(profile: profile) else { continue }
                 if c.quadrantMask == 0b1111 { return true }
                 if c.quadrantMask == 0 { continue }
                 // Test the overlap against each remaining quadrant.

@@ -137,7 +137,7 @@ decisions of 2026-09-10 evening and the ADR-0012 results/bonus work:
 `Scripts/ci.sh` passes end to end (Claude's run; PI was unavailable) —
 architecture check, content validator, `Scripts/check-audio.sh` selftest
 and check (18 synthesized files match the generator, 8 excerpts match the
-manifest and the re-run extractor), `swift test` 261 tests / 64 suites,
+manifest and the re-run extractor), `swift test` 319 tests / 80 suites (after M4 items 1–5),
 xcodegen, the simulator `xcodebuild test` on iPhone 17, the smoke render
 selftest and the smoke render itself; `git diff --check` is clean. This
 paragraph is the one current count; the handoff repeats it with the same
@@ -734,6 +734,35 @@ text treatment (no Phase 1 art):
   plan intends, variants and the floor, builder application, run and
   header naming, notice raise/expiry, app-flow difficulty choice.
 
+## M4 item 5 — deferred mechanics (2026-09-10 late evening; ADR-0016 proposed)
+
+- Traversal profiles: `TraversalProfile` from equipment; water blocks all
+  but AmphiTank through `TerrainKind/TerrainGrid.blocksTank(profile:)`,
+  `Simulation.ObstacleField` (the mover's profile; a tank that loses
+  AmphiTank over water may leave, never re-enter) and `Navigation`
+  (profile beside `canDig`; the brain passes its own).
+- Ice inertia: `MovementRuleset.iceSlideDistanceSubunits` 1536; centre
+  cell on ice + no AntiSkid → release or direction change slides the
+  distance along the last travel direction at normal speed; input turns
+  the facing only, the slide direction cancels; blocks/leaving ice end
+  it. Enemies too. The M1 movement golden was regenerated (note in the
+  test: the script crosses the lab's ice patch and turns on it).
+- Foliage: scene overlay at z 520 (tanks 500 < foliage < mines 600),
+  47-joint textures with a slow frame cycle, 45 % fade over the player's
+  footprint; presentation only (AI perception §24 Q8 open).
+- Mine launch: `WeaponRuleset` launch distance/airborne/slow per level
+  and the enable switch, `MovementRuleset.slowedSpeedPercent`;
+  `TankState.landingSubunits` (checksummed, invariant-bound); the
+  triggering survivor (Memory of Sea exempt) flies along its travel
+  direction, suspended from movement, fire, targeting, blasts, flames,
+  mines, pickups and blocking; lands by ring scan when the status
+  expires; slowed after. Scene: a scale bump on launch, reset on landing.
+- Replay format 6. Tests (319 / 81): `TraversalProfileTests`,
+  `IceInertiaTests`, `MineLaunchTests`, the foliage presentation test.
+- Not done (recorded in the ADR): the §15.3 per-archetype reachability
+  waiver, foliage flammability and AI perception, wake/skid decals and
+  a landing effect, a wake for amphibious tanks.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -743,11 +772,10 @@ Do not interpret green tests as product completion:
 - VS-01 keeps the owner-directed reference layout; the plan's "one visible
   Speed or Power pickup" teaching goal is served by carriers and hidden
   treasures, which is a recorded deviation, not equivalence.
-- Deferred to M4: amphibious traversal, ice inertia, foliage rendering,
-  difficulty profiles, mine launch/flight, persistence/settings/tutorials,
-  full pause UI, a title screen. Equipment is rendered and mine
-  interactions work; traversal effects are not. (Cost-map navigation and
-  the results screen landed on 2026-09-10.)
+- Still deferred: settings, tutorials, accessibility options, the
+  input-selection screen (the rest of the former M4 deferral list —
+  traversal, ice, foliage, difficulty, mine launch, persistence, pause,
+  title — landed on 2026-09-10 late evening).
 - Explosions resolve after the contact queue (documented approximation).
 - The ground tile family is fixed to the frontier theme until stage data
   selects it.
@@ -756,7 +784,9 @@ Do not interpret green tests as product completion:
   A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
   icons; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
-  is in progress: items 1 (campaign progression, ADR-0013 proposed), 2
-  (screen flow), 3 (checkpoint save, ADR-0014 proposed) and 4
-  (difficulty profiles and director phases, ADR-0015 proposed) landed;
-  item 5 follows.
+  items 1–5 landed on 2026-09-10 late evening (ADR-0013…0016 proposed):
+  campaign progression, screen flow, checkpoint save, difficulty
+  profiles and director phases, the deferred mechanics. Remaining M4
+  deliverables: settings/accessibility/controller support (owner's item
+  6), the external playtest build, the "final replacement visual
+  language", performance/export targets, and a played three-stage golden.

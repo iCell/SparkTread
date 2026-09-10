@@ -38,6 +38,7 @@ public enum Simulation {
         }
 
         // 2. Timers and status effects.
+        var landings: [Int] = []
         world.withTanksInEntityOrder { tank in
             if tank.spawnProtectionTicks > 0 { tank.spawnProtectionTicks -= 1 }
             if tank.bufferedDirectionRemainingTicks > 0 {
@@ -49,7 +50,36 @@ public enum Simulation {
             }
             for (status, remaining) in tank.statusEffects.sorted(by: { $0.key < $1.key }) {
                 tank.statusEffects[status] = remaining > 1 ? remaining - 1 : nil
+                if status == "airborne", remaining <= 1 { landings.append(tank.entityID) }
             }
+        }
+        // Mine launch landings (§8.6, ADR-0016): the tank lands at the
+        // nearest legal footprint to its nominal target by deterministic
+        // ring scan (terrain, other tanks, the base), in place when no cell
+        // within the scan is free, then is slowed for the level's ticks.
+        for id in landings {
+            guard let index = world.tanks.firstIndex(where: { $0.entityID == id }) else { continue }
+            var tank = world.tanks[index]
+            let target = tank.landingSubunits ?? tank.positionSubunits
+            tank.landingSubunits = nil
+            world.tanks[index] = tank
+            let field = ObstacleField(world: world, excludingTank: id)
+            let cell = SpatialUnits.subunitsPerCell, footprint = SpatialUnits.standardTankFootprintSubunits
+            let inset = ruleset.collisionInsetSubunits
+            let anchor = Vec2i(x: (target.x + cell / 2) / cell, y: (target.y + cell / 2) / cell)
+            var landed = tank.positionSubunits
+            for candidate in RingScan.cells(around: anchor, maxRadius: 4) {
+                let p = Vec2i(x: candidate.x * cell, y: candidate.y * cell)
+                if !field.blocksTank(minX: p.x + inset, minY: p.y + inset,
+                                     maxX: p.x + footprint - inset, maxY: p.y + footprint - inset) {
+                    landed = p
+                    break
+                }
+            }
+            tank.positionSubunits = landed
+            tank.movementAccumulator = 0
+            world.tanks[index] = tank
+            events.append(.tankLanded(entityID: id, ownerPlayerID: tank.ownerPlayerID, position: landed))
         }
         if var base = world.base {
             if base.burnCooldownTicks > 0 { base.burnCooldownTicks -= 1 }
@@ -78,6 +108,7 @@ public enum Simulation {
         for index in world.tanks.indices {
             var tank = world.tanks[index]
             if tank.statusEffects["frozen"] != nil { continue } // held in place
+            if tank.statusEffects["airborne"] != nil { continue } // in flight (§8.6): uncontrollable
             let field = ObstacleField(world: world, excludingTank: tank.entityID)
             resolveTurnAndMovement(&tank, field: field, ruleset: ruleset, events: &events)
             world.tanks[index] = tank
@@ -108,12 +139,32 @@ public enum Simulation {
     struct ObstacleField {
         let terrain: TerrainGrid
         let boxes: [(minX: Int, minY: Int, maxX: Int, maxY: Int)]
+        /// The moving tank's traversal profile (ADR-0016). A tank whose
+        /// footprint already overlaps water — it lost AmphiTank mid-crossing
+        /// — keeps the amphibious profile so it can finish leaving instead
+        /// of being wedged for ever.
+        let profile: TraversalProfile
 
         init(world: WorldState, excludingTank excluded: Int) {
             terrain = world.terrain
             var boxes: [(Int, Int, Int, Int)] = []
             let footprint = SpatialUnits.standardTankFootprintSubunits
-            for other in world.tanks where other.entityID != excluded {
+            var profile = TraversalProfile.normal
+            for other in world.tanks {
+                if other.entityID == excluded {
+                    profile = TraversalProfile(equipmentID: other.equipmentID)
+                    let p = other.positionSubunits
+                    if profile != .amphibious,
+                       world.terrain.blocksTank(minX: p.x + 64, minY: p.y + 64, maxX: p.x + footprint - 64,
+                                                maxY: p.y + footprint - 64, profile: .normal),
+                       !world.terrain.blocksTank(minX: p.x + 64, minY: p.y + 64, maxX: p.x + footprint - 64,
+                                                 maxY: p.y + footprint - 64, profile: .amphibious) {
+                        profile = .amphibious // embedded in water: may leave
+                    }
+                    continue
+                }
+                // Airborne tanks (mine launch, §8.6) are suspended from all interactions.
+                if other.statusEffects["airborne"] != nil { continue }
                 let p = other.positionSubunits
                 boxes.append((p.x, p.y, p.x + footprint, p.y + footprint))
             }
@@ -122,10 +173,11 @@ public enum Simulation {
                 boxes.append((p.x, p.y, p.x + base.sizeSubunits, p.y + base.sizeSubunits))
             }
             self.boxes = boxes
+            self.profile = profile
         }
 
         func blocksTank(minX: Int, minY: Int, maxX: Int, maxY: Int) -> Bool {
-            if terrain.blocksTank(minX: minX, minY: minY, maxX: maxX, maxY: maxY) { return true }
+            if terrain.blocksTank(minX: minX, minY: minY, maxX: maxX, maxY: maxY, profile: profile) { return true }
             for box in boxes
             where minX < box.maxX && maxX > box.minX && minY < box.maxY && maxY > box.minY {
                 return true
@@ -136,10 +188,70 @@ public enum Simulation {
 
     // MARK: - Movement (step 5)
 
+    /// Per-tick travel in whole subunits from the integer accumulator
+    /// (§7.1), at the tank's speed level, halved-by-percent while slowed.
+    private static func consumeTravel(_ tank: inout TankState, ruleset: MovementRuleset) -> Int {
+        var increment = tank.ownerPlayerID != nil
+            ? ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
+            : ruleset.enemyAccumulatorIncrement(speedLevel: tank.speedLevel)
+        if tank.statusEffects["slowed"] != nil { increment = increment * ruleset.slowedSpeedPercent / 100 }
+        tank.movementAccumulator += increment
+        let wholeSubunits = tank.movementAccumulator / MovementRuleset.accumulatorUnitsPerSubunit
+        tank.movementAccumulator %= MovementRuleset.accumulatorUnitsPerSubunit
+        return wholeSubunits
+    }
+
+    /// The tank's centre cell is ice and its equipment does not grip.
+    private static func slidesOnIce(_ tank: TankState, field: ObstacleField) -> Bool {
+        guard TraversalProfile(equipmentID: tank.equipmentID) != .traction else { return false }
+        let footprint = SpatialUnits.standardTankFootprintSubunits, cell = SpatialUnits.subunitsPerCell
+        let cx = (tank.positionSubunits.x + footprint / 2) / cell, cy = (tank.positionSubunits.y + footprint / 2) / cell
+        return field.terrain.isInside(cellX: cx, cellY: cy) && field.terrain[cx, cy].kind == .ice
+    }
+
     private static func resolveTurnAndMovement(
         _ tank: inout TankState, field: ObstacleField,
         ruleset: MovementRuleset, events: inout [DomainEvent]
     ) {
+        // Ice inertia (§7.3, ADR-0016). `slideDirection` remembers the last
+        // travel direction while the centre is on ice; releasing input or
+        // changing direction there converts it into a slide of
+        // `iceSlideDistanceSubunits`, during which input only turns the
+        // facing ("turning friction") — except the slide direction itself,
+        // which cancels the slide and drives on. Off ice, nothing slides.
+        let onIce = ruleset.iceSlideDistanceSubunits > 0 && slidesOnIce(tank, field: field)
+        if !onIce {
+            tank.slideDirection = nil
+            tank.slideMomentumSubunits = 0
+        } else {
+            let intent = tank.movementIntent
+            if tank.slideMomentumSubunits > 0, let sliding = tank.slideDirection {
+                if intent == sliding {
+                    tank.slideMomentumSubunits = 0 // driving on in the slide direction
+                } else {
+                    if let intent, intent != tank.facing {
+                        tank.facing = intent // turns, but keeps sliding
+                        tank.bufferedDirection = nil
+                        tank.bufferedDirectionRemainingTicks = 0
+                        events.append(.tankTurned(entityID: tank.entityID, facing: intent))
+                    }
+                    slide(&tank, direction: sliding, field: field, ruleset: ruleset)
+                    return
+                }
+            } else if let last = tank.slideDirection, intent == nil || intent != last {
+                // Release or direction change with momentum: start sliding.
+                tank.slideMomentumSubunits = ruleset.iceSlideDistanceSubunits
+                if let intent, intent != tank.facing {
+                    tank.facing = intent
+                    tank.bufferedDirection = nil
+                    tank.bufferedDirectionRemainingTicks = 0
+                    events.append(.tankTurned(entityID: tank.entityID, facing: intent))
+                }
+                slide(&tank, direction: last, field: field, ruleset: ruleset)
+                return
+            }
+        }
+
         // A held direction is the live turn candidate; otherwise a still-live
         // buffered direction keeps trying (§6.3 — a tap shortly before a
         // legal turn executes when alignment arrives).
@@ -157,11 +269,7 @@ public enum Simulation {
             || (tank.bufferedDirection != nil && tank.bufferedDirectionRemainingTicks > 0)
         guard moving else { return }
 
-        tank.movementAccumulator += tank.ownerPlayerID != nil
-            ? ruleset.accumulatorIncrement(speedLevel: tank.speedLevel)
-            : ruleset.enemyAccumulatorIncrement(speedLevel: tank.speedLevel)
-        let wholeSubunits = tank.movementAccumulator / MovementRuleset.accumulatorUnitsPerSubunit
-        tank.movementAccumulator %= MovementRuleset.accumulatorUnitsPerSubunit
+        let wholeSubunits = consumeTravel(&tank, ruleset: ruleset)
         guard wholeSubunits > 0 else { return }
 
         let travelDirection = tank.facing
@@ -172,6 +280,20 @@ public enum Simulation {
             // not bank speed (documented, deterministic).
             tank.movementAccumulator = 0
         }
+        if onIce, moved > 0 { tank.slideDirection = travelDirection } // momentum to spend later
+    }
+
+    /// One tick of sliding: the tank's normal per-tick travel along the
+    /// slide direction, bounded by the remaining momentum; a block ends the
+    /// slide flush against the obstacle.
+    private static func slide(_ tank: inout TankState, direction: Direction, field: ObstacleField,
+                              ruleset: MovementRuleset) {
+        let step = min(tank.slideMomentumSubunits, consumeTravel(&tank, ruleset: ruleset))
+        guard step > 0 else { return }
+        let moved = sweptMove(&tank, direction: direction, distance: step, field: field, ruleset: ruleset)
+        tank.slideMomentumSubunits = moved < step ? 0 : tank.slideMomentumSubunits - moved
+        if moved < step { tank.movementAccumulator = 0 }
+        if tank.slideMomentumSubunits == 0 { tank.slideDirection = nil }
     }
 
     /// Attempts a facing change with alignment assistance (§6.3, §7.1).

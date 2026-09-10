@@ -45,6 +45,7 @@
 
 ## 提议中的 ADR（待所有者接受，尚不具备权威）
 
+- `docs/decisions/ADR-0016-traversal-ice-foliage-and-mine-launch.md`：装备通行档案（两栖过水、防滑不打滑）、冰面惯性（松键或转向后滑行 1.5 格）、植被前景遮挡（坦克之上、地雷之下，覆盖玩家处淡化）、地雷弹射（触雷坦克沿行进方向抛飞、空中免疫一切交互、落地环扫、减速）；回放格式 6。
 - `docs/decisions/ADR-0015-difficulty-profiles-and-director-phases.md`：难度档案（休闲/标准/老兵：敌人决策间隔、基地倾向、游走、开火窗口、布雷概率、编成变体、预警时长、误伤基地开关）作为关卡状态数据；导演阶段（精英增援插队、存活上限、基地修复）；回放格式 5。
 - `docs/decisions/ADR-0014-checkpoint-save-and-suspended-session.md`：检查点存档（每关通关后写 `campaign_progress.json`）与中断快照（游戏中离开前台写 `suspended_session.json`，关卡结束或放弃时删除；标题页提供"继续上次战斗"，恢复后处于暂停）；文件带版本号、原子写入、损坏或异版本文件报错不崩溃。
 - `docs/decisions/ADR-0013-campaign-progression-and-session-state.md`：战役推进——三关顺序内容（VS-02 隐于草丛、VS-03 沙漠阶梯，按原作地图适配 56×27）、跨关携带状态（生命、分数、弹药、保留升级；护甲不携带）、胜利自动进入下一关、失败从关卡起点检查点重来、回放格式 4 与链式战役回放。
