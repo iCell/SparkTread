@@ -23,6 +23,33 @@ import GameCore
         #expect(model.screen == .playing(stageIndex: nil))
     }
 
+    @Test func progressAndSnapshotsShapeTheTitle() {
+        let checkpoint = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["a_01_x"])
+        let progress = CampaignProgress(campaignID: "c", completedStageIDs: ["a_01_x"], checkpoint: checkpoint, bestScore: 5)
+        var model = AppFlowModel(campaign: campaign, progress: progress)
+        #expect(model.completedStageIDs == ["a_01_x"] && model.checkpoint == checkpoint && model.suggestedStageIndex == 1)
+        #expect(model.run(forStageIndex: 1) == checkpoint)            // the checkpoint run
+        #expect(model.run(forStageIndex: 0) == CampaignRun(campaign: campaign)) // a fresh run on stage 1
+        #expect(model.run(forStageIndex: 2) == nil)                    // locked
+        // Progress of another campaign is ignored.
+        let foreign = AppFlowModel(campaign: campaign, progress: CampaignProgress(campaignID: "other", completedStageIDs: ["a_01_x"]))
+        #expect(foreign.completedStageIDs.isEmpty)
+        // A snapshot is offered, then either resumed or discarded.
+        var world = WorldState(terrain: TerrainGrid(arena: .universal), seed: 1)
+        world.addPlayer(PlayerState(playerID: .one))
+        world.stage = StageState(spawnQueue: ["normal_a"], maxAliveEnemies: 1, spawnPointsCells: [Vec2i(x: 1, y: 1)],
+                                 playerRespawnCell: Vec2i(x: 3, y: 3), dropTable: [])
+        let run = CampaignRun(campaign: campaign)
+        let snapshot = SuspendedSession(run: run, world: world,
+                                        recording: ReplayRecording(initialWorld: world, stageID: run.stageID, sessionState: run.checkpoint))
+        model = AppFlowModel(campaign: campaign, suspended: snapshot)
+        #expect(model.suspended == snapshot)
+        var discarding = model
+        discarding.discardSuspended()
+        #expect(discarding.suspended == nil && discarding.resumeSuspended() == nil)
+        #expect(model.resumeSuspended() == snapshot && model.screen == .playing(stageIndex: 0))
+    }
+
     @Test func launchEnvironmentSkipsTheTitle() {
         #expect(AppFlowModel(campaign: campaign, autostart: true).screen == .playing(stageIndex: 0))
         #expect(AppFlowModel(campaign: nil, autostart: true).screen == .title)

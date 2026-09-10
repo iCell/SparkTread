@@ -124,6 +124,21 @@ public struct MovementLabSession: Sendable {
                                          stageID: stageID, sessionState: sessionState)
     }
 
+    /// Resumes a suspended session (ADR-0003 §3): the snapshot world with
+    /// the recording made so far, which keeps growing from the world's
+    /// tick — the resumed run replays as one recording.
+    public init(resuming world: WorldState, recording: ReplayRecording) {
+        precondition(SuspendedSessionCheck.issues(world: world, recording: recording).isEmpty,
+                     "snapshot rejected: \(SuspendedSessionCheck.issues(world: world, recording: recording))")
+        self.world = world
+        self.ruleset = recording.movement
+        self.weapons = recording.weapons
+        self.pickups = recording.pickups
+        self.stageID = recording.stageID
+        self.sessionState = recording.sessionState
+        self.recording = recording
+    }
+
     /// Debug hooks mutate the world outside the recorded command stream, so
     /// the recording restarts from the mutated world: what was recorded
     /// before is no longer reproducible from the old start.
@@ -190,5 +205,19 @@ public struct MovementLabSession: Sendable {
                    "invariants violated: \(WorldInvariants.violations(in: world))")
         }
         return events
+    }
+}
+
+/// Consistency of a world with the recording that led to it (the checks a
+/// resume needs before trusting a snapshot).
+public enum SuspendedSessionCheck {
+    public static func issues(world: WorldState, recording: ReplayRecording) -> [String] {
+        var issues = MovementLabSession.configurationIssues(ruleset: recording.movement, weapons: recording.weapons,
+                                                            pickups: recording.pickups)
+        issues += WorldInvariants.violations(in: world)
+        if recording.initialWorld.checksum() != recording.startChecksum { issues.append("recording start checksum mismatch") }
+        if world.tick < recording.initialTick { issues.append("world precedes its recording") }
+        if let last = recording.commandLog.last, last.tick >= world.tick { issues.append("commands beyond the snapshot") }
+        return issues
     }
 }

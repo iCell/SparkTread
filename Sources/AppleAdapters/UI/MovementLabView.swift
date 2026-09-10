@@ -53,6 +53,13 @@ public final class MovementLabController {
     /// worlds) and its stage source.
     public private(set) var campaignRun: CampaignRun?
     private let stages: StageProvider?
+    /// Where progress and the suspended session go (plan §16.1; nil for the
+    /// lab, injected worlds and tests without a store). Write failures are
+    /// reported through `persistenceFailure` and never interrupt play.
+    public var persistence: CampaignPersistence?
+    public private(set) var persistenceFailure: String?
+    /// Best score seen this run (progress document).
+    private var bestScore = 0
     /// Recordings of the stages completed in this run, in order — the
     /// chained campaign replay (plan §16.3).
     public private(set) var campaignRecordings: [ReplayRecording] = []
@@ -77,15 +84,42 @@ public final class MovementLabController {
     }
 
     /// A campaign run from an explicit stage source.
-    public init(campaign: CampaignRun, stages: StageProvider, audio: GameAudio? = nil) {
+    public init(campaign: CampaignRun, stages: StageProvider, audio: GameAudio? = nil,
+                persistence: CampaignPersistence? = nil) {
         injectedWorld = nil
         isLab = false
         campaignRun = campaign
         self.stages = stages
+        self.persistence = persistence
         session = Self.makeSession(for: campaign, stages: stages)
         self.audio = audio ?? GameAudio()
         self.haptics = GameHaptics()
         flow = Self.makeFlow(for: session.world, lab: false)
+        #if canImport(GameController)
+        physicalInput = PhysicalInputAdapter(store: input)
+        #endif
+        input.isAcceptingInput = false
+        self.audio.suspend()
+        self.haptics.suspend()
+    }
+
+    /// Resumes a suspended session (plan §17.5, ADR-0003 §3): the snapshot
+    /// world continues its recording; the flow starts in play (the intro
+    /// is presentation and was already seen) and the game opens PAUSED so
+    /// the player resumes deliberately.
+    public init(resuming snapshot: SuspendedSession, stages: StageProvider, audio: GameAudio? = nil,
+                persistence: CampaignPersistence? = nil) {
+        precondition(snapshot.validationIssues.isEmpty, "snapshot rejected: \(snapshot.validationIssues)")
+        injectedWorld = nil
+        isLab = false
+        campaignRun = snapshot.run
+        self.stages = stages
+        self.persistence = persistence
+        session = MovementLabSession(resuming: snapshot.world, recording: snapshot.recording)
+        self.audio = audio ?? GameAudio()
+        self.haptics = GameHaptics()
+        flow = .playing()
+        isPaused = true
         #if canImport(GameController)
         physicalInput = PhysicalInputAdapter(store: input)
         #endif
@@ -167,25 +201,64 @@ public final class MovementLabController {
         campaignRecordings.append(session.recording)
         lastCompletedRecording = session.recording
         let exit = SessionState.carried(from: session.world) ?? run.checkpoint
-        if run.advance(exitState: exit) {
-            campaignRun = run
+        bestScore = max(bestScore, exit.score)
+        let hasNext = run.advance(exitState: exit)
+        campaignRun = run
+        // Checkpoint after every completed stage (§5.1): completed stages,
+        // the run to continue (none once the campaign is complete), best score.
+        persist { store in
+            try store.saveProgress(CampaignProgress(
+                campaignID: run.campaign.id, completedStageIDs: run.completedStageIDs,
+                checkpoint: hasNext ? run : nil, bestScore: bestScore))
+        }
+        if hasNext {
             replaceSession(Self.makeSession(for: run, stages: stages))
         } else {
-            campaignRun = run
             campaignComplete = true
             syncInputAdmission()
         }
     }
 
     /// Starts the campaign over from its first stage and the campaign
-    /// start state.
+    /// start state; the checkpoint to continue from is withdrawn.
     public func restartCampaign() {
         guard let campaignRun, let stages else { restart(); return }
         let fresh = CampaignRun(campaign: campaignRun.campaign)
         self.campaignRun = fresh
         campaignRecordings.removeAll()
         campaignComplete = false
+        bestScore = 0
+        persist { store in
+            let completed = try store.loadProgress()?.completedStageIDs ?? []
+            try store.saveProgress(CampaignProgress(campaignID: fresh.campaign.id, completedStageIDs: completed,
+                                                    checkpoint: nil, bestScore: try store.loadProgress()?.bestScore ?? 0))
+        }
         replaceSession(Self.makeSession(for: fresh, stages: stages))
+    }
+
+    /// Leaving the game screen mid-run (返回标题): the suspended session, if
+    /// any, is abandoned (§16.1) and the clock stops.
+    public func abandon() {
+        persist { try $0.clearSuspended() }
+        stop()
+    }
+
+    /// Writes the mid-stage snapshot (ADR-0003 §3) while a campaign stage
+    /// is being played; nothing while there is no stage, in the lab, or
+    /// once the stage is decided.
+    private func saveSuspendedSession() {
+        guard let run = campaignRun, !campaignComplete, session.world.stage?.phase == .playing,
+              flow.allowsSimulation else { return }
+        let snapshot = SuspendedSession(run: run, world: session.world, recording: session.recording)
+        persist { try $0.saveSuspended(snapshot) }
+    }
+
+    /// Persistence never interrupts play: a failing store is recorded on
+    /// `persistenceFailure` (the title reports it) and play continues.
+    private func persist(_ body: (CampaignPersistence) throws -> Void) {
+        guard let persistence else { return }
+        do { try body(persistence); persistenceFailure = nil }
+        catch { persistenceFailure = String(describing: error) }
     }
 
     private func replaceSession(_ next: MovementLabSession) {
@@ -344,6 +417,7 @@ public final class MovementLabController {
     /// an intro, outro or results screen simply resumes on return.
     public func applicationDidBecomeInactive() {
         let midPlay = isRunning && flow.allowsSimulation && stagePhase == .playing
+        if midPlay { saveSuspendedSession() } // §17.5: written before suspension
         suspend()
         if midPlay { isPaused = true }
     }
@@ -405,6 +479,8 @@ public final class MovementLabController {
                 flow.beginOutro(won: false, resultRows: KillTally.tableRows, lossReason: reason)
             }
         }
+        // A decided stage is no longer resumable: the snapshot goes (§16.1).
+        if flow.outcome != nil, campaignRun != nil { persist { try $0.clearSuspended() } }
         if !flow.allowsSimulation { syncInputAdmission() }
     }
 
@@ -694,7 +770,7 @@ public struct MovementLabView: View {
                     menuButton("重新开始本关") { controller.restart(); controller.resume(); paused = false }
                 }
                 if let onExit {
-                    menuButton("返回标题") { controller.stop(); onExit() }
+                    menuButton("返回标题") { controller.abandon(); onExit() }
                 }
             }
             .padding(28)
@@ -939,11 +1015,11 @@ public struct MovementLabView: View {
                         .font(.system(size: compact ? 15 : 17, weight: .heavy))
                         .foregroundStyle(Color.yellow)
                     footerButton("再来一局", compact: compact) { controller.restartCampaign() }
-                    if let onExit { footerButton("返回标题", compact: compact) { controller.stop(); onExit() } }
+                    if let onExit { footerButton("返回标题", compact: compact) { controller.abandon(); onExit() } }
                 }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
                     footerButton("重新开始", compact: compact) { controller.restart() }
-                    if let onExit { footerButton("返回标题", compact: compact) { controller.stop(); onExit() } }
+                    if let onExit { footerButton("返回标题", compact: compact) { controller.abandon(); onExit() } }
                 }
             }
             .padding(.horizontal, 14)

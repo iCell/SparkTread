@@ -17,16 +17,42 @@ public struct AppFlowModel: Equatable, Sendable {
     }
 
     public private(set) var screen: Screen = .title
-    /// Stages completed this app run (persisted campaign progress arrives
-    /// with the checkpoint save; until then the unlock state lives here).
+    /// Completed stages (from the progress document, plus this run).
     public private(set) var completedStageIDs: Set<String> = []
+    /// The run to continue from (progress checkpoint), if any.
+    public private(set) var checkpoint: CampaignRun?
+    /// A mid-stage snapshot offered on the title, if any.
+    public private(set) var suspended: SuspendedSession?
     public let campaign: CampaignDefinition?
 
-    public init(campaign: CampaignDefinition?, autostart: Bool = false, lab: Bool = false) {
+    public init(campaign: CampaignDefinition?, progress: CampaignProgress? = nil,
+                suspended: SuspendedSession? = nil, autostart: Bool = false, lab: Bool = false) {
         self.campaign = campaign
+        if let progress, progress.campaignID == campaign?.id {
+            completedStageIDs = Set(progress.completedStageIDs)
+            checkpoint = progress.checkpoint
+        }
+        if let suspended, suspended.run.campaign.id == campaign?.id { self.suspended = suspended }
         if lab { screen = .playing(stageIndex: nil) }
         else if autostart, campaign != nil { screen = .playing(stageIndex: 0) }
     }
+
+    /// The run a stage card starts: the checkpoint when it is that stage,
+    /// else the campaign-start state on that stage.
+    public func run(forStageIndex index: Int) -> CampaignRun? {
+        guard let campaign, isUnlocked(stageIndex: index) else { return nil }
+        if let checkpoint, checkpoint.stageIndex == index { return checkpoint }
+        return CampaignRun(campaign: campaign, stageIndex: index)
+    }
+
+    /// Resuming the snapshot leaves the title; declining discards it.
+    public mutating func resumeSuspended() -> SuspendedSession? {
+        guard let suspended else { return nil }
+        screen = .playing(stageIndex: suspended.run.stageIndex)
+        return suspended
+    }
+
+    public mutating func discardSuspended() { suspended = nil }
 
     public mutating func openCampaignSelect() { screen = .campaignSelect }
     public mutating func startTraining() { screen = .playing(stageIndex: nil) }
@@ -62,7 +88,9 @@ public struct AppFlowModel: Equatable, Sendable {
 public struct AppRootView: View {
     @State private var model: AppFlowModel
     @State private var controller: MovementLabController?
+    @State private var storeNotice: String?
     private let campaign: CampaignDefinition?
+    private let store: CampaignPersistence?
 
     public init() {
         let env = ProcessInfo.processInfo.environment
@@ -74,15 +102,36 @@ public struct AppRootView: View {
             catch { fatalError("bundled campaign failed to load: \(error)") }
         }
         self.campaign = campaign
-        let model = AppFlowModel(campaign: campaign, autostart: env["SPARKTREAD_AUTOSTART"] != nil, lab: lab)
+        // The save store: an unusable store or an unreadable document is a
+        // notice on the title, never a crash (the file stays for inspection).
+        var store: CampaignPersistence?
+        var notice: String?
+        var progress: CampaignProgress?
+        var suspended: SuspendedSession?
+        if !lab, env["SPARKTREAD_NO_SAVE"] == nil {
+            do {
+                let file = try FileSaveStore.standard()
+                store = file
+                do { progress = try file.loadProgress() } catch { notice = "进度存档无法读取：\(error)" }
+                do { suspended = try file.loadSuspended() } catch { notice = "上次战斗存档无法读取：\(error)" }
+            } catch {
+                notice = "存档目录不可用：\(error)"
+            }
+        }
+        self.store = store
+        let model = AppFlowModel(campaign: campaign, progress: progress, suspended: suspended,
+                                 autostart: env["SPARKTREAD_AUTOSTART"] != nil, lab: lab)
         _model = State(initialValue: model)
-        _controller = State(initialValue: Self.makeController(for: model.screen, campaign: campaign))
+        _storeNotice = State(initialValue: notice)
+        _controller = State(initialValue: Self.makeController(for: model.screen, run: model.run(forStageIndex: 0),
+                                                              store: store))
     }
 
-    private static func makeController(for screen: AppFlowModel.Screen, campaign: CampaignDefinition?) -> MovementLabController? {
+    private static func makeController(for screen: AppFlowModel.Screen, run: CampaignRun?,
+                                       store: CampaignPersistence?) -> MovementLabController? {
         guard case .playing(let stageIndex) = screen else { return nil }
-        if let stageIndex, let campaign {
-            return MovementLabController(campaign: CampaignRun(campaign: campaign, stageIndex: stageIndex), stages: .bundled())
+        if stageIndex != nil, let run {
+            return MovementLabController(campaign: run, stages: .bundled(), persistence: store)
         }
         return MovementLabController(world: nil) // the lab
     }
@@ -93,31 +142,57 @@ public struct AppRootView: View {
             switch model.screen {
             case .title:
                 TitleScreen(hasCampaign: campaign != nil,
-                            onStart: { model.openCampaignSelect() },
-                            onTraining: { enter(.playing(stageIndex: nil)) })
+                            canResume: model.suspended != nil,
+                            canContinue: model.checkpoint != nil,
+                            notice: storeNotice,
+                            onResume: resumeSuspended,
+                            onContinue: { if let run = model.checkpoint { start(run) } },
+                            onStart: { discardSuspended(); model.openCampaignSelect() },
+                            onTraining: { discardSuspended(); startTraining() })
             case .campaignSelect:
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model,
-                                         onSelect: { index in if model.startCampaign(at: index) { enter(model.screen) } },
+                                         onSelect: { index in if let run = model.run(forStageIndex: index) { start(run) } },
                                          onBack: { model.backToTitle() })
                 }
             case .playing:
                 if let controller {
-                    MovementLabView(controller: controller) {
-                        model.recordCompleted(stageIDs: controller.campaignRun?.completedStageIDs ?? [])
-                        self.controller = nil
-                        model.backToTitle()
-                    }
-                    .id(ObjectIdentifier(controller))
+                    MovementLabView(controller: controller) { leaveGame(controller) }
+                        .id(ObjectIdentifier(controller))
                 }
             }
         }
         .persistentSystemOverlays(.hidden)
     }
 
-    private func enter(_ screen: AppFlowModel.Screen) {
-        controller = Self.makeController(for: screen, campaign: campaign)
-        if case .playing(let index) = screen, index == nil { model.startTraining() }
+    private func start(_ run: CampaignRun) {
+        guard model.startCampaign(at: run.stageIndex) else { return }
+        controller = MovementLabController(campaign: run, stages: .bundled(), persistence: store)
+    }
+
+    private func startTraining() {
+        model.startTraining()
+        controller = MovementLabController(world: nil)
+    }
+
+    private func resumeSuspended() {
+        guard let snapshot = model.resumeSuspended() else { return }
+        controller = MovementLabController(resuming: snapshot, stages: .bundled(), persistence: store)
+    }
+
+    /// Declining the snapshot discards it (§17.5).
+    private func discardSuspended() {
+        guard model.suspended != nil else { return }
+        model.discardSuspended()
+        try? store?.clearSuspended()
+    }
+
+    private func leaveGame(_ controller: MovementLabController) {
+        model.recordCompleted(stageIDs: controller.campaignRun?.completedStageIDs ?? [])
+        if let failure = controller.persistenceFailure { storeNotice = "存档失败：\(failure)" }
+        self.controller = nil
+        model.discardSuspended()
+        model.backToTitle()
     }
 }
 
@@ -125,11 +200,16 @@ public struct AppRootView: View {
 /// provisional text treatment until Phase 1 art is authorized).
 struct TitleScreen: View {
     let hasCampaign: Bool
+    var canResume = false
+    var canContinue = false
+    var notice: String?
+    var onResume: () -> Void = {}
+    var onContinue: () -> Void = {}
     let onStart: () -> Void
     let onTraining: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             Spacer()
             Text("SparkTread")
                 .font(.system(size: 54, weight: .black, design: .rounded))
@@ -139,11 +219,24 @@ struct TitleScreen: View {
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
             Spacer()
+            if hasCampaign, canResume {
+                titleButton("继续上次战斗", action: onResume)
+            }
+            if hasCampaign, canContinue, !canResume {
+                titleButton("继续战役", action: onContinue)
+            }
             if hasCampaign {
-                titleButton("开始战役", action: onStart)
+                titleButton(canResume || canContinue ? "新的战役" : "开始战役", action: onStart)
             }
             titleButton("训练场", action: onTraining)
-            Spacer().frame(height: 30)
+            if let notice {
+                Text(notice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.orange)
+                    .lineLimit(2)
+                    .padding(.horizontal, 30)
+            }
+            Spacer().frame(height: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

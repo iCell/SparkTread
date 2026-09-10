@@ -691,6 +691,27 @@ text treatment (no Phase 1 art):
   options (M4 "settings, accessibility baseline, controller support" is
   the owner's item 6).
 
+## M4 item 3 — checkpoint save and suspended session (2026-09-10 late evening; ADR-0014 proposed)
+
+- Documents: `CampaignProgress` and `SuspendedSession` (versioned,
+  self-validating), `SaveSchema` version gate (migration table empty at
+  version 1), `CampaignPersistence` protocol, `InMemorySaveStore`,
+  `FileSaveStore` (Application Support/SparkTread, atomic sorted JSON,
+  version read first, errors not crashes).
+- Controller: the snapshot is written on inactivity mid-play (before the
+  clock stops), cleared on decision and abandonment; progress is
+  checkpointed after each won stage (next run as checkpoint, best
+  score); `init(resuming:)` continues the snapshot's recording, skips
+  the intro and opens paused; failures land on `persistenceFailure`.
+- Title: 继续上次战斗 (snapshot) / 继续战役 (checkpoint) / 新的战役 / 训练场,
+  store notices; declining the snapshot discards it; stage cards start
+  the checkpoint run when it is that stage.
+- Tests (290 / 74): documents and version gate, snapshot → resume equals
+  an uninterrupted run (session and controller), the resumed recording
+  replays as one recording, write/clear/checkpoint timing, a failing
+  store reported not fatal, file store round trip / foreign version /
+  corrupt file.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -713,5 +734,6 @@ Do not interpret green tests as product completion:
   A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
   icons; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
-  is in progress: items 1 (campaign progression, ADR-0013 proposed) and
-  2 (screen flow) landed; items 3–5 follow.
+  is in progress: items 1 (campaign progression, ADR-0013 proposed), 2
+  (screen flow) and 3 (checkpoint save, ADR-0014 proposed) landed; items
+  4–5 follow.
