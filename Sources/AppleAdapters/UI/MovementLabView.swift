@@ -618,7 +618,7 @@ enum HUDLabels {
         }
     }
 
-    /// Results-table reward categories (ADR-0012; GAME_MECHANICS_SPEC §8.2
+    /// Results-table reward categories (ADR-0012; GAME_RULES §8.2
     /// last column): 0/1 the two Normal pairs, 2 Rapid, 3 Mine,
     /// 4 Explosion, 5 Fire, 6/7 the two AP pairs.
     static func rewardCategory(_ category: Int) -> String {

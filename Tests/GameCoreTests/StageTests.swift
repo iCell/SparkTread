@@ -38,7 +38,7 @@ private func tick(_ world: inout WorldState, _ n: Int,
 }
 
 @Suite struct EnemyArchetypeTests {
-    /// The reference-recovered table (GAME_MECHANICS_SPEC §8.2) gives each
+    /// The reference-recovered table (GAME_RULES §8.2) gives each
     /// family a distinct identity: AP heavies are near-immobile fortresses,
     /// Rapids the fastest, Normals fragile teaching fodder.
     @Test func familiesHaveDistinctReferenceIdentities() {

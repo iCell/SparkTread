@@ -4,7 +4,7 @@ Status: Proposed (drafted 2026-09-10 late evening on the owner's instruction to 
 
 Date: 2026-09-10
 
-Related: plan §5.1, §6.4–6.5, §11.3–11.4, §12.1, §16.2–16.3, §19 M4; ADR-0011 §4 (the provisional same-stage loop this replaces); ADR-0012 (clear bonuses, `stageNumber`); `GAME_MECHANICS_SPEC.md` §3.1 (reference stage roster)
+Related: plan §5.1, §6.4–6.5, §11.3–11.4, §12.1, §16.2–16.3, §19 M4; ADR-0011 §4 (the provisional same-stage loop this replaces); ADR-0012 (clear bonuses, `stageNumber`); `GAME_RULES.md` §3.1 (reference stage roster)
 
 ## Context
 

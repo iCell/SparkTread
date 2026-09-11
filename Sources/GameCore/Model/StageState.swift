@@ -172,13 +172,13 @@ public enum EnemyArchetypes {
         public let baseFocusPercent: Int
         /// Equipment variant (mine/traversal interactions, §8.6).
         public let equipmentID: String?
-        /// Results-table reward category 0…7 (GAME_MECHANICS_SPEC §8.2 last
+        /// Results-table reward category 0…7 (GAME_RULES §8.2 last
         /// column; ADR-0012): the reference's results screen lists kills in
         /// these eight categories, four rows of two, multiplied ×1…×4 by row.
         public let rewardCategory: Int
     }
 
-    /// The reference-recovered per-slot table (GAME_MECHANICS_SPEC §8.2):
+    /// The reference-recovered per-slot table (GAME_RULES §8.2):
     /// each weapon family has a distinct property identity — Normal is
     /// 1-armor teaching fodder, Rapid is fragile but the fastest thing on
     /// the field, AP is a 5–6-armor near-stationary fortress, and so on.

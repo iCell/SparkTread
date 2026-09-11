@@ -44,7 +44,7 @@ This is not a claim that the new game will be a byte-identical recreation. The o
 When documents conflict, use this order:
 
 1. this document and accepted Architecture Decision Records;
-2. `GAME_MECHANICS_SPEC.md` for facts about the reference game;
+2. `GAME_RULES.md` for facts about the reference game;
 3. `STAGE_52_METADATA.csv` for recovered candidate reference-stage metadata;
 4. automated tests and checked-in content schemas;
 5. issue descriptions, agent prompts, comments, and informal notes.
@@ -54,7 +54,7 @@ Reference-game data does not override an explicit modern-product decision in thi
 ### 1.4 Required companion material
 
 - `DOCUMENT_INDEX.md`: reading order, authority order, and current fixed-direction index.
-- `GAME_MECHANICS_SPEC.md`: evidence-graded reference-mechanics research.
+- `GAME_RULES.md`: evidence-graded reference-mechanics research.
 - `STAGE_52_METADATA.csv`: 52 candidate reference-stage metadata records.
 - `PROJECT_MASTER_SUMMARY_ZH.md`: Chinese consolidated summary of all currently confirmed product and implementation decisions.
 - `ASSET_PRODUCTION_MANIFEST.md`: complete visual/audio inventory, art direction, production method, and provenance requirements.
@@ -748,7 +748,7 @@ Variants differ by:
 - visual silhouette or palette;
 - AI behavior weights.
 
-The reference-derived attribute table in `GAME_MECHANICS_SPEC.md` is the starting dataset, not an untouchable modern balance requirement.
+The reference-derived attribute table in `GAME_RULES.md` is the starting dataset, not an untouchable modern balance requirement.
 
 ### 10.2 AI architecture
 
@@ -1184,7 +1184,7 @@ Package.swift
 README.md
 docs/
   PRODUCT_IMPLEMENTATION_PLAN.md
-  GAME_MECHANICS_SPEC.md
+  GAME_RULES.md
   decisions/
   agent_handoffs/
 

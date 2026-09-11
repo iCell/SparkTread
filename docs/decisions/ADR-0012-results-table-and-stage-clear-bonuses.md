@@ -4,7 +4,7 @@ Status: Accepted by the owner on 2026-09-10 (late evening) with its questions an
 
 Date: 2026-09-10
 
-Related: plan §11, §12.2; `GAME_MECHANICS_SPEC.md` §8.2 (reward category column), §11; ADR-0011 (stage transitions); `docs/CURRENT_REVIEW.md` "Stage-clear results table and bonuses"; `Tools/reference_measure/results_screens.py`
+Related: plan §11, §12.2; `GAME_RULES.md` §8.2 (reward category column), §11; ADR-0011 (stage transitions); `docs/CURRENT_REVIEW.md` "Stage-clear results table and bonuses"; `Tools/reference_measure/results_screens.py`
 
 ## Context
 

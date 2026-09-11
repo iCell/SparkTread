@@ -830,13 +830,14 @@ brick × shell, tank × equipment × terrain, and their combination — into one
 document, reach consensus with PI, have the owner review it, and only then
 delegate implementation to Opus-class agents. State:
 
-- `docs/REFERENCE_GAMEPLAY_RULES_ZH.md` (draft v0.1): evidence tags
-  【V】video / 【B】【C】decompile / 【M】modern / 【?】owner; matrices for
-  shell × terrain, shell × tank, terrain × equipment, equipment × mine,
-  pickups, enemy slots; §9 deviation list D-01…D-23. Weapon facts are in
-  `GAME_MECHANICS_SPEC.md` §5.4, world facts (enemy catalogue and speeds,
-  hits-to-kill anchors, terrain, pickups/HUD, equipment, base ring,
-  spawning, death/continue persistence) in §7.1/§8.4/§10.4. PI's
+- `GAME_RULES.md` (v1.0) is now the single rules document: it merges the
+  former `GAME_MECHANICS_SPEC.md`, `RESEARCH_SUMMARY.md` and the video
+  work. Evidence tags 【V】video / B / C decompile / M modern (M-ADR vs
+  M-临时) / ? owner; video measurements live in §3.4, §4.5, §5.4–§5.6,
+  §6.3, §7.1–§7.2, §8.4, §10.4; the interaction matrices (shell × terrain,
+  shell × tank, terrain × equipment, equipment × mine, combinations) in
+  §17; the deviation list D-01…D-23 in §18; what the video cannot answer
+  in §19. PI's
   round-32 frame check rejected the world half's high-impact claims
   (hits-to-kill anchors, Armor Up +1, kill-site drops, death resets,
   "steel U" base ring, Explosion-only steel damage): they are recorded as

@@ -13,7 +13,7 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
     public var speedMultipliersPermille: [Int]
 
     /// Enemy speed multipliers for levels -4…4, in permille (reference table,
-    /// GAME_MECHANICS_SPEC §8.3; level 0 is 0.6× the player base, NOT 1.0×).
+    /// GAME_RULES §8.3; level 0 is 0.6× the player base, NOT 1.0×).
     public var enemySpeedMultipliersPermille: [Int]
 
     /// How long a pre-pressed turn stays buffered (§6.3).

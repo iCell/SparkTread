@@ -6,12 +6,10 @@
 2. `PRODUCT_IMPLEMENTATION_PLAN.md`：产品、架构、范围、里程碑和验收的最终实施权威。
 3. `ASSET_REQUIREMENTS_LIST_ZH.md`：只列举全部素材需求，不授权生成。
 4. `ASSET_PRODUCTION_MANIFEST.md`：素材技术规格、生产边界和来源台账要求。
-5. `GAME_MECHANICS_SPEC.md`：原版机制证据和恢复数据。
-   - `docs/REFERENCE_GAMEPLAY_RULES_ZH.md`：原版玩法规则复原（视频逐帧实测 V + 反编译 B/C + 现有代码对照 + 差异清单）。草稿，待 PI 交叉核对与所有者审阅；其中的原版事实与 `GAME_MECHANICS_SPEC.md` 同级，差异清单不是决定。
-6. `RESEARCH_SUMMARY.md`：原版反向分析摘要。
-7. `STAGE_52_METADATA.csv`：52 个候选参考关卡元数据。
-8. `docs/CURRENT_REVIEW.md`：当前实现审查（2026-09-09 Claude/PI 联合评审）、验证证据与未完成项。
-9. `docs/agent_handoffs/2026-09-09-joint-review.md`：联合评审交接：已完成、验证命令、地雷区、下一步。
+5. `GAME_RULES.md`：**唯一的规则文档**——原版事实（反编译/说明书 B/C + 通关录像逐帧实测 V）、现行实现对照、以及 §18 待所有者裁决的差异清单。合并自原 `GAME_MECHANICS_SPEC.md`、`RESEARCH_SUMMARY.md`、`docs/REFERENCE_GAMEPLAY_RULES_ZH.md`（2026-09-11）。
+6. `STAGE_52_METADATA.csv`：52 个候选参考关卡元数据。
+7. `docs/CURRENT_REVIEW.md`：当前实现审查（2026-09-09 Claude/PI 联合评审）、验证证据与未完成项。
+8. `docs/agent_handoffs/2026-09-09-joint-review.md`：联合评审交接：已完成、验证命令、地雷区、下一步。
 
 ## 权威顺序
 
@@ -21,7 +19,7 @@
 2. `PRODUCT_IMPLEMENTATION_PLAN.md`；
 3. `PROJECT_MASTER_SUMMARY_ZH.md`；
 4. 自动测试和已固定内容 schema；
-5. `GAME_MECHANICS_SPEC.md` 中的参考事实；
+5. `GAME_RULES.md` 中的参考事实（【V】/【B】/【C】行）。同一文件里的“现行实现”段落只是对照描述（真正的权威是代码、测试与已接受 ADR），§18 差异清单是提案；
 6. 其他清单、提示词、聊天记录和非正式说明。
 
 原版研究事实不能覆盖现代产品中已经固定的平台、地图、视角、单人范围、美术和架构决定。

@@ -610,12 +610,11 @@ V1 不开发匹配、Socket、网络管理器、预测、回滚、重连或主�
 
 1. `PRODUCT_IMPLEMENTATION_PLAN.md`：产品和实施权威。
 2. `PROJECT_MASTER_SUMMARY_ZH.md`：当前确认内容的中文汇总。
-3. `GAME_MECHANICS_SPEC.md`：原版机制证据，不覆盖现代产品决定。
+3. `GAME_RULES.md`：唯一的规则文档（原版事实 + 现行实现对照 + 待决差异清单），原版事实不覆盖现代产品决定。
 4. `ASSET_PRODUCTION_MANIFEST.md`：美术/音频生产规格和来源要求。
 5. `ASSET_REQUIREMENTS_LIST_ZH.md`：只列举素材，不授权生成。
 6. `STAGE_52_METADATA.csv`：候选原版关卡研究数据。
-7. `RESEARCH_SUMMARY.md`：反向分析摘要。
-8. `AI_REVIEW_PROMPT.md`：交给其他 AI 审查规划的统一提示词。
+7. `AI_REVIEW_PROMPT.md`：交给其他 AI 审查规划的统一提示词。
 
 若中文汇总与英文主规划存在冲突，以英文主规划和已接受 ADR 为准；任何实现 agent 不得根据聊天记忆擅自覆盖文档中的固定决定。
 

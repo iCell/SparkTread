@@ -54,7 +54,7 @@ public struct ScoreRules: Equatable, Sendable {
     ])
 
     /// The reference's results table lists kills in eight reward categories
-    /// (GAME_MECHANICS_SPEC §8.2, last column) as four rows of two: row `r`
+    /// (GAME_RULES §8.2, last column) as four rows of two: row `r`
     /// holds categories `2r` and `2r+1` and multiplies their kills by `r+1`.
     public static let rewardCategoryCount = 8
     public static let rewardTableRows = 4

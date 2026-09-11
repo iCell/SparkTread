@@ -4,7 +4,7 @@ Status: Proposed (drafted 2026-09-10 late evening, M4 item 4)
 
 Date: 2026-09-10
 
-Related: plan §5.1, §10.2, §10.6–10.7, §11.3, §6.6, §16.3, §22.3; ADR-0005 (`allied_base_damage` is difficulty data); ADR-0013 (campaign run); `GAME_MECHANICS_SPEC.md` §9.2 (the reference's five-level table, research only)
+Related: plan §5.1, §10.2, §10.6–10.7, §11.3, §6.6, §16.3, §22.3; ADR-0005 (`allied_base_damage` is difficulty data); ADR-0013 (campaign run); `GAME_RULES.md` §9.2 (the reference's five-level table, research only)
 
 ## Context
 

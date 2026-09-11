@@ -4,7 +4,7 @@
 /// decision — a longer running invincibility timer is never shortened, and
 /// drops appear at random cells (ADR-0010 item 7, proposed). The reference
 /// game's alternatives (e.g. its 25-second invincibility refresh rule,
-/// GAME_MECHANICS_SPEC §7) are expressible here without touching simulation
+/// GAME_RULES §7) are expressible here without touching simulation
 /// code and land only through a recorded balance decision.
 public struct PickupRuleset: Codable, Equatable, Sendable {
     /// Lifetime of a spawned pickup before it vanishes.
@@ -105,7 +105,7 @@ public struct PickupRuleset: Codable, Equatable, Sendable {
 
     public static let provisional = PickupRuleset()
 
-    /// The reference game's rule (GAME_MECHANICS_SPEC §7, id 13): remaining
+    /// The reference game's rule (GAME_RULES §7, id 13): remaining
     /// ≤ 12.5 s → 25 s, otherwise +12.5 s. Not the campaign default.
     public static let referenceInvincibility = PickupRuleset(
         invincibilityFloorTicks: 1500, invincibilityRefreshBelowTicks: 750,
