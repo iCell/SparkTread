@@ -292,7 +292,7 @@ final class MovementLabScene: SKScene {
     func refreshWallTexture(_ art: PixelArt, world: WorldState, cellX: Int, cellY: Int) {
         let key = cellY * world.arena.cellsWide + cellX
         let cell = world.terrain[cellX, cellY]
-        guard cell.kind == .brick || cell.kind == .steel, cell.quadrantMask != 0 else {
+        guard cell.kind.isWall, cell.quadrantMask != 0 else {
             wallNodes.removeValue(forKey: key)?.removeFromParent()
             return
         }
@@ -308,7 +308,17 @@ final class MovementLabScene: SKScene {
             addChild(node)
             wallNodes[key] = node
         }
-        let name = cell.kind == .brick ? "brick" : "steel"
+        // The reference draws all four materials with two patterns and
+        // different palettes (GAME_RULES §3.5), so the white tiers reuse the
+        // brick/steel atlases with a tint; cracked white brick darkens.
+        let name = cell.kind.isBrickFamily ? "brick" : "steel"
+        switch cell.kind {
+        case .whiteBrick, .whiteSteel:
+            node.color = .white
+            node.colorBlendFactor = cell.crackMask != 0 ? 0.45 : 0.62
+        default:
+            node.colorBlendFactor = 0
+        }
         var mask = 0
         for (bit, dx, dy) in [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0)]
         where world.terrain.isInside(cellX: cellX + dx, cellY: cellY + dy)

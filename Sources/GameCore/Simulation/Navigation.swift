@@ -28,9 +28,9 @@ enum Navigation {
         for dy in 0..<2 {
             for dx in 0..<2 {
                 let kind = world.terrain[anchor.x + dx, anchor.y + dy].kind
-                if kind == .steel || kind == .base { return false }
+                if kind.isSteelFamily || kind == .base { return false }
                 if kind == .water && profile != .amphibious { return false } // ADR-0016
-                if kind == .brick && !canDig { return false }
+                if kind.isBrickFamily && !canDig { return false }
             }
         }
         if let base = world.base {
@@ -45,7 +45,7 @@ enum Navigation {
     static func entryCost(_ world: WorldState, anchor: Vec2i) -> Int {
         var bricks = 0
         for dy in 0..<2 {
-            for dx in 0..<2 where world.terrain[anchor.x + dx, anchor.y + dy].kind == .brick {
+            for dx in 0..<2 where world.terrain[anchor.x + dx, anchor.y + dy].kind.isBrickFamily {
                 bricks += 1
             }
         }

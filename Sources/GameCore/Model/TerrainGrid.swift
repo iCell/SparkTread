@@ -1,5 +1,7 @@
-/// Terrain cell kinds (§7.3). M1 implements tank-blocking legality; weapon
-/// interaction and destruction rules land in M2.
+/// Terrain cell kinds (§7.3). Four wall materials, in the reference's
+/// durability order (GAME_RULES §3.5, owner testimony): red brick, white
+/// brick (twice the rounds), grey steel (only the AP shell, one round per
+/// cell) and white steel (indestructible).
 public enum TerrainKind: Int, Codable, Sendable, Equatable {
     case ground = 0
     case brick = 1
@@ -8,12 +10,14 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
     case ice = 4
     case foliage = 5
     case base = 6
+    case whiteBrick = 7
+    case whiteSteel = 8
 
     /// Whether the kind blocks a `normal`-profile tank (before quadrant
     /// masks); `blocksTank(profile:)` applies the equipment profile.
     public var blocksTanksByDefault: Bool {
         switch self {
-        case .brick, .steel, .water, .base: true
+        case .brick, .whiteBrick, .steel, .whiteSteel, .water, .base: true
         case .ground, .ice, .foliage: false
         }
     }
@@ -25,10 +29,27 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
     public var canHoldPickup: Bool {
         switch self {
         case .ground, .ice, .foliage: true
-        case .brick, .steel, .water, .base: false
+        case .brick, .whiteBrick, .steel, .whiteSteel, .water, .base: false
         }
     }
+
+    /// Brick-family walls chip away quadrant by quadrant under any weapon
+    /// that lists brick damage; steel-family walls use the steel column.
+    public var isBrickFamily: Bool { self == .brick || self == .whiteBrick }
+    public var isSteelFamily: Bool { self == .steel || self == .whiteSteel }
+    public var isWall: Bool { isBrickFamily || isSteelFamily }
+
+    /// White steel takes no damage from anything (owner, §3.5).
+    public var isIndestructibleWall: Bool { self == .whiteSteel }
+
+    /// Rounds a single quadrant costs, relative to red brick. White brick is
+    /// the same wall with twice the durability: the first hit cracks the
+    /// quadrant, the second removes it.
+    public var roundsPerQuadrant: Int { self == .whiteBrick ? 2 : 1 }
 }
+
+/// Outcome of one round of damage against a wall quadrant.
+public enum WallDamage: Sendable, Equatable { case none, cracked, removed }
 
 /// One terrain cell. Destructible kinds carry a four-bit quadrant mask
 /// (§7.4): bit 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right
@@ -36,10 +57,32 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
 public struct TerrainCell: Codable, Hashable, Sendable {
     public var kind: TerrainKind
     public var quadrantMask: Int
+    /// Quadrants that have taken one round but have not fallen yet — only
+    /// white brick uses it (`roundsPerQuadrant` 2). Always a subset of
+    /// `quadrantMask`; absent from older documents, where it decodes as 0.
+    public var crackMask: Int
 
-    public init(kind: TerrainKind, quadrantMask: Int = 0b1111) {
+    public init(kind: TerrainKind, quadrantMask: Int = 0b1111, crackMask: Int = 0) {
         self.kind = kind
         self.quadrantMask = kind.blocksTanksByDefault ? quadrantMask : 0
+        self.crackMask = kind.blocksTanksByDefault ? (crackMask & self.quadrantMask) : 0
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, quadrantMask, crackMask }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try c.decode(TerrainKind.self, forKey: .kind)
+        let mask = try c.decode(Int.self, forKey: .quadrantMask)
+        let cracks = try c.decodeIfPresent(Int.self, forKey: .crackMask) ?? 0
+        self.init(kind: kind, quadrantMask: mask, crackMask: cracks)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(quadrantMask, forKey: .quadrantMask)
+        if crackMask != 0 { try c.encode(crackMask, forKey: .crackMask) }
     }
 }
 

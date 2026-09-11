@@ -526,8 +526,9 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(columns == [5632, 6656, 7680]) // cells x=5,6,7 ahead of the tank
     }
 
-    /// Owner rule: a flame that burns out on ice melts the cell to ground.
-    @Test func fireMeltsIceToGroundWhenBurnedOut() {
+    /// Owner rule (2026-09-11, reverses the earlier "fire melts ice"):
+    /// ice does not react to fire at all.
+    @Test func fireLeavesIceUnchanged() {
         var world = makeCombatWorld { w in
             for x in 5...7 { for y in 3...4 { w.terrain[x, y] = TerrainCell(kind: .ice) } }
         }
@@ -538,11 +539,10 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(world.terrain[5, 3].kind == .ice) // still ice while burning
         tickAll(&world, 245, events: &events) // lifetime 240 elapses
         #expect(world.fireHazards.isEmpty)
-        // Every flamed ice cell melted; unflamed ice (x=7 wasn't reached? steps cover 5,6,7) —
         for x in 5...7 { for y in 3...4 {
-            #expect(world.terrain[x, y].kind == .ground, "cell (\(x),\(y)) did not melt")
+            #expect(world.terrain[x, y].kind == .ice, "cell (\(x),\(y)) stopped being ice")
         } }
-        #expect(events.contains { if case .terrainChanged(5, 3, 0) = $0 { true } else { false } })
+        #expect(!events.contains { if case .terrainChanged(5, 3, 0) = $0 { true } else { false } })
     }
 
     /// Empty special ammo no longer dry-fires: the press falls back to the
@@ -673,5 +673,103 @@ private func giveSpecial(_ world: inout WorldState, _ weaponID: String, ammo: In
         #expect(a.checksum() == b.checksum())
         #expect(a == b)
         #expect(WorldInvariants.violations(in: a).isEmpty, "\(WorldInvariants.violations(in: a))")
+    }
+}
+
+// MARK: - Four wall materials (owner rules 2026-09-11, GAME_RULES §3.5)
+
+@Suite("Wall materials")
+struct WallMaterialTests {
+    /// Red brick loses the quadrant it is hit on; white brick is the same
+    /// wall at twice the durability, so the first round only cracks it.
+    @Test func whiteBrickNeedsTwoRoundsPerQuadrant() {
+        var world = makeCombatWorld { w in
+            for y in 2...4 { w.terrain[6, y] = TerrainCell(kind: .brick) }
+            for y in 2...4 { w.terrain[9, y] = TerrainCell(kind: .whiteBrick) }
+        }
+        var events: [DomainEvent] = []
+        // One normal round into the red brick column: the front quadrants go.
+        tickAll(&world, 1, normal: true, events: &events)
+        tickAll(&world, 40, events: &events)
+        let red = world.terrain[6, 3]
+        #expect(red.quadrantMask != 0b1111)
+        #expect(red.crackMask == 0)
+
+        // The same round into white brick cracks instead of removing.
+        var world2 = makeCombatWorld { w in
+            for y in 2...4 { w.terrain[6, y] = TerrainCell(kind: .whiteBrick) }
+        }
+        var events2: [DomainEvent] = []
+        tickAll(&world2, 1, normal: true, events: &events2)
+        tickAll(&world2, 40, events: &events2)
+        let first = world2.terrain[6, 3]
+        #expect(first.quadrantMask == 0b1111)
+        #expect(first.crackMask != 0)
+        // A second round on the same quadrants removes them.
+        tickAll(&world2, 1, normal: true, events: &events2)
+        tickAll(&world2, 40, events: &events2)
+        let second = world2.terrain[6, 3]
+        #expect(second.quadrantMask != 0b1111)
+        #expect(second.crackMask & second.quadrantMask == second.crackMask)
+    }
+
+    /// Grey steel yields only to the AP shell, and one round takes the whole
+    /// cell (both quadrant layers) — normal, rapid, explosion and mines do
+    /// nothing to it.
+    @Test func greySteelOnlyYieldsToArmorPiercing() {
+        for weapon in ["normal", "rapid", "explosion"] {
+            var world = makeCombatWorld { w in
+                for y in 2...4 { w.terrain[6, y] = TerrainCell(kind: .steel) }
+            }
+            if weapon != "normal" { giveSpecial(&world, weapon) }
+            var events: [DomainEvent] = []
+            for _ in 0..<6 {
+                tickAll(&world, 1, normal: weapon == "normal", special: weapon != "normal", events: &events)
+                tickAll(&world, 55, events: &events)
+            }
+            let cell = world.terrain[6, 3]
+            #expect(cell.kind == .steel, "\(weapon) changed grey steel")
+            #expect(cell.quadrantMask == 0b1111, "\(weapon) chipped grey steel")
+        }
+
+        var world = makeCombatWorld { w in
+            for y in 2...4 { w.terrain[6, y] = TerrainCell(kind: .steel) }
+        }
+        giveSpecial(&world, "ap")
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, special: true, events: &events)
+        tickAll(&world, 45, events: &events)
+        #expect(world.terrain[6, 3].kind == .ground) // one AP round, one whole cell
+    }
+
+    /// White steel takes nothing from any weapon, including blasts.
+    @Test func whiteSteelIsIndestructible() {
+        for weapon in ["ap", "explosion"] {
+            var world = makeCombatWorld { w in
+                for y in 2...4 { w.terrain[6, y] = TerrainCell(kind: .whiteSteel) }
+            }
+            giveSpecial(&world, weapon)
+            var events: [DomainEvent] = []
+            for _ in 0..<4 {
+                tickAll(&world, 1, special: true, events: &events)
+                tickAll(&world, 55, events: &events)
+            }
+            #expect(world.terrain[6, 3].kind == .whiteSteel, "\(weapon) damaged white steel")
+            #expect(world.terrain[6, 3].quadrantMask == 0b1111)
+        }
+    }
+
+    /// The AP shell cuts a corridor: brick it breaks through costs no
+    /// penetration, so one round opens the whole run instead of stopping.
+    @Test func armorPiercingCutsAWholeBrickCorridor() {
+        var world = makeCombatWorld { w in
+            for x in 6...14 { for y in 2...4 { w.terrain[x, y] = TerrainCell(kind: .brick) } }
+        }
+        giveSpecial(&world, "ap")
+        var events: [DomainEvent] = []
+        tickAll(&world, 1, special: true, events: &events)
+        tickAll(&world, 60, events: &events)
+        let opened = (6...14).filter { world.terrain[$0, 3].kind == .ground }
+        #expect(opened.count >= 6, "AP opened only \(opened.count) cells: \(opened)")
     }
 }

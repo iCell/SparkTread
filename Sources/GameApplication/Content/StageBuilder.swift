@@ -123,6 +123,8 @@ public enum StageBuilder {
         case "ground": .ground
         case "brick": .brick
         case "steel": .steel
+        case "white_brick": .whiteBrick
+        case "white_steel": .whiteSteel
         case "water": .water
         case "ice": .ice
         case "foliage": .foliage

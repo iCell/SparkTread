@@ -37,7 +37,9 @@ extension WorldState {
         c.mix(arena.cellsHigh)
         for cell in terrain.cells {
             c.mix(cell.kind.rawValue)
-            c.mix(cell.quadrantMask)
+            // Cracked quadrants ride in the high nibble so worlds without
+            // white brick keep the checksums they had before it existed.
+            c.mix(cell.quadrantMask | (cell.crackMask << 4))
         }
         for p in players { // already sorted by playerID
             c.mix(p.playerID.rawValue)

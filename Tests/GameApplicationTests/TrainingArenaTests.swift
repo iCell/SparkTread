@@ -18,7 +18,8 @@ import GameCore
                 if c.kind == .steel { steelMasks.insert(c.quadrantMask) }
             }
         }
-        #expect(kinds == [.ground, .brick, .steel, .water, .ice, .foliage])
+        // All four wall materials (GAME_RULES §3.5) plus the walkable kinds.
+        #expect(kinds == [.ground, .brick, .whiteBrick, .steel, .whiteSteel, .water, .ice, .foliage])
         #expect(brickMasks.count >= 8 && brickMasks.contains(0b1111))
         #expect(steelMasks.count >= 4 && steelMasks.contains(0b1111))
         #expect(world.tanks.filter { $0.ownerPlayerID == nil }.isEmpty) // enemies come from the panel

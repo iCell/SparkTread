@@ -26,6 +26,39 @@ public struct WeaponDefinition: Codable, Equatable, Sendable {
     public let statusEffectID: String?
     public let friendlyFirePolicy: String
     public let presentationID: String
+    /// Owner rule (2026-09-11, GAME_RULES §17.1): the AP shell cuts a whole
+    /// corridor — brick it actually breaks through never consumes
+    /// `penetrationCount`, so one round opens the full run instead of
+    /// stopping after a cell. Optional so documents written before the rule
+    /// still decode; `cutsThroughBrick` is the accessor simulation uses.
+    public let cutsBrickCorridor: Bool?
+
+    public var cutsThroughBrick: Bool { cutsBrickCorridor ?? false }
+
+    public init(id: String, family: WeaponFamily, fireChannel: FireChannel,
+                ammoCost: Int, refillAmount: Int, maxAmmo: Int,
+                cooldownTicks: [Int], maxActive: [Int],
+                initialSpeedSubunitsPerTick: [Int], accelerationSubunitsPerTick2: [Int],
+                maxSpeedSubunitsPerTick: [Int], lifetimeTicks: [Int],
+                tankDamage: [Int], brickDamage: [Int], steelDamage: [Int],
+                projectileDurability: [Int], penetrationCount: [Int],
+                explosionRadiusSubunits: [Int], mineTriggerRadiusSubunits: [Int],
+                statusEffectID: String?, friendlyFirePolicy: String, presentationID: String,
+                cutsBrickCorridor: Bool? = nil) {
+        self.id = id; self.family = family; self.fireChannel = fireChannel
+        self.ammoCost = ammoCost; self.refillAmount = refillAmount; self.maxAmmo = maxAmmo
+        self.cooldownTicks = cooldownTicks; self.maxActive = maxActive
+        self.initialSpeedSubunitsPerTick = initialSpeedSubunitsPerTick
+        self.accelerationSubunitsPerTick2 = accelerationSubunitsPerTick2
+        self.maxSpeedSubunitsPerTick = maxSpeedSubunitsPerTick
+        self.lifetimeTicks = lifetimeTicks
+        self.tankDamage = tankDamage; self.brickDamage = brickDamage; self.steelDamage = steelDamage
+        self.projectileDurability = projectileDurability; self.penetrationCount = penetrationCount
+        self.explosionRadiusSubunits = explosionRadiusSubunits
+        self.mineTriggerRadiusSubunits = mineTriggerRadiusSubunits
+        self.statusEffectID = statusEffectID; self.friendlyFirePolicy = friendlyFirePolicy
+        self.presentationID = presentationID; self.cutsBrickCorridor = cutsBrickCorridor
+    }
 
     public func level(_ array: [Int], _ power: Int) -> Int {
         array[max(0, min(3, power))]
@@ -206,7 +239,7 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
                 accelerationSubunitsPerTick2: [0, 0, 0, 0],
                 maxSpeedSubunitsPerTick: [192, 192, 224, 224],
                 lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [1, 1, 1, 2], brickDamage: [1, 1, 2, 2], steelDamage: [0, 0, 0, 1],
+                tankDamage: [1, 1, 1, 2], brickDamage: [1, 1, 2, 2], steelDamage: [0, 0, 0, 0],
                 projectileDurability: [1, 1, 1, 1], penetrationCount: [0, 0, 0, 0],
                 explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
                 statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
@@ -245,11 +278,11 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
                 accelerationSubunitsPerTick2: [8, 10, 12, 16],
                 maxSpeedSubunitsPerTick: [448, 512, 576, 640],
                 lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [2, 2, 3, 3], brickDamage: [2, 2, 2, 2], steelDamage: [0, 1, 1, 2],
+                tankDamage: [2, 2, 3, 3], brickDamage: [2, 2, 2, 2], steelDamage: [2, 2, 2, 2],
                 projectileDurability: [2, 2, 3, 3], penetrationCount: [1, 2, 3, 4],
                 explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
                 statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "projectile_ap"),
+                presentationID: "projectile_ap", cutsBrickCorridor: true),
             WeaponDefinition(
                 id: "explosion", family: .explosion, fireChannel: .special,
                 ammoCost: 1, refillAmount: 20, maxAmmo: 100,
@@ -258,7 +291,7 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
                 accelerationSubunitsPerTick2: [4, 4, 6, 8],
                 maxSpeedSubunitsPerTick: [256, 288, 320, 384],
                 lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [2, 2, 2, 3], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 1, 1],
+                tankDamage: [2, 2, 2, 3], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 0, 0],
                 projectileDurability: [2, 2, 2, 2], penetrationCount: [0, 0, 0, 0],
                 explosionRadiusSubunits: [1024, 1280, 1536, 2048],
                 mineTriggerRadiusSubunits: [0, 0, 0, 0],
@@ -272,7 +305,7 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
                 accelerationSubunitsPerTick2: [0, 0, 0, 0],
                 maxSpeedSubunitsPerTick: [0, 0, 0, 0],
                 lifetimeTicks: [0, 0, 0, 0], // mines persist until triggered
-                tankDamage: [2, 2, 3, 4], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 1, 1],
+                tankDamage: [2, 2, 3, 4], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 0, 0],
                 projectileDurability: [0, 0, 0, 0], penetrationCount: [0, 0, 0, 0],
                 explosionRadiusSubunits: [1024, 1152, 1280, 1536],
                 mineTriggerRadiusSubunits: [768, 832, 896, 1024],

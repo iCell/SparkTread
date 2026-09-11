@@ -233,7 +233,7 @@ enum Combat {
                     let (cx, cy) = horizontal ? (along / cell, cross) : (cross, along / cell)
                     guard world.terrain.isInside(cellX: cx, cellY: cy) else { break }
                     let kind = world.terrain[cx, cy].kind
-                    if kind == .brick || kind == .steel || kind == .water { break }
+                    if kind.isWall || kind == .water { break }
                     patches.append((cx, cy))
                     if cellTouchesBase(world, cellX: cx, cellY: cy) { break }
                 }
@@ -294,7 +294,7 @@ enum Combat {
         let cx = center.x / cell, cy = center.y / cell
         guard world.terrain.isInside(cellX: cx, cellY: cy) else { return nil }
         let kind = world.terrain[cx, cy].kind
-        if kind == .brick || kind == .steel || kind == .base { return nil }
+        if kind.isWall || kind == .base { return nil }
         if cellTouchesBase(world, cellX: cx, cellY: cy) { return nil }
         let onWater = kind == .water
         if onWater && tank.equipmentID != "amphi_tank" { return nil } // §8.6
@@ -611,7 +611,7 @@ enum Combat {
             destroy(.boundary)
 
         case .terrain(let qx, let qy):
-            let material: ImpactTarget = world.terrain[qx / 2, qy / 2].kind == .steel ? .steel : .brick
+            let material: ImpactTarget = world.terrain[qx / 2, qy / 2].kind.isSteelFamily ? .steel : .brick
             let destroyedCount = applyTerrainDamage(
                 &world, entryQuadrant: (qx, qy), direction: projectile.direction,
                 crossCenter: projectile.positionSubunits, half: half,
@@ -619,10 +619,14 @@ enum Combat {
                 steelDamage: weapon.level(weapon.steelDamage, projectile.powerLevel),
                 events: &events)
             outcome.terrainChanged = destroyedCount > 0
-            if destroyedCount == 0 || projectile.penetrationRemaining < destroyedCount {
+            // Owner rule: the AP shell cuts a whole corridor, so brick it
+            // actually broke through costs no penetration (GAME_RULES §17.1).
+            // A round that only cracked white brick broke nothing and stops.
+            let freeCut = weapon.cutsThroughBrick && material == .brick // kind read before damage
+            if destroyedCount == 0 || (!freeCut && projectile.penetrationRemaining < destroyedCount) {
                 destroy(material)
             } else {
-                projectile.penetrationRemaining -= destroyedCount
+                if !freeCut { projectile.penetrationRemaining -= destroyedCount }
                 survive(material)
             }
 
@@ -876,12 +880,36 @@ enum Combat {
         let cx = qx / 2, cy = qy / 2
         guard terrain.isInside(cellX: cx, cellY: cy) else { return false }
         let cell = terrain[cx, cy]
-        guard cell.kind == .brick || cell.kind == .steel else { return false }
+        guard cell.kind.isWall else { return false }
         let bit = (qy % 2) * 2 + (qx % 2)
         return cell.quadrantMask & (1 << bit) != 0
     }
 
     // MARK: - Damage application
+
+    /// Applies one round's worth of damage to a single wall quadrant.
+    /// Red brick and grey steel lose the quadrant outright; white brick
+    /// needs two rounds per quadrant (owner rule, GAME_RULES §3.5) — the
+    /// first cracks it, the second removes it; white steel never yields.
+    /// Emptied cells normalize to ground so pickup legality and hidden
+    /// treasures keep agreeing with "final quadrant destroyed".
+    /// Returns what happened to the quadrant.
+    @discardableResult
+    static func damageQuadrant(_ world: inout WorldState, cellX: Int, cellY: Int, bit: Int) -> WallDamage {
+        var cell = world.terrain[cellX, cellY]
+        let flag = 1 << bit
+        guard cell.quadrantMask & flag != 0, !cell.kind.isIndestructibleWall else { return .none }
+        if cell.kind.roundsPerQuadrant > 1, cell.crackMask & flag == 0 {
+            cell.crackMask |= flag
+            world.terrain[cellX, cellY] = cell
+            return .cracked
+        }
+        cell.quadrantMask &= ~flag
+        cell.crackMask &= ~flag
+        if cell.quadrantMask == 0 { cell = TerrainCell(kind: .ground) }
+        world.terrain[cellX, cellY] = cell
+        return .removed
+    }
 
     /// Destroys quadrant layers at the impact point. Layer i falls when the
     /// material's damage value exceeds i (brick 1 = front layer, 2 = full
@@ -929,13 +957,12 @@ enum Combat {
                 guard solidQuadrant(world.terrain, qx: qx, qy: qy) else { continue }
                 let cx = qx / 2, cy = qy / 2
                 let kind = world.terrain[cx, cy].kind
-                let damage = kind == .brick ? brickDamage : steelDamage
+                let damage = kind.isBrickFamily ? brickDamage : steelDamage
                 guard damage > layer else { continue }
-                var cell = world.terrain[cx, cy]
-                cell.quadrantMask &= ~(1 << ((qy % 2) * 2 + (qx % 2)))
-                if cell.quadrantMask == 0 { cell = TerrainCell(kind: .ground) }
-                world.terrain[cx, cy] = cell
-                if (pierceLo...pierceHi).contains(cross) { piercedCount += 1 }
+                let result = damageQuadrant(&world, cellX: cx, cellY: cy,
+                                            bit: (qy % 2) * 2 + (qx % 2))
+                guard result != .none else { continue }
+                if result == .removed, (pierceLo...pierceHi).contains(cross) { piercedCount += 1 }
                 changedCells.insert(cy * world.arena.cellsWide + cx)
             }
         }
@@ -1242,12 +1269,10 @@ enum Combat {
                 let dx = explosion.center.x - centerX, dy = explosion.center.y - centerY
                 guard dx * dx + dy * dy <= r * r else { continue }
                 let cx = qx / 2, cy = qy / 2
-                let damage = world.terrain[cx, cy].kind == .brick ? explosion.brickDamage : explosion.steelDamage
+                let damage = world.terrain[cx, cy].kind.isBrickFamily ? explosion.brickDamage : explosion.steelDamage
                 guard damage > 0 else { continue }
-                var cell = world.terrain[cx, cy]
-                cell.quadrantMask &= ~(1 << ((qy % 2) * 2 + (qx % 2)))
-                if cell.quadrantMask == 0 { cell = TerrainCell(kind: .ground) }
-                world.terrain[cx, cy] = cell
+                guard damageQuadrant(&world, cellX: cx, cellY: cy,
+                                     bit: (qy % 2) * 2 + (qx % 2)) != .none else { continue }
                 changedCells.insert(cy * world.arena.cellsWide + cx)
             }
         }
@@ -1330,14 +1355,10 @@ enum Combat {
         world.projectiles.removeAll { destroyedProjectiles.contains($0.entityID) }
         for hazard in world.fireHazards where hazard.lifetimeRemainingTicks <= 0 {
             decrementActiveCount(&world, ownerEntityID: hazard.ownerEntityID, weaponID: "fire")
-            // A flame that burns out on ice melts the cell to plain ground
-            // (owner rule): terrain change lands with the same-tick event.
+            // Ice does not react to fire (owner, 2026-09-11 — this reverses
+            // the earlier "fire melts ice" rule; GAME_RULES §17.1).
             let cell = SpatialUnits.subunitsPerCell
             let cx = hazard.positionSubunits.x / cell, cy = hazard.positionSubunits.y / cell
-            if world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .ice {
-                world.terrain[cx, cy] = TerrainCell(kind: .ground)
-                events.append(.terrainChanged(cellX: cx, cellY: cy, quadrantMask: 0))
-            }
             // Foliage a flame burns out on is gone (ADR-0017, owner rule).
             if weapons.foliageBurnsAway, world.terrain.isInside(cellX: cx, cellY: cy),
                world.terrain[cx, cy].kind == .foliage {

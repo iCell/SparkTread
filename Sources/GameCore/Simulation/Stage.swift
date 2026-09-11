@@ -142,7 +142,7 @@ enum Stage {
                     let cx = probe.x / SpatialUnits.subunitsPerCell
                     let cy = probe.y / SpatialUnits.subunitsPerCell
                     return world.terrain.isInside(cellX: cx, cellY: cy)
-                        && world.terrain[cx, cy].kind == .brick
+                        && world.terrain[cx, cy].kind.isBrickFamily
                 }
                 // Cost-field descent (§10.4): the best neighbour anchor that
                 // is free, or brick to dig through; a neighbour blocked by
@@ -220,7 +220,7 @@ enum Stage {
                 let probe = selfCenter + tank.facing.vector * (footprint / 2 + SpatialUnits.subunitsPerCell)
                 let cx = probe.x / SpatialUnits.subunitsPerCell, cy = probe.y / SpatialUnits.subunitsPerCell
                 if world.terrain.isInside(cellX: cx, cellY: cy),
-                   world.terrain[cx, cy].kind == .brick {
+                   world.terrain[cx, cy].kind.isBrickFamily {
                     shouldFire = true
                 }
             }
@@ -417,7 +417,8 @@ enum Stage {
         let ring = baseFortRingCells(world)
         for (i, (x, y)) in ring.enumerated() {
             let recorded: TerrainKind? = i < base.fortRingRestore.count ? base.fortRingRestore[i] : nil
-            let preserved = rules.fortRingRestoresRecordedKinds && (recorded == .steel || recorded == .water)
+            let preserved = rules.fortRingRestoresRecordedKinds
+                && (recorded?.isSteelFamily == true || recorded == .water)
             let target: TerrainKind = preserved ? recorded! : .brick
             guard !fortRingCellOccupied(world, cellX: x, cellY: y,
                                         mineHalfExtent: weapons.mineHalfExtentSubunits) else { continue }

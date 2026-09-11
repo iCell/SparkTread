@@ -33,7 +33,8 @@ public enum StageValidator {
                           "max_armor_ammo", "ammo_crate",
                           "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "mine_weapon"]),
             themes: Set(["frontier", "floodplain", "frozen_works", "iron_citadel"]),
-            terrainKinds: Set(["ground", "brick", "steel", "water", "ice", "foliage", "base"]))
+            terrainKinds: Set(["ground", "brick", "steel", "white_brick", "white_steel",
+                               "water", "ice", "foliage", "base"]))
     }
 
     /// Content budget: the most enemies one stage may schedule (per entry
@@ -239,8 +240,8 @@ public enum StageValidator {
         let arena = ArenaSpecification.universal
         var solid = Set<Int>()
         let solidKinds = brickIsSolid
-            ? ["brick", "steel", "water", "base"]
-            : ["steel", "water", "base"]
+            ? ["brick", "white_brick", "steel", "white_steel", "water", "base"]
+            : ["steel", "white_steel", "water", "base"]
         // Sample the bounded arena rather than iterating untrusted ranges.
         // Later layers can clear walls, exactly as in StageBuilder.
         for y in 0..<arena.cellsHigh {

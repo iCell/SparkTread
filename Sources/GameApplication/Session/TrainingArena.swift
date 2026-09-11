@@ -89,8 +89,13 @@ public enum TrainingArenaFixture {
         for (i, mask) in [0b0001, 0b0011, 0b0101, 0b0111, 0b1000, 0b1100, 0b1010, 0b1110].enumerated() {
             fill(.brick, 3 + i, 11, 3 + i, 11, mask: mask)
         }
-        // Top-middle: steel blocks and damaged-steel states (AP chips them).
-        fill(.steel, 18, 2, 19, 3); fill(.steel, 24, 2, 25, 3); fill(.steel, 30, 2, 31, 3); fill(.steel, 36, 2, 37, 3)
+        // Top-left, second row: white brick — the same wall at twice the
+        // rounds (GAME_RULES §3.5), so both tiers can be compared side by side.
+        fill(.whiteBrick, 3, 13, 4, 16); fill(.whiteBrick, 7, 13, 8, 16)
+        // Top-middle: grey steel (only the AP shell breaks it, one round per
+        // cell) and white steel (nothing breaks it).
+        fill(.steel, 18, 2, 19, 3); fill(.steel, 24, 2, 25, 3); fill(.steel, 30, 2, 31, 3)
+        fill(.whiteSteel, 36, 2, 37, 3)
         for (i, mask) in [0b0011, 0b1100, 0b0101, 0b1010].enumerated() {
             fill(.steel, 20 + 4 * i, 4, 20 + 4 * i, 4, mask: mask)
         }
