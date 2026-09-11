@@ -36,7 +36,12 @@ final class MovementLabScene: SKScene {
     /// fade so the player stays readable (vendor guidance).
     private var foliageNodes: [Int: SKSpriteNode] = [:]
     static let foliageZPosition: CGFloat = 520
+    /// Foliage over the player: thin enough to keep one's own tank readable.
     static let foliageFadedAlpha: CGFloat = 0.45
+    /// Foliage over any other tank. Owner rule (2026-09-11): a tank in the
+    /// bushes stays visible, it is only hard to make out — so cover never
+    /// hides a tank outright, it just thins over one.
+    static let foliageOverTankAlpha: CGFloat = 0.72
     private var layout: ArenaLayout?
 
     // Dynamic mirrors keyed by entity ID.
@@ -247,7 +252,7 @@ final class MovementLabScene: SKScene {
     }
 
     /// Per-frame foliage pass: the 8-neighbour joint mask and a slow frame
-    /// cycle, and the local fade over the player's footprint.
+    /// cycle, and the local fade over any tank standing in the cover.
     private func animateFoliage(_ art: PixelArt, world: WorldState) {
         guard !foliageNodes.isEmpty else { return }
         let frame = (world.tick / 20) % 3
@@ -274,13 +279,17 @@ final class MovementLabScene: SKScene {
             if let texture = try? art.texture(String(format: "px_foliage_%03d_%d", mask, frame)) {
                 node.texture = texture
             }
-            var faded = false
-            if let player {
-                let p = player.positionSubunits
-                faded = cx * cell < p.x + footprint && (cx + 1) * cell > p.x
-                    && cy * cell < p.y + footprint && (cy + 1) * cell > p.y
+            func covers(_ position: Vec2i) -> Bool {
+                cx * cell < position.x + footprint && (cx + 1) * cell > position.x
+                    && cy * cell < position.y + footprint && (cy + 1) * cell > position.y
             }
-            node.alpha = faded ? Self.foliageFadedAlpha : 1
+            if let player, covers(player.positionSubunits) {
+                node.alpha = Self.foliageFadedAlpha
+            } else if world.tanks.contains(where: { covers($0.positionSubunits) }) {
+                node.alpha = Self.foliageOverTankAlpha
+            } else {
+                node.alpha = 1
+            }
         }
     }
 

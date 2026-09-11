@@ -69,7 +69,8 @@ import GameCore
     }
 
     /// ADR-0016: foliage is drawn above tanks (below mines/projectiles),
-    /// jointed to its neighbours, and fades where it covers the player.
+    /// jointed to its neighbours, and thins where it covers a tank — most
+    /// over the player, less over anyone else (owner rule 2026-09-11).
     @Test func foliageOverlaysTanksAndFadesOverThePlayer() throws {
         var (art, scene, world) = try makeScene()
         for y in 9...11 { for x in 9...11 { world.terrain[x, y] = TerrainCell(kind: .foliage) } }
@@ -92,6 +93,16 @@ import GameCore
         #expect(faded(corner) && faded(centre))
         let far = try #require(scene.foliageNodeForTests(cellX: 11, cellY: 11, world: world))
         #expect(abs(far.alpha - 1) < 0.001)
+        // Owner rule (2026-09-11): an enemy in cover stays visible, only
+        // harder to make out — the foliage over it thins too, less than over
+        // the player.
+        world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
+                        positionSubunits: Vec2i(x: 11 * cell, y: 11 * cell), facing: .up)
+        scene.syncForTests(world: world)
+        let overEnemy = try #require(scene.foliageNodeForTests(cellX: 11, cellY: 11, world: world))
+        #expect(abs(overEnemy.alpha - MovementLabScene.foliageOverTankAlpha) < 0.001)
+        #expect(MovementLabScene.foliageOverTankAlpha > MovementLabScene.foliageFadedAlpha)
+        #expect(MovementLabScene.foliageOverTankAlpha < 1)
         // Foliage removed from the world disappears from the scene.
         world.terrain[10, 10] = TerrainCell(kind: .ground)
         scene.reconcileTerrainCell(art, world: world, cellX: 10, cellY: 10)
