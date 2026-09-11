@@ -38,6 +38,14 @@ final class MovementLabScene: SKScene {
     static let foliageZPosition: CGFloat = 520
     /// Foliage over the player: thin enough to keep one's own tank readable.
     static let foliageFadedAlpha: CGFloat = 0.45
+    /// Tints that turn the brick/steel atlases into the white tiers
+    /// (GAME_RULES §3.5). Cool tints cancel the atlas brick's warm hue so
+    /// white brick reads as a different material, not a lighter red one.
+    static let whiteWallBlend: CGFloat = 0.75
+    static let whiteBrickTint = SKColor(red: 0.83, green: 0.91, blue: 0.96, alpha: 1)
+    static let whiteBrickCrackedTint = SKColor(red: 0.59, green: 0.63, blue: 0.67, alpha: 1)
+    static let whiteSteelTint = SKColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1)
+
     /// Foliage over any other tank. Owner rule (2026-09-11): a tank in the
     /// bushes stays visible, it is only hard to make out — so cover never
     /// hides a tank outright, it just thins over one.
@@ -319,12 +327,19 @@ final class MovementLabScene: SKScene {
         }
         // The reference draws all four materials with two patterns and
         // different palettes (GAME_RULES §3.5), so the white tiers reuse the
-        // brick/steel atlases with a tint; cracked white brick darkens.
+        // brick/steel atlases with a tint. The atlas brick is warm orange
+        // (mean 167,100,63) and the steel blue-grey (98,117,127), so the
+        // tints have to be strong enough to carry the material, not just
+        // lighten it: white brick lands near a neutral 200-grey, cracked
+        // white brick a dimmer 150-grey, white steel near 218.
         let name = cell.kind.isBrickFamily ? "brick" : "steel"
         switch cell.kind {
-        case .whiteBrick, .whiteSteel:
-            node.color = .white
-            node.colorBlendFactor = cell.crackMask != 0 ? 0.45 : 0.62
+        case .whiteBrick:
+            node.color = cell.crackMask != 0 ? Self.whiteBrickCrackedTint : Self.whiteBrickTint
+            node.colorBlendFactor = Self.whiteWallBlend
+        case .whiteSteel:
+            node.color = Self.whiteSteelTint
+            node.colorBlendFactor = Self.whiteWallBlend
         default:
             node.colorBlendFactor = 0
         }

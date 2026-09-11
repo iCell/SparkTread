@@ -20,6 +20,14 @@ import GameCore
         }
         // All four wall materials (GAME_RULES §3.5) plus the walkable kinds.
         #expect(kinds == [.ground, .brick, .whiteBrick, .steel, .whiteSteel, .water, .ice, .foliage])
+        // Enough of each new tier to be obvious on the device — a later fill
+        // once overwrote most of the white brick.
+        var counts: [TerrainKind: Int] = [:]
+        for y in 0..<world.arena.cellsHigh { for x in 0..<world.arena.cellsWide {
+            counts[world.terrain[x, y].kind, default: 0] += 1
+        } }
+        #expect((counts[.whiteBrick] ?? 0) >= 12)
+        #expect((counts[.whiteSteel] ?? 0) >= 4)
         #expect(brickMasks.count >= 8 && brickMasks.contains(0b1111))
         #expect(steelMasks.count >= 4 && steelMasks.contains(0b1111))
         #expect(world.tanks.filter { $0.ownerPlayerID == nil }.isEmpty) // enemies come from the panel

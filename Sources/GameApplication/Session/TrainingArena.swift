@@ -89,9 +89,11 @@ public enum TrainingArenaFixture {
         for (i, mask) in [0b0001, 0b0011, 0b0101, 0b0111, 0b1000, 0b1100, 0b1010, 0b1110].enumerated() {
             fill(.brick, 3 + i, 11, 3 + i, 11, mask: mask)
         }
-        // Top-left, second row: white brick — the same wall at twice the
-        // rounds (GAME_RULES §3.5), so both tiers can be compared side by side.
-        fill(.whiteBrick, 3, 13, 4, 16); fill(.whiteBrick, 7, 13, 8, 16)
+        // Directly under the red-brick columns: white brick — the same wall
+        // at twice the rounds (GAME_RULES §3.5), so the two tiers sit in one
+        // line of sight. Rows 12–14 only: the bottom-left foliage starts at
+        // row 15 and would overwrite anything below.
+        fill(.whiteBrick, 3, 12, 4, 14); fill(.whiteBrick, 7, 12, 8, 14)
         // Top-middle: grey steel (only the AP shell breaks it, one round per
         // cell) and white steel (nothing breaks it).
         fill(.steel, 18, 2, 19, 3); fill(.steel, 24, 2, 25, 3); fill(.steel, 30, 2, 31, 3)
