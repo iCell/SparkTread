@@ -822,6 +822,45 @@ format 7); the §10.6 danger telegraph is removed. Tests 331 / 82.
   traction profile never slides (ADR-0016); it is in the pickup spawner
   and the enemy equipment picker.
 
+## Reference rules reverse-engineering (owner direction 2026-09-11, in progress)
+
+The owner replaced rule-by-rule decisions with: derive the original's rules
+from the reference video (all 31 stages) — shells, terrain, equipment,
+brick × shell, tank × equipment × terrain, and their combination — into one
+document, reach consensus with PI, have the owner review it, and only then
+delegate implementation to Opus-class agents. State:
+
+- `docs/REFERENCE_GAMEPLAY_RULES_ZH.md` (draft v0.1): evidence tags
+  【V】video / 【B】【C】decompile / 【M】modern / 【?】owner; matrices for
+  shell × terrain, shell × tank, terrain × equipment, equipment × mine,
+  pickups, enemy slots; §9 deviation list D-01…D-23. Weapon facts are in
+  `GAME_MECHANICS_SPEC.md` §5.4, world facts (enemy catalogue and speeds,
+  hits-to-kill anchors, terrain, pickups/HUD, equipment, base ring,
+  spawning, death/continue persistence) in §7.1/§8.4/§10.4. PI's
+  round-32 frame check rejected the world half's high-impact claims
+  (hits-to-kill anchors, Armor Up +1, kill-site drops, death resets,
+  "steel U" base ring, Explosion-only steel damage): they are recorded as
+  observations with unresolved attribution, and D-16…D-23 are framed as
+  design choices for the owner (keep accepted policy unless the owner
+  chooses otherwise), not as restoration fixes.
+- Notable corrections to earlier assumptions (after PI's round-30
+  cross-check): the reference base cell is 12 px in the 480×360 encode
+  (tank = 2×2 cells), so Normal is 15.75 cells/s and the current code's
+  11.25 cells/s (LV0–1) is 29 % slower than that unclassified-level
+  sample; Fire is a visible delivery round that leaves persistent fire
+  where it stops (rendered footprint 2×2 / 2×1 base cells, visible burn
+  ≈5.5–5.8 s in the inspected samples, no attributable autonomous spread
+  in the inspected non-foliage samples); AP/Explosion accelerate (caps
+  unmeasured); the player's Rapid speed could not be attributed (the fast
+  rounds at t=2465 belong to an enemy); mines were not identified in the
+  recording. PI's round-31 wording review (video observations must not be
+  promoted to immunity/absence/cap claims) is applied.
+- PI's round-29 inventory (R29-01…25, verified with probes against
+  `30af2b9`) is the "current code" column; R29-17 (Bomb damages airborne
+  tanks) is a plain consistency defect to fix without a decision.
+- Nothing in the code changed for this work; no implementation before the
+  owner confirms §9.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

@@ -7,6 +7,7 @@
 3. `ASSET_REQUIREMENTS_LIST_ZH.md`：只列举全部素材需求，不授权生成。
 4. `ASSET_PRODUCTION_MANIFEST.md`：素材技术规格、生产边界和来源台账要求。
 5. `GAME_MECHANICS_SPEC.md`：原版机制证据和恢复数据。
+   - `docs/REFERENCE_GAMEPLAY_RULES_ZH.md`：原版玩法规则复原（视频逐帧实测 V + 反编译 B/C + 现有代码对照 + 差异清单）。草稿，待 PI 交叉核对与所有者审阅；其中的原版事实与 `GAME_MECHANICS_SPEC.md` 同级，差异清单不是决定。
 6. `RESEARCH_SUMMARY.md`：原版反向分析摘要。
 7. `STAGE_52_METADATA.csv`：52 个候选参考关卡元数据。
 8. `docs/CURRENT_REVIEW.md`：当前实现审查（2026-09-09 Claude/PI 联合评审）、验证证据与未完成项。
