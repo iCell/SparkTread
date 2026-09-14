@@ -10,16 +10,7 @@ The owner writes in Chinese — answer in Chinese. Decisions that are the owner'
 
 **Any other model** (Opus, Sonnet, …): execute directly. Do not spawn a subagent to relay work you can do yourself; use subagents only for genuinely parallel or search-heavy work.
 
-## Authority order (when documents conflict)
-
-1. Accepted ADRs in `docs/decisions/`
-2. `PRODUCT_IMPLEMENTATION_PLAN.md`
-3. `PROJECT_MASTER_SUMMARY_ZH.md`
-4. Automated tests and pinned content schemas
-5. `GAME_RULES.md` reference facts (its "current implementation" notes are descriptive and its §18 deviation list is a proposal, not authority)
-6. Everything else
-
-Key accepted ADRs: 1 cell = 1024 subunits (ADR-0001); `PlayerCommand` is the only external input contract (ADR-0002); serializable authoritative state (ADR-0003); full-screen arena and the 390-point device floor (ADR-0004); allied base damage by difficulty (ADR-0005); the pixel delivery satisfies the style lock (ADR-0008); universal arena pinned at 56×27 (ADR-0009); owner combat rules and fort ring (ADR-0010); reference SFX and stage transitions (ADR-0011); results table and stage-clear bonuses (ADR-0012); no danger telegraph, foliage fire, Training Arena (ADR-0017). ADR-0013…0016 (campaign, screen flow, checkpoint save, difficulty/director, traversal/ice/mine launch) are **Proposed**: their numbers are owner-delegated guesses, not accepted values.
+When documents conflict, confirm with the owner first.
 
 ## Project state
 
