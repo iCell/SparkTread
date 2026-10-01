@@ -1404,17 +1404,28 @@ is where the owner's audio came from; that line is theirs to give.
 **The four open review items, done (2026-10-01, fifth pass).** The owner
 took the recommendations from the art and audio review and closed the list.
 
-*The delivery's control art is finally on screen.* `PixelUI` shipped 46
-sprites and not one was referenced: the stick, its thumb and the two fire
-buttons were plain vector circles while their pixel art sat in the bundle.
-`TouchControlsView` now draws `px_ui_joystick_normal`/`_pressed`,
-`px_ui_control_knob`, `px_ui_control_normal` and `px_ui_control_special`,
-with a press reading as full opacity plus a 7 % sink since the set has no
-round pressed variant. The vector shapes stay as the fallback for when the
-art cannot load, so the controls never become untouchable. §15.2's geometry
-is untouched — 66 pt visible buttons, 45 pt hit radius 96 pt apart, 12 pt
-dead zone, 36 pt leash — and the stick's base and thumb are drawn at whole
-multiples of the 48 px art (96 pt and 48 pt) so their pixels stay square.
+*The controls became glass, by way of the delivery's art.* `PixelUI`
+shipped 46 sprites and not one was referenced, so the first pass wired its
+stick, thumb and fire-button discs into `TouchControlsView`. Seeing them on
+the device the owner asked for the opposite — "操控面板还是用透明的有玻璃效果
+的背景" — and they were right about the cost: the delivered discs are opaque,
+so the pad hid whatever it sat on, and the pad sits over the playfield.
+
+Glass by real blur does not work here. `UIVisualEffectView` cannot sample
+SpriteKit's Metal output, so the material came out a flat opaque grey that
+hid the bricks under it completely — worse than the art it replaced. It is
+painted instead: a low-alpha channel tint the arena reads straight through
+(cyan for the normal gun, orange for the special, matching the HUD's own
+colour coding), a top-lit sheen that is gone by the middle so the lower half
+stays clear, a 1.5 pt bright rim and one specular highlight. A press raises
+the tint and the rim rather than moving anything. Deterministic, and it
+looks the same over any content. `GlassDisc` in that file owns it.
+
+§15.2's geometry is untouched throughout — 66 pt visible buttons, 45 pt hit
+radius 96 pt apart, 12 pt dead zone, 36 pt leash, and the stick's 96 pt base
+with its 44 pt thumb on the same ±34 pt clamp. `PixelUI` is unused again;
+the owner has now seen both and chosen, which is worth recording so the
+unused-art finding is not re-raised as a defect.
 
 *The HUD gets out of the way.* Since the full-screen fit (ADR-0022) the HUD
 has nowhere off the playfield to sit, and it sits on the top edge — which §9
