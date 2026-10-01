@@ -590,3 +590,24 @@ is the owner's to weigh, not something this repository can verify. Nothing
 in the cue set is a copy of the Battle City theme the owner had referenced:
 the request to imitate its melody was declined (third amendment above) and
 the cue that ships instead came from the owner, not from that reference.
+
+## Amendment 2026-10-01 (fifth): rapid fire becomes its own voice
+
+`sfx_fire_rapid` was a third byte-identical copy of the shot excerpt — the
+extractor cut the same 185.29–185.63 s window three times, once each for
+normal, rapid and special. Special is gone (second amendment above), and
+rapid is now DERIVED rather than extracted: the shot replayed 12 % faster,
+which is also 12 % shorter, cut to 200 ms and levelled to the normal
+launch's own −16.3 dBFS RMS.
+
+The reason is scenario fit, not timbre. Rapid is the special weapon a new
+campaign starts with (`TankState`) and the one whose ammo the player spends
+(50/250), so it is the launch they hear most — and it sounded exactly like
+the normal round, which means the special channel had no voice of its own.
+200 ms also clears the fastest cadence R5.6 allows (13 ticks = 217 ms), so
+a burst reads as separate shots rather than one smear; the 340 ms copy
+overlapped itself at that rate.
+
+The excerpt itself is untouched and still serves the normal launch, and the
+extractor no longer cuts it three times. The set is now 17 synthesized, 6
+excerpts, and the owner's own stage card.

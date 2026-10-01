@@ -18,6 +18,9 @@ final class TouchControlsUIView: UIView {
     private var normalTouch: UITouch?
     private var specialTouch: UITouch?
 
+    // The shape layers are the fallback the controls draw themselves with
+    // until the delivery's own control art is available (and if it never
+    // is): the view must stay usable without `PixelArt`.
     private let ringLayer = CAShapeLayer()
     private let knobLayer = CAShapeLayer()
     private let normalButton = CAShapeLayer()
@@ -26,6 +29,17 @@ final class TouchControlsUIView: UIView {
     private let specialLabel = UILabel()
     private let normalIcon = UIImageView()
     private let specialIcon = UIImageView()
+    /// The delivery's control art (`PixelUI`, wired up 2026-10-01): the
+    /// stick base, its thumb and the two fire buttons, which until now were
+    /// plain vector circles while this art sat unused in the bundle. The hit
+    /// geometry of §15.2 is unchanged — only what is drawn changed.
+    private let stickBase = UIImageView()
+    private let stickKnob = UIImageView()
+    private let normalArt = UIImageView()
+    private let specialArt = UIImageView()
+    private var stickRestImage: UIImage?
+    private var stickPressedImage: UIImage?
+    private var artLoaded = false
     /// Weapon icons (GAME_RULES §15.2): the normal round and the current
     /// special weapon's projectile art replace text placeholders.
     var iconProvider: ((String) -> CGImage?)?
@@ -55,6 +69,13 @@ final class TouchControlsUIView: UIView {
 
         configureButton(normalButton, label: normalLabel, text: "普", color: .systemCyan)
         configureButton(specialButton, label: specialLabel, text: "特", color: .systemOrange)
+        // The art sits over the fallback shapes and under the weapon icons.
+        for art in [stickBase, stickKnob, normalArt, specialArt] {
+            art.contentMode = .scaleAspectFit
+            art.layer.magnificationFilter = .nearest
+            art.isHidden = true
+            addSubview(art)
+        }
         for icon in [normalIcon, specialIcon] {
             icon.contentMode = .scaleAspectFit
             icon.layer.magnificationFilter = .nearest
@@ -74,6 +95,41 @@ final class TouchControlsUIView: UIView {
         shownSpecialWeapon = specialWeaponID
         specialIcon.image = UIImage(cgImage: image)
         specialLabel.isHidden = true
+    }
+
+    /// Takes the control art once it can be loaded and retires the vector
+    /// fallback. Idempotent: `updateUIView` runs on every SwiftUI pass.
+    func updateControlArt(_ provider: (String) -> CGImage?) {
+        guard !artLoaded,
+              let base = provider("px_ui_joystick_normal"),
+              let knob = provider("px_ui_control_knob"),
+              let normal = provider("px_ui_control_normal"),
+              let special = provider("px_ui_control_special") else { return }
+        stickRestImage = UIImage(cgImage: base)
+        stickPressedImage = provider("px_ui_joystick_pressed").map(UIImage.init(cgImage:)) ?? stickRestImage
+        stickBase.image = stickRestImage
+        stickKnob.image = UIImage(cgImage: knob)
+        normalArt.image = UIImage(cgImage: normal)
+        specialArt.image = UIImage(cgImage: special)
+        artLoaded = true
+        // The fire buttons are always on screen; the stick is a floating
+        // control and stays hidden until touched, exactly as the ring and
+        // knob it replaces did.
+        normalButton.isHidden = true
+        specialButton.isHidden = true
+        normalArt.isHidden = false
+        specialArt.isHidden = false
+        setNeedsLayout()
+    }
+
+    /// Pixel art has no round pressed variant in this set, so a press reads
+    /// as the button coming fully opaque and sinking slightly.
+    private func setPressed(_ pressed: Bool, art: UIImageView, icon: UIImageView) {
+        guard artLoaded else { return }
+        let scale: CGFloat = pressed ? 0.93 : 1.0
+        art.transform = CGAffineTransform(scaleX: scale, y: scale)
+        icon.transform = art.transform
+        art.alpha = pressed ? 1.0 : 0.88
     }
 
     @available(*, unavailable)
@@ -105,6 +161,17 @@ final class TouchControlsUIView: UIView {
                                  width: buttonRadius * 2, height: buttonRadius * 2)
             icon.frame = label.frame.insetBy(dx: 12, dy: 12)
         }
+        // The art fills the same 66 pt circle the vector button described.
+        normalArt.frame = CGRect(x: normalCenter.x - buttonRadius, y: normalCenter.y - buttonRadius,
+                                 width: buttonRadius * 2, height: buttonRadius * 2)
+        specialArt.frame = CGRect(x: specialCenter.x - buttonRadius, y: specialCenter.y - buttonRadius,
+                                  width: buttonRadius * 2, height: buttonRadius * 2)
+        if artLoaded {
+            normalArt.alpha = normalTouch == nil ? 0.88 : 1.0
+            specialArt.alpha = specialTouch == nil ? 0.88 : 1.0
+        }
+        bringSubviewToFront(normalIcon)
+        bringSubviewToFront(specialIcon)
     }
 
     private func buttonHit(_ point: CGPoint, center: CGPoint) -> Bool {
@@ -119,17 +186,21 @@ final class TouchControlsUIView: UIView {
             if normalTouch == nil, buttonHit(point, center: normalCenter) {
                 normalTouch = touch
                 normalButton.fillColor = UIColor.systemCyan.withAlphaComponent(0.75).cgColor
+                setPressed(true, art: normalArt, icon: normalIcon)
                 onNormalFire?(true)
             } else if specialTouch == nil, buttonHit(point, center: specialCenter) {
                 specialTouch = touch
                 specialButton.fillColor = UIColor.systemOrange.withAlphaComponent(0.75).cgColor
+                setPressed(true, art: specialArt, icon: specialIcon)
                 onSpecialFire?(true)
             } else if stickTouch == nil, point.x < bounds.width * 0.62 {
                 stickTouch = touch
                 stickOrigin = point
                 updateStickVisual(offset: .zero)
-                ringLayer.isHidden = false
-                knobLayer.isHidden = false
+                ringLayer.isHidden = artLoaded
+                knobLayer.isHidden = artLoaded
+                stickBase.isHidden = !artLoaded
+                stickKnob.isHidden = !artLoaded
             }
         }
     }
@@ -169,15 +240,19 @@ final class TouchControlsUIView: UIView {
                 store?.release(from: .touch)
                 ringLayer.isHidden = true
                 knobLayer.isHidden = true
+                stickBase.isHidden = true
+                stickKnob.isHidden = true
             }
             if touch == normalTouch {
                 normalTouch = nil
                 normalButton.fillColor = UIColor.systemCyan.withAlphaComponent(0.4).cgColor
+                setPressed(false, art: normalArt, icon: normalIcon)
                 onNormalFire?(false)
             }
             if touch == specialTouch {
                 specialTouch = nil
                 specialButton.fillColor = UIColor.systemOrange.withAlphaComponent(0.4).cgColor
+                setPressed(false, art: specialArt, icon: specialIcon)
                 onSpecialFire?(false)
             }
         }
@@ -189,9 +264,20 @@ final class TouchControlsUIView: UIView {
         ringLayer.path = UIBezierPath(arcCenter: stickOrigin, radius: 48,
                                       startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
         let clampedX = max(-34, min(34, offset.x)), clampedY = max(-34, min(34, offset.y))
-        knobLayer.path = UIBezierPath(
-            arcCenter: CGPoint(x: stickOrigin.x + clampedX, y: stickOrigin.y + clampedY),
-            radius: 22, startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
+        let knobCenter = CGPoint(x: stickOrigin.x + clampedX, y: stickOrigin.y + clampedY)
+        knobLayer.path = UIBezierPath(arcCenter: knobCenter, radius: 22,
+                                      startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
+        if artLoaded {
+            // The 48 px base and thumb are drawn at whole multiples — 96 pt
+            // and 48 pt — so the pixels stay square, and they sit on the
+            // same centres and the same ±34 pt clamp as the vector stick.
+            stickBase.frame = CGRect(x: stickOrigin.x - 48, y: stickOrigin.y - 48, width: 96, height: 96)
+            stickKnob.frame = CGRect(x: knobCenter.x - 24, y: knobCenter.y - 24, width: 48, height: 48)
+            let moved = abs(clampedX) + abs(clampedY) > 1
+            stickBase.image = moved ? stickPressedImage : stickRestImage
+            bringSubviewToFront(stickBase)
+            bringSubviewToFront(stickKnob)
+        }
         CATransaction.commit()
     }
 }
@@ -219,6 +305,7 @@ struct TouchControlsView: UIViewRepresentable {
             uiView.iconProvider = { weaponID in
                 try? art.texture("px_projectile_" + weaponID).cgImage()
             }
+            uiView.updateControlArt { try? art.texture($0).cgImage() }
         }
         uiView.updateIcons(specialWeaponID: specialWeaponID)
     }

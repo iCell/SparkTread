@@ -817,6 +817,7 @@ public struct MovementLabView: View {
                 stageFlowOverlay(size: geometry.size)
                 if paused { pauseOverlay }
             }
+            .coordinateSpace(name: Self.surfaceSpace)
             .onChange(of: geometry.size) { _, size in scene?.surfaceDidChange(to: size) }
             .onReceive(flowTimer) { _ in
                 syncFlow()
@@ -849,6 +850,14 @@ public struct MovementLabView: View {
     /// Mirrors `controller.isPaused` into view state (SwiftUI does not
     /// observe the controller).
     @State private var paused = false
+    /// The HUD pill's own frame, so it can tell what it is covering.
+    @State private var hudRect: CGRect = .zero
+    static let surfaceSpace = "sparktread.surface"
+    /// Re-read on every HUD refresh, which is the cadence the numbers
+    /// already update at.
+    private var hudObstructed: Bool {
+        scene?.drawsLiveObject(under: hudRect) ?? false
+    }
 
     private var pauseButton: some View {
         Button {
@@ -935,6 +944,24 @@ public struct MovementLabView: View {
             .font(.system(size: 12, weight: .bold, design: .monospaced))
             .padding(.horizontal, 12).padding(.vertical, 5)
             .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.55)))
+            // The full-screen arena (ADR-0022) leaves the HUD nowhere off the
+            // playfield, and it sits on the top edge — which §9 makes the
+            // spawn lane, so an arriving enemy is exactly under it. §15.1
+            // forbids an opaque HUD over a key object, so the pill thins out
+            // while anything live is behind it and comes back when it passes.
+            .background(GeometryReader { proxy in
+                Color.clear
+                    .onAppear { hudRect = proxy.frame(in: .named(Self.surfaceSpace)) }
+                    .onChange(of: proxy.frame(in: .named(Self.surfaceSpace))) { _, rect in
+                        hudRect = rect
+                    }
+            })
+            // 0.4, not lower: the top edge is the spawn lane, so the pill
+            // spends real time thinned out, and it still has to be readable
+            // at a glance while it is. Enough to see a tank through, enough
+            // to read the armour and the ammo.
+            .opacity(hudObstructed ? 0.4 : 1)
+            .animation(.easeInOut(duration: 0.18), value: hudObstructed)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, 4)
         }

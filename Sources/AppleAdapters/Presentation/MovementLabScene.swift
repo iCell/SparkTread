@@ -139,6 +139,12 @@ final class MovementLabScene: SKScene {
         return texture
     }
 
+    /// How far the decorative gutter band is multiplied toward black, so the
+    /// brightest wall material in the game reads as a frame rather than as
+    /// the brightest thing on screen (2026-10-01 review). 0 is the atlas's
+    /// own brightness, which is what the playfield's own 精钢 walls keep.
+    static let bezelDimming: CGFloat = 0.34
+
     /// Foliage over any other tank. Owner rule (2026-09-11): a tank in the
     /// bushes stays visible, it is only hard to make out — so cover never
     /// hides a tank outright, it just thins over one.
@@ -300,6 +306,12 @@ final class MovementLabScene: SKScene {
         // scales to the FULL screen and the leftover gutter is dressed as
         // the indestructible wall, so nothing reads as wasted space and the
         // notch/Dynamic Island sits over decor, never over gameplay.
+        // It is dressed in 精钢 because §15.1 says so, and §3.1 makes 精钢 the
+        // brightest wall in the game — which left the FRAME brighter than
+        // the field it frames (2026-10-01 review). The material is unchanged
+        // and the gutter is still filled, so "不留黑边" holds; the band is
+        // just multiplied toward black enough to sit behind the playfield
+        // instead of competing with it. One constant to revert.
         if let layout, let bezel = try? art.texture("px_white_steel_joint_15_15") {
             let rect = layout.arenaRect
             let columnsBefore = max(0, Int((rect.minX / cellPoints).rounded(.up)))
@@ -313,6 +325,8 @@ final class MovementLabScene: SKScene {
                     n.size = CGSize(width: cellPoints, height: cellPoints)
                     n.position = cellCenter(x: x, y: y)
                     n.zPosition = 0
+                    n.color = .black
+                    n.colorBlendFactor = Self.bezelDimming
                     addChild(n)
                 }
             }
@@ -425,6 +439,26 @@ final class MovementLabScene: SKScene {
                 node.alpha = 1
             }
         }
+    }
+
+    /// Whether a live tank or shell is drawn under `viewRect`, which is in
+    /// the hosting view's coordinates (y down) over a surface the size of
+    /// this scene. Presentation only: the HUD reads it so it can get out of
+    /// the way. Since the arena scales to the FULL screen (ADR-0022) the HUD
+    /// has nowhere off the playfield to sit, and it sits on the top edge —
+    /// which §9 makes the spawn lane, so enemies arrive exactly under it.
+    /// Nothing in the simulation depends on the answer.
+    func drawsLiveObject(under viewRect: CGRect) -> Bool {
+        guard !viewRect.isEmpty, size.height > 0 else { return false }
+        let flipped = CGRect(x: viewRect.minX, y: size.height - viewRect.maxY,
+                             width: viewRect.width, height: viewRect.height)
+        for node in tankNodes.values where !node.isHidden {
+            if node.calculateAccumulatedFrame().intersects(flipped) { return true }
+        }
+        for node in projectileNodes.values where !node.isHidden {
+            if node.frame.intersects(flipped) { return true }
+        }
+        return false
     }
 
     /// Test seam: the foliage node of a cell and its alpha.

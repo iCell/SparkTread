@@ -53,12 +53,11 @@ CUTS = {
     "sfx_stage_win": (74.000, 78.200, 5, 60,
                       "end-of-stage passage: the results-screen drum loop from its rise to the next card (continuous; faded)"),
     "sfx_fire_normal": (185.290, 185.630, 2, 20, "shot glide: isolated instance, silence before and after"),
-    "sfx_fire_rapid": (185.290, 185.630, 2, 20, "the same isolated shot instance; whether the reference has other launch sounds is not established"),
-    # sfx_fire_special was a third copy of this same cut, for a
-    # special-channel weapon id outside the five R5 defines. There is
-    # no such id and WeaponRules is code, not content, so the cue could
-    # never play; dropped in the 2026-10-01 review and the fallback in
-    # GameAudio now points at the normal launch.
+    # sfx_fire_rapid and sfx_fire_special were copies of this same cut.
+    # Special was for a weapon id R5 cannot produce and is gone; rapid is now
+    # DERIVED in build_audio_assets.py (replayed faster and shortened) so the
+    # special channel is audibly its own weapon. Both dropped 2026-10-01; this
+    # cut now serves the normal launch alone.
     "sfx_tank_explode": (21.860, 22.720, 2, 20, "enemy destroyed: the kill with the score roll (confirmed), isolated"),
     "sfx_player_explode": (100.200, 101.000, 2, 20, "heavy explosion: isolated instance, silence before and after"),
     "sfx_pickup_collect": (104.740, 105.480, 2, 30, "pickup jingle: isolated instance (cut before its repeat)"),

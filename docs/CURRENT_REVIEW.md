@@ -1401,6 +1401,57 @@ remaining synthesized cues are byte-identical across the removal. Details
 in ADR-0011's fourth 2026-10-01 amendment. What the manifest cannot state
 is where the owner's audio came from; that line is theirs to give.
 
+**The four open review items, done (2026-10-01, fifth pass).** The owner
+took the recommendations from the art and audio review and closed the list.
+
+*The delivery's control art is finally on screen.* `PixelUI` shipped 46
+sprites and not one was referenced: the stick, its thumb and the two fire
+buttons were plain vector circles while their pixel art sat in the bundle.
+`TouchControlsView` now draws `px_ui_joystick_normal`/`_pressed`,
+`px_ui_control_knob`, `px_ui_control_normal` and `px_ui_control_special`,
+with a press reading as full opacity plus a 7 % sink since the set has no
+round pressed variant. The vector shapes stay as the fallback for when the
+art cannot load, so the controls never become untouchable. §15.2's geometry
+is untouched — 66 pt visible buttons, 45 pt hit radius 96 pt apart, 12 pt
+dead zone, 36 pt leash — and the stick's base and thumb are drawn at whole
+multiples of the 48 px art (96 pt and 48 pt) so their pixels stay square.
+
+*The HUD gets out of the way.* Since the full-screen fit (ADR-0022) the HUD
+has nowhere off the playfield to sit, and it sits on the top edge — which §9
+makes the spawn lane, so an arriving enemy is exactly under it, which §15.1
+speaks against. The owner chose the overlay fix over giving a row back to a
+HUD strip, so the pill now reads its own frame, asks the scene whether a
+live tank or shell is drawn under it (`drawsLiveObject(under:)`, node frames
+only, nothing the simulation depends on) and thins to 0.4 while there is,
+easing back over 0.18 s. 0.4 rather than lower because the top edge means it
+will thin out often and must stay readable while it does.
+
+*The gutter band recedes.* §15.1 dresses the leftover gutter in 精钢 and
+§3.1 makes 精钢 the brightest wall in the game, so the frame was the
+brightest thing on screen and pulled the eye off the field. The material
+and the fill are unchanged — "不留黑边" holds — and the band is multiplied
+34 % toward black so it sits behind the playfield. One constant
+(`bezelDimming`) to revert.
+
+*Rapid fire is audibly its own weapon.* `sfx_fire_rapid` was a third
+byte-identical copy of the shot excerpt, so the special channel sounded
+exactly like the normal one even though rapid is the weapon a new campaign
+starts with and the one whose ammo you spend. It is now derived from that
+same excerpt — replayed 12 % faster, which is also 12 % shorter, cut to
+200 ms, levelled to the normal launch's own −16.3 dBFS RMS. 200 ms clears
+the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as
+separate shots instead of one smear. The excerpt itself is untouched and
+still serves the normal launch; it is no longer extracted three times, so
+the set is 17 synthesized, 6 excerpts and the owner's stage card.
+
+Three items were closed WITHOUT changes, deliberately: a separate cue for
+base repair versus flag guard (both mean "your base just got better", and
+the visuals already differ); a loss stinger for running out of lives (the
+player's own tank explosion already plays, which is why the base needs its
+own cue and this does not); and a cue for the results reward line (the
+reference has no isolated instance to take, and synthesising one would add
+a placeholder voice to a set that just lost two).
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

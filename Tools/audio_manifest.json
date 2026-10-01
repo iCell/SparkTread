@@ -1,7 +1,7 @@
 {
   "creative_decision": "owner, 2026-09-10: the game's sounds are to be the original \u51b3\u6218\u5766\u514b sounds; excerpts of the public recording are used wherever it holds an isolated instance (attribution 'excerpt'); the rest is synthesized and provisional (ADR-0011, accepted by the owner 2026-09-10)",
   "extractor": "Tools/extract_reference_audio.py",
-  "extractor_sha256": "553e8f95e4d8940b9e48af57ec6a7d6170925009b78dad32674db05185b6f32a",
+  "extractor_sha256": "2931dbbce52dc9eb0909478496d083a8166cb26f931b8c23a79a63949ebaf24f",
   "files": {
     "sfx_base_destroyed.wav": {
       "attribution": "derived",
@@ -67,17 +67,10 @@
       ]
     },
     "sfx_fire_rapid.wav": {
-      "attribution": "excerpt",
-      "milliseconds": 340,
-      "note": "the same isolated shot instance; whether the reference has other launch sounds is not established",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
-      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        185.29,
-        185.63
-      ]
+      "attribution": "derived",
+      "milliseconds": 200,
+      "note": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
+      "sha256": "c87fb2c83f030138a6393b6ca16fff898b52115c876311f2d096309addaa92dd"
     },
     "sfx_flame_loop.wav": {
       "attribution": "provisional",
@@ -182,7 +175,7 @@
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "d0c775673f616ca7842c7d83b2daa7057fa3c12cac40f55abc12948d6f691483",
+  "generator_sha256": "0b3656cbfe7f99148a7ffe1194c92ce8052219cc524c599611474c9143e31da4",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
   "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",

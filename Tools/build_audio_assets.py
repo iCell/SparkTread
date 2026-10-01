@@ -54,6 +54,7 @@ MANIFEST = os.environ.get("SPARKTREAD_AUDIO_MANIFEST") or COMMITTED_MANIFEST
 # Per-cue manifest note, in the same "note" field the excerpt entries carry:
 # how a voice was built, where that is not obvious from its attribution.
 NOTES = {
+    "sfx_fire_rapid": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
     "sfx_stage_card": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased — standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured ≈0.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E♭4 — the key taken from this excerpt's own faint harmonic stabs — over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first — SHAPE in the generator selects",
 }
 
@@ -61,6 +62,7 @@ ATTRIBUTION = {
     "sfx_stage_card": "derived",
     "sfx_base_destroyed": "derived", "sfx_pickup_spawn": "derived", "sfx_deflect": "derived",
     "sfx_hit_brick": "derived", "sfx_tally_tick": "derived",
+    "sfx_fire_rapid": "derived",
 }
 SOURCE_NOTE = ("measurements of the public reference gameplay recording BV14b411K7bv, "
                "2026-09-10; procedure in Tools/reference_measure/")
@@ -207,6 +209,46 @@ def lowpass(sig, cutoff, passes=1):
 
 
 
+
+
+def read_bundled(name):
+    """Samples of a COMMITTED bundled WAV as floats, for a cue derived from
+    an excerpt. The bytes are read from the repository (never from OUT,
+    which is a scratch directory while Scripts/check-audio.sh runs) and must
+    hash to the committed manifest's entry: a cue cut out of an excerpt is
+    only reproducible while the excerpt is the one that was cut."""
+    path = os.path.join(BUNDLED_AUDIO, name + ".wav")
+    if not os.path.exists(path):
+        raise SystemExit(f"{name}.wav is missing from {os.path.normpath(BUNDLED_AUDIO)}: cannot derive from it")
+    with open(path, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    try:
+        with open(COMMITTED_MANIFEST) as f:
+            want = json.load(f)["files"][name + ".wav"]["sha256"]
+    except (OSError, KeyError, ValueError) as error:
+        raise SystemExit(f"no committed manifest entry for {name}.wav ({error}): cannot derive from it")
+    if digest != want:
+        raise SystemExit(
+            f"{name}.wav does not match the committed manifest (have {digest[:12]}…, "
+            f"want {want[:12]}…): re-extract it, or regenerate the manifest deliberately")
+    with wave.open(path, "rb") as f:
+        if (f.getnchannels(), f.getsampwidth(), f.getframerate()) != (1, 2, OUTPUT_RATE):
+            raise SystemExit(f"{name}.wav is not mono 16-bit {OUTPUT_RATE} Hz: cannot derive from it")
+        frames = f.readframes(f.getnframes())
+    return [s / 32767.0 for s in struct.unpack(f"<{len(frames) // 2}h", frames)]
+
+
+def resample(sig, ratio):
+    """Linear-interpolation resample: `ratio` > 1 raises the pitch and
+    shortens the signal, exactly as replaying a drum sample faster does."""
+    out, n = [], int(len(sig) / ratio)
+    for i in range(n):
+        at = i * ratio
+        left = int(at)
+        frac = at - left
+        right = min(len(sig) - 1, left + 1)
+        out.append(sig[left] * (1 - frac) + sig[right] * frac)
+    return out
 
 def saturate(sig, drive):
     """Soft tanh saturation, scaled so the loudest sample stays where it was.
@@ -383,6 +425,18 @@ def write_manifest():
 def write_native(name, sig, peak=0.72):
     """Writes a signal generated inside native(): ZOH-upsampled to OUTPUT_RATE."""
     write(name, zoh(sig, NATIVE_RATE, OUTPUT_RATE), peak)
+
+
+def write_rms(name, sig, target_dbfs, ceiling=0.9):
+    """`write` at a target LOUDNESS rather than a target peak, for material
+    already at OUTPUT_RATE. The OUTPUT_RATE twin of write_native_rms."""
+    top, level = max(abs(s) for s in sig), rms(sig)
+    peak = 10 ** (target_dbfs / 20.0) * top / max(1e-9, level)
+    if peak > ceiling:
+        print(f"  {name}: peak capped at {ceiling}, "
+              f"{20 * math.log10(ceiling * level / top):.1f} dBFS RMS "
+              f"instead of {target_dbfs}")
+    write(name, sig, peak=min(ceiling, peak))
 
 
 def write_native_rms(name, sig, target_dbfs, ceiling=0.9):
@@ -685,6 +739,22 @@ def build():
                              ([0.0] * samples(115) + apply(bandpass(noise(tick, 9000, 0x2E), 2800, 1.0),
                                                            env_decay(tick, 1, 3.0)), 1.8)),
                          -16.4)
+
+    # ---------------------------------------------- rapid launch (derived)
+    # Owner 2026-10-01 review: `sfx_fire_rapid` was a third byte-identical
+    # copy of the shot excerpt, so the special channel sounded exactly like
+    # the normal one and the player could not hear which weapon was firing —
+    # and rapid is the default special weapon a new campaign starts with
+    # (TankState), with ammo to spend (50/250), so it is the cue they hear
+    # most. It is now DERIVED from that same excerpt rather than being it:
+    # the shot replayed 12 % faster, which is also 12 % shorter, and cut to
+    # 200 ms. Same gun, lighter and quicker round — and 200 ms clears even
+    # the fastest cadence R5.6 allows (13 ticks, 217 ms), so twelve shots a
+    # second read as twelve shots instead of one smear. The excerpt itself is
+    # untouched and still serves the normal launch.
+    shot = read_bundled("sfx_fire_normal")
+    rapid = resample(shot, 1.12)[:int(OUTPUT_RATE * 0.200)]
+    write_rms("sfx_fire_rapid", fade_out(fade_in(rapid, 2), 24), -16.3)
 
     # ------------------------------------------------ reference-derived set
     # CANDIDATE set (ADR-0011, accepted 2026-09-10): re-synthesised from Claude's
