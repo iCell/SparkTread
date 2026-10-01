@@ -541,3 +541,52 @@ peak −3.4 against −1.9, band tilt −10.2/−9.4/−8.4/−7.9/−4.9 agains
 −7.0/−7.6/−8.7/−8.7/−6.4 (resampling a tom upward naturally lightens the
 bottom), and a flat drive with the crash lifting at the end. `SHAPE` selects
 which of the four ships; `melodic` does. Owner listen pending.
+
+## Amendment 2026-10-01 (fourth): the owner supplies the stage card
+
+The owner committed their own audio for the stage start
+(`sfx_stage_start_v3.wav`, commit 3c0bc96) and directed that it be used as
+the cue. It is now `sfx_stage_card.wav` — renamed to the cue name the code,
+`StageFlow` and the tests already use, so nothing downstream changed — and
+it is bundled exactly as given.
+
+It needed no work. Measured: 3.23 s, mono 22050 Hz, −20.8 dBFS RMS, which
+is the stage-end excerpt's level to the decimal; peak −3.5 dBFS; band tilt
+−7.5/−9.2/−8.0/−6.9/−7.0 against the stage end's −7.0/−7.6/−8.7/−8.7/−6.4;
+and 0.1 s longer than the 3.13 s intro, so it resolves essentially on the
+hand-off. It is a closer match to `sfx_stage_win` on every axis than
+anything generated here, which settles the four-attempt search in the three
+amendments above.
+
+**A third provenance class.** Until now every bundled file was either
+produced by `Tools/build_audio_assets.py` and byte-compared on every check,
+or cut by `Tools/extract_reference_audio.py` and hash-compared. A file the
+owner hands over is neither, and the check rejected it outright
+("generator did not produce sfx_stage_card.wav"). Attribution `owner` now
+means: verified by hash against the manifest, never regenerated, and
+PROTECTED in the generator so a regeneration refuses the name instead of
+overwriting it. `Scripts/check-audio.sh` splits by provenance rather than
+by "is it an excerpt", and its selftest gained two cases proving that a
+corrupted entry and replaced bytes both fail for this class too. The
+generator's own refusal path already covered it through `load_protected`.
+
+**What was removed.** The stage-card generation block (266 lines: the grid
+slicing, the band-energy role selection, the four shapes, the room bed and
+the level matching) and the machinery that existed only for it —
+`read_bundled`, `resample`, `tom_pitch`, `_pole_lp`, `_accelerando`. The
+general signal helpers stay with the rest of the toolkit. All four
+candidates and the code that built them are in git history at commit
+1363851 if the owner wants to go back; the 16 remaining synthesized cues
+are byte-identical across the removal.
+
+**Provenance.** The owner states (2026-10-01) that they generated the audio
+with ChatGPT. That is recorded verbatim on the manifest entry, alongside
+what can be verified here: the file is theirs, bundled as given, and
+reproducible by nothing in this repository. `rights_review` already records
+that the rights decision and its responsibility are the owner's
+(2026-09-10), and that stands unchanged for this file — a generated asset
+carries whatever the generating service's terms say about its output, which
+is the owner's to weigh, not something this repository can verify. Nothing
+in the cue set is a copy of the Battle City theme the owner had referenced:
+the request to imitate its melody was declined (third amendment above) and
+the cue that ships instead came from the owner, not from that reference.

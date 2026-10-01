@@ -1380,6 +1380,27 @@ are byte-identical after the change, so the earlier audition stands, and
 `SHAPE` in the generator selects which of the four ships. Details in
 ADR-0011's third 2026-10-01 amendment; owner listen pending.
 
+**The owner supplies the stage card (2026-10-01, fourth pass).** After four
+generated candidates, the owner committed their own stage-start audio
+(3c0bc96) and directed that it be the cue. It is `sfx_stage_card.wav` now —
+renamed to the name the code already uses — and bundled as given: measured
+3.23 s, mono 22050 Hz, −20.8 dBFS RMS (the stage end's level exactly), band
+tilt within ~1 dB of it, and 0.1 s longer than the intro, so it needed no
+processing and is a closer match to `sfx_stage_win` than anything generated
+here. That ends the search recorded in the three amendments above.
+
+It did need a change to the pipeline. Every bundled file was either
+generated and byte-compared or extracted and hash-compared, and a file the
+owner hands over is neither, so the check rejected it. Attribution `owner`
+now means verified by hash, never regenerated, and protected in the
+generator against being overwritten; `check-audio.sh` splits by provenance
+instead of by "is it an excerpt", with two new selftest cases for the class.
+The stage-card generation block and the machinery that served only it were
+removed — all four candidates are in git history at 1363851 — and the 16
+remaining synthesized cues are byte-identical across the removal. Details
+in ADR-0011's fourth 2026-10-01 amendment. What the manifest cannot state
+is where the owner's audio came from; that line is theirs to give.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

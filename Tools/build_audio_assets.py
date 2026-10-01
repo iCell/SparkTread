@@ -71,12 +71,19 @@ _written = []
 PROTECTED = set()
 
 
+# Attributions this generator must never produce or overwrite: an excerpt is
+# owned by Tools/extract_reference_audio.py, and an "owner" asset is a file the
+# owner supplied as-is (the stage card, 2026-10-01) which nothing here can
+# reproduce. Both are verified by hash instead of by regeneration.
+NOT_GENERATED = ("excerpt", "owner")
+
+
 def load_protected():
     if not os.path.exists(MANIFEST):
         return set()
     with open(MANIFEST) as f:
         return {name for name, entry in json.load(f).get("files", {}).items()
-                if entry.get("attribution") == "excerpt"}
+                if entry.get("attribution") in NOT_GENERATED}
 
 
 # ---------------------------------------------------------------- voices
@@ -198,62 +205,7 @@ def lowpass(sig, cutoff, passes=1):
     return out
 
 
-def resample(sig, ratio):
-    """Linear-interpolation resample: `ratio` > 1 raises the pitch and
-    shortens the signal, exactly as replaying a drum sample faster does."""
-    out, n = [], int(len(sig) / ratio)
-    for i in range(n):
-        at = i * ratio
-        left = int(at)
-        frac = at - left
-        right = min(len(sig) - 1, left + 1)
-        out.append(sig[left] * (1 - frac) + sig[right] * frac)
-    return out
 
-
-def tom_pitch(cut, rate, low=110.0, high=280.0):
-    """The fundamental of a drum slice, by autocorrelation of its tom band.
-
-    Measured rather than assumed so the melody's resampling ratios stay
-    correct if the excerpt is ever re-extracted; returns (hz, clarity)."""
-    band = [a - b for a, b in zip(_pole_lp(cut, 320.0, rate), _pole_lp(cut, 95.0, rate))]
-    mean = sum(band) / len(band)
-    band = [v - mean for v in band]
-    energy = sum(v * v for v in band) or 1e-9
-    best, lag_at = 0.0, 0
-    for lag in range(int(rate / high), int(rate / low)):
-        if lag >= len(band) // 2:
-            break
-        c = sum(band[j] * band[j + lag] for j in range(len(band) - lag)) / energy
-        if c > best:
-            best, lag_at = c, lag
-    return (rate / lag_at if lag_at else 0.0), best
-
-
-def _pole_lp(sig, cutoff, rate, passes=2):
-    """`lowpass` at an explicit rate, for analysis outside a native() block."""
-    a = math.exp(-2 * math.pi * cutoff / rate)
-    out = sig
-    for _ in range(passes):
-        y, res = 0.0, []
-        for v in out:
-            y = a * y + (1 - a) * v
-            res.append(y)
-        out = res
-    return out
-
-
-def _accelerando(end_step, start_gap=2.0, end_gap=0.25):
-    """Positions of a roll whose gap shrinks geometrically start_gap→end_gap
-    across `end_step` sixteenths, with the gain rising over the same span.
-    Returns [(position, gain)]; the last stroke stops short of `end_step` so
-    the crash there is heard as the arrival and not as one more roll hit."""
-    out, at = [], 0.0
-    while at < end_step - end_gap:
-        progress = at / end_step
-        out.append((at, 0.25 + 0.75 * progress))
-        at += start_gap * (end_gap / start_gap) ** progress
-    return out
 
 
 def saturate(sig, drive):
@@ -361,7 +313,8 @@ def write(name, sig, peak=0.72):
     """Writes a signal generated at OUTPUT_RATE. Refuses a protected name
     BEFORE touching the file."""
     if name + ".wav" in PROTECTED:
-        raise SystemExit(f"{name}.wav is a reference excerpt owned by the extractor: not generated")
+        raise SystemExit(f"{name}.wav is not this generator's to write "
+                         f"(a reference excerpt, or an asset the owner supplied): not generated")
     top = max(1e-9, max(abs(s) for s in sig))
     scale = peak / top
     frames = b"".join(
@@ -384,21 +337,23 @@ def write_manifest():
     with open(os.path.abspath(__file__), "rb") as f:
         generator = hashlib.sha256(f.read()).hexdigest()
     entries = {}
-    # Excerpt files are owned by Tools/extract_reference_audio.py; their
-    # entries and the extractor's own record survive a regeneration untouched.
+    # Files this generator does not produce — the extractor's excerpts and the
+    # owner's own assets — keep their entries, and the extractor's record, from
+    # the previous manifest untouched.
     extractor_record = {}
     if os.path.exists(MANIFEST):
         with open(MANIFEST) as f:
             previous = json.load(f)
         for name, entry in previous.get("files", {}).items():
-            if entry.get("attribution") == "excerpt":
+            if entry.get("attribution") in NOT_GENERATED:
                 entries[name] = entry
         for key in ("extractor", "extractor_sha256", "rights_review"):
             if key in previous:
                 extractor_record[key] = previous[key]
     for name, ms, digest in sorted(_written):
-        if entries.get(name + ".wav", {}).get("attribution") == "excerpt":
-            raise SystemExit(f"{name} is a reference excerpt: not generated")
+        if entries.get(name + ".wav", {}).get("attribution") in NOT_GENERATED:
+            raise SystemExit(f"{name} is not a generated cue (attribution "
+                             f"{entries[name + '.wav']['attribution']}): refusing to claim it")
         entries[name + ".wav"] = {
             "sha256": digest,
             "milliseconds": round(ms),
@@ -449,32 +404,6 @@ def write_native_rms(name, sig, target_dbfs, ceiling=0.9):
               f"instead of {target_dbfs}")
     write_native(name, sig, peak=min(ceiling, peak))
 
-
-def read_bundled(name):
-    """Samples of a COMMITTED bundled WAV as floats, for a cue derived from
-    an excerpt. The bytes are read from the repository (never from OUT,
-    which is a scratch directory while Scripts/check-audio.sh runs) and must
-    hash to the committed manifest's entry: a cue cut out of an excerpt is
-    only reproducible while the excerpt is the one that was cut."""
-    path = os.path.join(BUNDLED_AUDIO, name + ".wav")
-    if not os.path.exists(path):
-        raise SystemExit(f"{name}.wav is missing from {os.path.normpath(BUNDLED_AUDIO)}: cannot derive from it")
-    with open(path, "rb") as f:
-        digest = hashlib.sha256(f.read()).hexdigest()
-    try:
-        with open(COMMITTED_MANIFEST) as f:
-            want = json.load(f)["files"][name + ".wav"]["sha256"]
-    except (OSError, KeyError, ValueError) as error:
-        raise SystemExit(f"no committed manifest entry for {name}.wav ({error}): cannot derive from it")
-    if digest != want:
-        raise SystemExit(
-            f"{name}.wav does not match the committed manifest (have {digest[:12]}…, "
-            f"want {want[:12]}…): re-extract it, or regenerate the manifest deliberately")
-    with wave.open(path, "rb") as f:
-        if (f.getnchannels(), f.getsampwidth(), f.getframerate()) != (1, 2, OUTPUT_RATE):
-            raise SystemExit(f"{name}.wav is not mono 16-bit {OUTPUT_RATE} Hz: cannot derive from it")
-        frames = f.readframes(f.getnframes())
-    return [s / 32767.0 for s in struct.unpack(f"<{len(frames) // 2}h", frames)]
 
 
 def fade_out(sig, ms):
@@ -756,272 +685,6 @@ def build():
                              ([0.0] * samples(115) + apply(bandpass(noise(tick, 9000, 0x2E), 2800, 1.0),
                                                            env_decay(tick, 1, 3.0)), 1.8)),
                          -16.4)
-
-    # ---------------------------------------------- stage-start cue
-    # Owner 2026-09-15: the opening and the stage-end music did not match
-    # ("开场音乐和结束音乐感觉风格对不上，你生成一个和结束音乐风格类似的开场音乐").
-    # The stage end is the 决战坦克 results passage (`sfx_stage_win`, an
-    # excerpt): a sampled drum loop, no clear melody. Measured on the
-    # bundled excerpt: hits on a ≈0.118 s sixteenth grid (≈127 bpm; flux
-    # autocorrelation peaks 0.229/0.474/0.713/0.943 s), in groups of 4–7
-    # separated by one empty step; kick ≈55–75 Hz (≈90 ms), toms
-    # ≈140–230 Hz ringing 250–400 ms, broadband snare strokes, a cymbal
-    # wash, a few faint harmonic stabs, ≈8 kHz sample sheen, ≈−21 dBFS
-    # RMS — and a ROOM THAT NEVER FALLS SILENT: measured 2026-09-25, no
-    # 118 ms step of the excerpt sits more than 9 dB under its loudest step,
-    # and no 5 ms pocket anywhere inside it falls below ≈−36 dBFS.
-    # Owner 2026-09-16: "开场曲不要和结束的一样的，设计一个和结束曲风格一致
-    # 且很有动感的节奏" — the opening must NOT be the same audio as the
-    # stage end, but must sound like it and drive. So neither a slice of the
-    # passage nor a re-synthesis: the cue is RE-SEQUENCED from the
-    # excerpt's OWN strokes. The passage is cut on the measured sixteenth
-    # grid above, five slices are chosen as kick/snare/tom/tick/wash by
-    # band energy, and they are re-laid into a new pattern — four-on-the-
-    # floor kick, backbeat snares, off-beat ticks, tom fills, and a final
-    # accent that rings out on the excerpt's own wash.
-    # Owner 2026-09-25, "align the opening style with the ending style":
-    # measured against the excerpt, the 2026-09-16 card missed it on three
-    # counts, all fixed here.
-    #   1. Ten of its thirty-six steps were DIGITAL SILENCE. A gate is the
-    #      one thing the sampled room never does, and that — not the notes —
-    #      is what made the opening read as dry and mechanical beside the
-    #      stage end. The pattern now plays over a room bed cut from the
-    #      excerpt's own material, so the card's rests breathe like the
-    #      ending's (see `air` below).
-    #   2. It sat 2.7 dB under the stage end (−23.5 vs −20.8 dBFS RMS). The
-    #      card is now levelled to the excerpt's OWN measured RMS, so the
-    #      two cues match by construction and a re-extraction re-levels it.
-    #   3. It CRESCENDOED — ≈−28 dBFS across its first bar up to ≈−18 dBFS
-    #      at the accent — where the ending drives flat from its first
-    #      stroke. Bar one no longer plays at 0.85; the drive is even and
-    #      only the fills and the closing accent lift.
-    # The phrase is also two bars of TWELVE sixteenths rather than sixteen.
-    # At the measured tempo that puts the closing accent at ≈2.83 s, which
-    # is where the intro hands over to play (card 2.3 s + reveal 0.45 s +
-    # title-out 0.4 s = 3.13 s, StageFlow.Durations), so the last stroke
-    # lands with the playfield instead of ≈0.9 s into it and only the
-    # accent's wash rings past. Timbre, tempo, room tone and the
-    # one-step-rest idiom stay identical to the stage end BY CONSTRUCTION
-    # (same samples, same grid); only the rhythm is new, and it is denser
-    # than the source (≈8.1 strokes/s laid over the source's own 8.3/s).
-    # Analysis and layout are plain deterministic float arithmetic over
-    # fixed input bytes, so Scripts/check-audio.sh reproduces it exactly.
-    # Written through write(): the material is already at OUTPUT_RATE and
-    # re-quantising it through NATIVE_RATE would only degrade it. Battle
-    # City material stays out entirely (standing owner rule).
-    passage = read_bundled("sfx_stage_win")
-    card_step = round(OUTPUT_RATE * 0.943 / 8)   # the measured sixteenth, ≈117.9 ms
-    card_scan = int(OUTPUT_RATE * 3.55)          # stop short of the excerpt's tail fade
-    if len(passage) < card_scan:
-        raise SystemExit("sfx_stage_win.wav is too short to re-sequence the stage card from it")
-    slices = []
-    for index in range(card_scan // card_step):
-        cut = passage[index * card_step:(index + 1) * card_step]
-        high = [s - l for s, l in zip(cut, lowpass(cut, 2000))]   # sheen / wash band
-        slices.append({
-            "index": index,
-            "rms": rms(cut),
-            "low": rms(lowpass(cut, 200)),                        # kick band
-            "mid": rms([a - b for a, b in zip(lowpass(cut, 300), lowpass(cut, 120))]),
-            # Sheen that SUSTAINS through the step, which is what a cymbal
-            # does and a stick hit does not: the tail half of the band.
-            # (The whole-step sheen level is what the analysis reported; only
-            # the sustaining half separates a wash from a bright stick hit.)
-            "ring": rms(high[len(high) // 2:]),
-        })
-    # Roles, in this order so each choice can exclude the ones before it.
-    # max()/min() keep the first extremum and the list is in step order, so
-    # a tie always goes to the lower step index.
-    levels = [s["rms"] for s in slices]
-    loud = [s for s in slices if s["rms"] >= percentile(levels, 70)]
-    body = [s for s in slices if s["rms"] >= percentile(levels, 40)]
-    taken = set()
-
-    def role(pool, key, pick=max):
-        chosen = pick([s for s in pool if s["index"] not in taken], key=key)
-        taken.add(chosen["index"])
-        return chosen["index"]
-
-    kick = role(loud, lambda s: s["low"] / s["rms"])       # loudest step that is most bass
-    snare = role(loud, lambda s: s["rms"])                 # the biggest broadband stroke
-    wash = role(slices, lambda s: s["ring"])               # longest-sustaining sheen
-    tom = role(body, lambda s: s["mid"] / s["rms"])        # the tom band, any solid step
-    light = percentile(levels, 30)
-    tick = role(slices, lambda s: abs(s["rms"] - light), min)   # a light off-beat stroke
-    voices = {"K": kick, "S": snare, "T": tom, "H": tick}
-    # A melody voice, for the shape that carries a tune: the slice whose tom
-    # band autocorrelates most strongly, i.e. the most cleanly PITCHED drum
-    # in the passage, resampled per note. Measured, not assumed, so a
-    # re-extraction re-tunes it (2026-10-01: slice 15, 110.8 Hz ≈ A2,
-    # clarity 0.57 — a drum in a dense mix is never a pure tone, but that
-    # is enough for resampling to read as pitch).
-    pitched = max(((tom_pitch(passage[i * card_step:(i + 1) * card_step], OUTPUT_RATE)[1], i)
-                   for i in range(card_scan // card_step)))[1]
-    melody_hz, melody_clarity = tom_pitch(passage[pitched * card_step:(pitched + 1) * card_step],
-                                          OUTPUT_RATE)
-    if melody_hz <= 0:
-        raise SystemExit("no pitched drum slice found in sfx_stage_win.wav for the melody voice")
-    # Owner 2026-10-01: `sfx_stage_win` is right and stays; the card "作为
-    # 开场音乐非常不合适，必须更改出一个配套的". The 2026-09-16/09-25 card was a
-    # two-bar LOOP, and that is the mismatch: the stage end is a groove
-    # because a results screen keeps rolling, while a stage card has to
-    # ANNOUNCE and then hand over. A loop built from the groove's own
-    # samples reads as more of the same, arriving in the wrong place.
-    # So the card keeps everything that makes it a set with the stage end —
-    # the same kit, the same room, the measured ≈127 bpm sixteenth grid, the
-    # same ≈−21 dBFS level — and changes its FORM to a gesture with an arc:
-    # a run-up, a statement, and a crash that lands exactly where the intro
-    # hands over to play. Three shapes were built from the same strokes for
-    # the owner to choose between (all three are in the review doc and were
-    # sent for audition); SHAPE names the one that ships, so switching is
-    # one word here and a regeneration.
-    #
-    # Positions are in sixteenths and may be fractional: a run-up tightens
-    # below the grid, which a groove never does and which is most of what
-    # makes this read as an opening rather than a loop. "A" is the accent —
-    # kick, snare and the excerpt's own wash struck together.
-    HANDOFF = 26.5          # (card 2.3 s + reveal 0.45 s + title-out 0.4 s) / step
-    SHAPES = {
-        # Run-up, statement, drive, and a tightening fill into the crash.
-        "roll_hit": (
-            [(0.0, "T", 0.40), (2.0, "T", 0.46), (3.0, "T", 0.52), (4.0, "T", 0.60),
-             (4.5, "T", 0.68), (5.0, "T", 0.76), (5.5, "T", 0.84), (5.75, "T", 0.92)]
-            + [(6.0, "A", 1.00)]
-            + [(7.0, "H", 0.60), (8.0, "K", 0.90), (9.0, "H", 0.60), (10.0, "S", 0.95),
-               (11.0, "H", 0.60), (12.0, "K", 0.90), (13.0, "H", 0.60), (14.0, "S", 0.95)]
-            + [(15.0, "A", 0.90)]
-            + [(16.0, "H", 0.60), (17.0, "K", 0.90), (18.0, "H", 0.60), (19.0, "S", 0.95),
-               (20.0, "K", 0.90), (21.0, "H", 0.60), (22.0, "S", 0.95), (23.0, "K", 0.90)]
-            + [(24.0, "T", 0.80), (24.5, "T", 0.85), (25.0, "T", 0.90),
-               (25.5, "T", 0.95), (26.0, "T", 1.00)]
-            + [(HANDOFF, "A", 1.00)]),
-        # Four heavy strikes with a full beat of room between them, rolls
-        # bridging the last two. The least groove-like of the three.
-        "three_strikes": (
-            [(0.0, "A", 1.00), (4.0, "A", 1.00), (8.0, "A", 1.00)]
-            + [(12.0, "T", 0.70), (13.0, "T", 0.80), (14.0, "T", 0.90)]
-            + [(16.0, "A", 1.00)]
-            + [(20.0, "T", 0.70), (21.0, "T", 0.78), (22.0, "T", 0.86),
-               (23.0, "T", 0.92), (24.0, "T", 0.96), (25.0, "T", 1.00), (26.0, "T", 1.00)]
-            + [(HANDOFF, "A", 1.00)]),
-        # A TUNE on the kit. Owner 2026-10-01 asked for a melodic opening and
-        # pointed at the Battle City NES start theme. Its melody is not
-        # copied or paraphrased — the standing rule against that holds, and
-        # ADR-0011 records the owner settling the same question on
-        # 2026-09-10 — so the notes below are an original figure, and all
-        # that is taken from the reference is its FUNCTION: short, rising,
-        # announcing, resolving as play begins. It is played on the
-        # excerpt's own pitched drum rather than a synthesized instrument,
-        # which keeps the kit, the room and the 2026-09-16 rule against
-        # synthesized instruments in the card all intact. C minor
-        # pentatonic, because ADR-0011's measurements found this excerpt's
-        # own faint harmonic stabs near C5/G5/B♭5 — the key comes from our
-        # own material. Register C3-E♭4 (resampling ratios 1.2-2.8 off the
-        # measured 110.8 Hz), where a pitched tom still sounds like a drum.
-        "melodic": (
-            [(0.0, "M", 0.95, 130.81), (2.0, "M", 0.70, 155.56), (3.0, "M", 0.80, 196.00),
-             (6.0, "M", 0.90, 233.08), (8.0, "M", 1.00, 261.63), (10.0, "M", 0.75, 233.08),
-             (12.0, "M", 0.85, 196.00), (14.0, "M", 0.75, 233.08), (15.0, "M", 0.85, 261.63),
-             (18.0, "M", 1.00, 311.13), (20.0, "M", 0.85, 261.63), (22.0, "M", 0.80, 196.00)]
-            + [(float(q), "K", 0.80) for q in range(0, 21, 4)]
-            + [(float(q) + 2.0, "H", 0.45) for q in range(0, 21, 4)]
-            + [(24.0, "T", 0.80), (24.5, "T", 0.86), (25.0, "T", 0.92),
-               (25.5, "T", 0.96), (26.0, "T", 1.00)]
-            + [(HANDOFF, "A", 0.78), (HANDOFF, "M", 1.00, 261.63)]),
-        # One continuous accelerando from near-silence to the crash: pure
-        # anticipation, quarter-note kicks marking the time through it.
-        "crescendo": (
-            [(round(p, 3), "T", g) for p, g in _accelerando(HANDOFF)]
-            + [(float(q), "K", 0.55 + 0.1 * (q // 4)) for q in range(0, 25, 4)]
-            + [(HANDOFF, "A", 1.00)]),
-    }
-    MELODY_GAIN = 2.6
-    # A tune made of short pitched drum hits has a far higher crest factor
-    # than a drum pattern — one closing crash against twelve brief notes —
-    # and the peak cap below then costs it nearly 3 dB of level against the
-    # stage end. Soft saturation is applied per shape so only the shape that
-    # needs it gets it and the drum shapes stay byte-identical.
-    SHAPE_DRIVE = {"roll_hit": None, "three_strikes": None, "crescendo": None, "melodic": 1.9}
-    SHAPE = "melodic"
-    events = SHAPES[SHAPE]
-    # The closing crash rings four steps past the hand-off; a mid-card
-    # accent rings two, so the drive behind it stays readable.
-    accent_steps, mid_accent_steps = 4, 2
-    span = HANDOFF + accent_steps
-
-    def stroke(index, steps=1, tail_ms=8):
-        """One grid slice, gated so it starts and ends clean at the seam."""
-        cut = passage[index * card_step:(index + steps) * card_step]
-        return fade_out(fade_in(cut, 2), tail_ms)
-
-    def accent(wash_steps):
-        """Kick, snare and the excerpt's own wash struck as one stroke."""
-        return mix((stroke(kick), 1.0), (stroke(snare), 1.0),
-                   (stroke(wash, steps=wash_steps, tail_ms=150), 1.0))
-
-    card = [0.0] * (int(span * card_step) + samples(20))
-
-    def place(step_position, cut, gain):
-        at = int(round(step_position * card_step))
-        for i, s in enumerate(cut):
-            if at + i < len(card):
-                card[at + i] += s * gain
-
-    for event in events:
-        position, symbol, gain = event[0], event[1], event[2]
-        if symbol == "A":
-            place(position, accent(accent_steps if position >= HANDOFF else mid_accent_steps), gain)
-        elif symbol == "M":
-            # One melody note: the pitched slice replayed at the ratio that
-            # puts it on the note, which shortens it exactly as a faster
-            # replay does, so a higher note is also a shorter one. A single
-            # resampled tom carries far less energy than a kick and snare
-            # struck together, so the written gains are the tune's own
-            # dynamics and MELODY_GAIN lifts the voice as a whole — without
-            # it the melody sat 8 dB under the closing crash and the cue
-            # lost 3 dB of level to that one peak.
-            note_cut = resample(stroke(pitched, tail_ms=16), event[3] / melody_hz)
-            place(position, note_cut, gain * MELODY_GAIN)
-        else:
-            place(position, stroke(voices[symbol]), gain)
-    # The room. The ending's rests are covered by a sampled room, so the
-    # card's are too — and by the same room: grains of the excerpt's own
-    # band above 2 kHz (its air and sample sheen, none of the kick or tom
-    # body), half-overlapped under a Bartlett window, which sums flat at a
-    # 50 % hop. Each grain is read five eighths of a step further into the
-    # passage, so no grain lands on the source's own grid, and every other
-    # one is reversed, so neither a transient nor a groove survives: what is
-    # left is the recording's air, not its drum loop. Level: the excerpt's
-    # quietest step sits ≈9 dB under its loudest, so the bed sits 11 dB
-    # under the pattern and no step of the card is a gate any more.
-    air = [s - l for s, l in zip(passage[:card_scan], lowpass(passage[:card_scan], 2000))]
-    grain, hop, stride = card_step, card_step // 2, card_step * 5 // 8
-    window = [1 - abs(2 * i / (grain - 1) - 1) for i in range(grain)]
-    bed, source_at = [0.0] * len(card), 0
-    for count, at in enumerate(range(0, len(bed) - grain, hop)):
-        cut = air[source_at:source_at + grain]
-        if count % 2:
-            cut = cut[::-1]
-        for i, s in enumerate(cut):
-            bed[at + i] += s * window[i]
-        source_at = (source_at + stride) % (len(air) - grain)
-    bed_gain = rms(card) * 10 ** (-11 / 20.0) / max(1e-9, rms(bed))
-    for i, s in enumerate(bed):
-        card[i] += s * bed_gain
-    # Level parity with the stage end, measured on the excerpt itself:
-    # write() normalises to `peak`, so the peak that lands the excerpt's own
-    # RMS is what is asked for. The cap keeps voice headroom — the cue's
-    # highest sample is the closing accent, 3 dB above every other stroke,
-    # and reaching exact parity through it would cost 1.4 dB of headroom for
-    # one sample. Capped, the card lands ≈0.4 dB under the stage end, which
-    # is below hearing, and the two cues can overlap at a stage change
-    # (the results passage still rings when the next card starts) without
-    # summing into the mixer's ceiling.
-    if SHAPE_DRIVE[SHAPE] is not None:
-        card = saturate(card, SHAPE_DRIVE[SHAPE])
-    card = fade_out(card, 60)
-    card_top = max(abs(s) for s in card)
-    write("sfx_stage_card", card, peak=min(0.9, rms(passage) * card_top / rms(card)))
 
     # ------------------------------------------------ reference-derived set
     # CANDIDATE set (ADR-0011, accepted 2026-09-10): re-synthesised from Claude's
