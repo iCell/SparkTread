@@ -1320,6 +1320,66 @@ three land within 0.1 dB of their 2026-09-25 loudness, so the owner's A/B
 is timbre only. The other 14 synthesized cues and all 8 excerpts are
 byte-identical; the full gate passes. Owner listen pending on these three.
 
+**Whole-cue-set review, and the card rebuilt as a gesture (2026-10-01,
+later).** The owner asked for the standard applied to the three named cues
+to be applied to every cue, and settled the two stage cues: `sfx_stage_win`
+is finished and must not be touched again, while the card "作为开场音乐非常
+不合适，必须更改出一个配套的".
+
+The card's diagnosis is worth recording because three attempts had missed
+it. All three were grooves, and the 2026-09-25 pass had made the last one
+match the stage end on every axis that can be measured — RMS, noise floor,
+band tilt, stroke density, stroke placement on the source's own grid — and
+the owner still rejected it. That locates the fault where the measurements
+were not looking: form, not texture. A results screen keeps rolling, so the
+stage end is a groove; a stage card has to announce and hand over. A loop
+built from the groove's own samples is the same music arriving in the wrong
+place. The card now keeps every matching property (same kit, room bed,
+≈127 bpm grid, the excerpt's own RMS, still only the excerpt's strokes) and
+changes only its shape: a run-up tightening BELOW the grid, a struck
+statement, a short drive split by a second accent, a tom fill, and a crash
+at 3.12 s where the intro hands over, ringing 0.47 s into play. Two further
+shapes (`three_strikes`, `crescendo`) were built from the same strokes and
+sent for audition; `SHAPE` in the generator selects the one that ships.
+
+The rest of the set was measured for duration against its event's cadence,
+level against its importance, and band tilt against the reference
+excerpts. Seven cues changed and one was deleted — `sfx_fire_ap` was the
+second-loudest cue in the product (−10.1 dBFS RMS, over a tank exploding at
+−12.4); `sfx_base_own_hit` sat under every impact cue at −20.0;
+`sfx_pickup_spawn` was 3 dB louder than collecting; `sfx_base_hit`, the
+loudest cue in the game, had no body under 150 Hz; `sfx_spawn_warp` had a
+crest factor of 1.0 dB, the constant-amplitude bare-square signature of the
+shield whoop the owner had already rejected, and was the last one in the
+set; `sfx_hit_brick`, the most frequent impact, piled its energy below the
+crack; and `sfx_base_destroyed` was almost all hiss. `sfx_fire_special` is
+removed outright: a third byte-identical copy of the shot excerpt kept for
+a weapon id R5 cannot produce, so it could never play. Figures and the
+reasoning are in ADR-0011's second 2026-10-01 amendment. `GameAudio`'s
+rapid-fire voice pool was also found to document a cadence R5.6 replaced
+(83 ms and five overlapping clips, now 217 ms and two); the six voices stay
+as headroom per R18-01 and only the stale comments were corrected — shrinking
+the pool would have traded a real safety margin for two preloaded voices.
+
+Owner listen pending on all of it. The bundled set is 24 cues, 7 excerpts,
+all byte-identical; the full gate passes.
+
+**The stage card carries a tune (2026-10-01, third pass).** Having heard the
+three drum-only shapes, the owner asked for a melodic opening and linked the
+Battle City NES start theme as the model. Its melody is not copied or
+paraphrased — the owner settled that on 2026-09-10 and the standing rule
+came out of it — so what is taken is the function (short, rising,
+announcing, resolving into play) and the notes are an original figure. The
+instrument is the interesting part: a tune needs a pitched voice while
+composing the card from synthesized instruments is separately forbidden, and
+both rules hold at once by playing the melody on the excerpt's OWN pitched
+drum, autocorrelated out of the passage (110.8 Hz) and resampled per note.
+C minor pentatonic, from this excerpt's own measured harmonic stabs. It
+lands at −20.8 dBFS RMS, identical to the stage end. The three drum shapes
+are byte-identical after the change, so the earlier audition stands, and
+`SHAPE` in the generator selects which of the four ships. Details in
+ADR-0011's third 2026-10-01 amendment; owner listen pending.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

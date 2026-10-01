@@ -54,7 +54,7 @@ MANIFEST = os.environ.get("SPARKTREAD_AUDIO_MANIFEST") or COMMITTED_MANIFEST
 # Per-cue manifest note, in the same "note" field the excerpt entries carry:
 # how a voice was built, where that is not obvious from its attribution.
 NOTES = {
-    "sfx_stage_card": "an original two-bar pattern re-sequenced from the results-passage excerpt's own drum strokes: grid-sliced at the measured ≈0.118 s sixteenth, kick/snare/tom/tick/wash slices chosen by deterministic band-energy analysis, two bars of twelve sixteenths (four-on-the-floor kick, backbeat snares, off-beat ticks, tom fills) and a closing accent that rings out on the excerpt's own wash, all laid over a room bed grain-built from the excerpt's own band above 2 kHz so no step is silent, and levelled to the excerpt's own RMS; same tempo, room, level and one-step-rest idiom as the stage end, denser and driving, with the accent landing where the intro hands over to play (owner 2026-09-16: not the same audio as the stage end — style-consistent and 动感; owner 2026-09-25: aligned to the stage end's room, level and flat drive)",
+    "sfx_stage_card": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased — standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured ≈0.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E♭4 — the key taken from this excerpt's own faint harmonic stabs — over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first — SHAPE in the generator selects",
 }
 
 ATTRIBUTION = {
@@ -195,6 +195,64 @@ def lowpass(sig, cutoff, passes=1):
             y = a * y + (1 - a) * s
             res.append(y)
         out = res
+    return out
+
+
+def resample(sig, ratio):
+    """Linear-interpolation resample: `ratio` > 1 raises the pitch and
+    shortens the signal, exactly as replaying a drum sample faster does."""
+    out, n = [], int(len(sig) / ratio)
+    for i in range(n):
+        at = i * ratio
+        left = int(at)
+        frac = at - left
+        right = min(len(sig) - 1, left + 1)
+        out.append(sig[left] * (1 - frac) + sig[right] * frac)
+    return out
+
+
+def tom_pitch(cut, rate, low=110.0, high=280.0):
+    """The fundamental of a drum slice, by autocorrelation of its tom band.
+
+    Measured rather than assumed so the melody's resampling ratios stay
+    correct if the excerpt is ever re-extracted; returns (hz, clarity)."""
+    band = [a - b for a, b in zip(_pole_lp(cut, 320.0, rate), _pole_lp(cut, 95.0, rate))]
+    mean = sum(band) / len(band)
+    band = [v - mean for v in band]
+    energy = sum(v * v for v in band) or 1e-9
+    best, lag_at = 0.0, 0
+    for lag in range(int(rate / high), int(rate / low)):
+        if lag >= len(band) // 2:
+            break
+        c = sum(band[j] * band[j + lag] for j in range(len(band) - lag)) / energy
+        if c > best:
+            best, lag_at = c, lag
+    return (rate / lag_at if lag_at else 0.0), best
+
+
+def _pole_lp(sig, cutoff, rate, passes=2):
+    """`lowpass` at an explicit rate, for analysis outside a native() block."""
+    a = math.exp(-2 * math.pi * cutoff / rate)
+    out = sig
+    for _ in range(passes):
+        y, res = 0.0, []
+        for v in out:
+            y = a * y + (1 - a) * v
+            res.append(y)
+        out = res
+    return out
+
+
+def _accelerando(end_step, start_gap=2.0, end_gap=0.25):
+    """Positions of a roll whose gap shrinks geometrically start_gap→end_gap
+    across `end_step` sixteenths, with the gain rising over the same span.
+    Returns [(position, gain)]; the last stroke stops short of `end_step` so
+    the crash there is heard as the arrival and not as one more roll hit."""
+    out, at = [], 0.0
+    while at < end_step - end_gap:
+        progress = at / end_step
+        out.append((at, 0.25 + 0.75 * progress))
+        at += start_gap * (end_gap / start_gap) ** progress
     return out
 
 
@@ -529,11 +587,16 @@ def build():
         # low rumble — no melodic sweep (owner: it must sound serious).
         n = samples(380)
         ign = samples(45)
-        write_native("sfx_fire_ap",
+        write_native_rms("sfx_fire_ap",
                      mix((apply(noise(ign, 11000, 0xC7), env_decay(ign, 1, 2.0)), 0.9),
                          (apply(noise_sweep(n, 7200, 1600, 0x9E1), env_hold(n, 30, 0.6)), 1.0),
                          (apply(triangle(sweep(78, 36, n, 1.2)), env_hold(n, 25, 0.55)), 0.6)),
-                     peak=0.62)
+                     # 2026-10-01 review: at −10.1 dBFS RMS this launch was the
+                     # second-loudest cue in the product, over a tank exploding
+                     # (−12.4) and over the blast of the shell it does not even
+                     # fire. Still the loudest launch, no longer louder than a
+                     # destruction.
+                     -12.8)
 
         # Demolition launch. Owner 2026-10-01: "有点闷，和别的音效感觉不太
         # 符合". Measured against the launch it plays beside (the reference's
@@ -607,23 +670,45 @@ def build():
                                 env_decay(sub, 3, 2.2)), 0.60)), 2.4),
                      -12.3)
 
-        # Base.
+        # Base taken by the enemy (§12.4 gives it priority over every weapon
+        # voice, and it is the loudest cue in the product). The two-tone
+        # four-stroke alarm figure and its pitches are kept exactly — an
+        # alternating two-tone alarm is the clearest "this is the emergency"
+        # signal there is — but it measured −20.5 dB in the band under 150 Hz,
+        # i.e. the loudest sound in the game had no body at all and would go
+        # shrill on a phone speaker (2026-10-01 review). The notes now carry a
+        # bandpassed edge instead of being bare squares, and the shell's own
+        # impact arrives under the first stroke.
         alarm = concat(note(620, 110, 0.5, 1, 0.15), note(470, 110, 0.5, 1, 0.15),
                        note(620, 110, 0.5, 1, 0.15), note(470, 110, 0.5, 1, 0.15))
-        boomn = samples(220)
-        write_native("sfx_base_hit",
-                     mix((alarm, 0.8),
-                         (apply(noise(boomn, 7000, 0x91), env_decay(boomn, 2, 3)), 0.9)),
-                     peak=0.75)
+        edge = apply(bandpass(noise(len(alarm), 9000, 0xA4), 1900, 0.8),
+                     env_db(len(alarm), [(0, -3), (110, -9), (440, -14)]))
+        boomn, impact = samples(220), samples(220)
+        write_native_rms("sfx_base_hit",
+                         # The impact raises the crest factor past what 0.9 of
+                         # headroom allows at this loudness, and this cue has to
+                         # stay the most urgent in the game — above the player's
+                         # own death at −10.2 — so the transient is rounded
+                         # rather than the alarm made quieter.
+                         saturate(mix((alarm, 0.80),
+                             (edge, 0.55),
+                             (apply(noise(boomn, 7000, 0x91), env_decay(boomn, 2, 3)), 0.9),
+                             (apply(triangle(sweep(180, 70, impact, 1.4)),
+                                    env_decay(impact, 2, 2.2)), 1.60)), 1.7),
+                         -9.2)
 
         # Own-fire hit (ADR-0005 distinct cue): a dull, short thud with no
         # alarm figure, clearly unlike the enemy breakthrough. Provisional
         # placeholder until the reference-derived set lands.
         n = samples(200)
-        write_native("sfx_base_own_hit",
+        write_native_rms("sfx_base_own_hit",
                      mix((apply(triangle(sweep(140, 60, n, 1.8)), env_decay(n, 2, 3.0)), 1.0),
                          (apply(noise(n, 3000, 0xB7), env_decay(n, 1, 5)), 0.35)),
-                     peak=0.5)
+                     # 2026-10-01 review: at −20.0 dBFS RMS this sat under every
+                     # impact cue and barely over the dry-fire click, and
+                     # "you just shot your own base" has to register. The
+                     # timbre is untouched, so ADR-0005's separation holds.
+                     -15.0)
 
         # Flag guard raised (§11.2) and base repaired. Owner 2026-10-01:
         # "觉得很滑稽，有点奇怪". The old cue was a 300→640 Hz square GLIDE
@@ -653,11 +738,24 @@ def build():
                                                        env_decay(ring, 2, 2.6)), 0.30)), 2.2),
                      -16.2)
 
-        n = samples(160)
-        write_native("sfx_spawn_warp",
-                     apply(square(concat(sweep(1200, 600, n // 2, 1.0),
-                                         sweep(600, 1200, n - n // 2, 1.0)), 0.25),
-                           env_hold(n, 4, 0.3)), peak=0.17)
+        # Enemy wave appears, and the director's elite phase. The old cue
+        # measured a crest factor of 1.0 dB — a constant-amplitude bare square
+        # under a hold envelope, the same signature as the shield whoop the
+        # owner called 滑稽, and the last one left in the set (2026-10-01
+        # review). The gesture is kept (something arriving, down then up) but
+        # it is now struck and decays: a rising materialise hiss, a blip that
+        # falls away instead of being held, and a bandpassed tick marking the
+        # arrival. Same loudness as the mix pass set.
+        n, blip, tick = samples(160), samples(110), samples(45)
+        write_native_rms("sfx_spawn_warp",
+                         mix((apply(noise_sweep(n, 1500, 7000, 0x2D),
+                                    env_hold(n, 8, 0.55)), 0.55),
+                             (apply(square(concat(sweep(1200, 600, blip // 2, 1.0),
+                                                  sweep(600, 1400, blip - blip // 2, 1.0)), 0.25),
+                                    env_decay(blip, 4, 1.8)), 1.0),
+                             ([0.0] * samples(115) + apply(bandpass(noise(tick, 9000, 0x2E), 2800, 1.0),
+                                                           env_decay(tick, 1, 3.0)), 1.8)),
+                         -16.4)
 
     # ---------------------------------------------- stage-start cue
     # Owner 2026-09-15: the opening and the stage-end music did not match
@@ -751,35 +849,141 @@ def build():
     light = percentile(levels, 30)
     tick = role(slices, lambda s: abs(s["rms"] - light), min)   # a light off-beat stroke
     voices = {"K": kick, "S": snare, "T": tom, "H": tick}
-    # Two bars of twelve sixteenths; "." is a rest, and the source's idiom
-    # is a single-step rest, never a longer gap. Bar two answers bar one
-    # with toms where bar one rests.
-    pattern = ("K H S H K . S H K H T T "
-               "K H S H K H S . K T S T").split()
-    fills = {10, 11, 21, 22, 23}
-    # The wash of the closing accent rings for four steps past the phrase.
-    accent_step, accent_steps = len(pattern), 4
+    # A melody voice, for the shape that carries a tune: the slice whose tom
+    # band autocorrelates most strongly, i.e. the most cleanly PITCHED drum
+    # in the passage, resampled per note. Measured, not assumed, so a
+    # re-extraction re-tunes it (2026-10-01: slice 15, 110.8 Hz ≈ A2,
+    # clarity 0.57 — a drum in a dense mix is never a pure tone, but that
+    # is enough for resampling to read as pitch).
+    pitched = max(((tom_pitch(passage[i * card_step:(i + 1) * card_step], OUTPUT_RATE)[1], i)
+                   for i in range(card_scan // card_step)))[1]
+    melody_hz, melody_clarity = tom_pitch(passage[pitched * card_step:(pitched + 1) * card_step],
+                                          OUTPUT_RATE)
+    if melody_hz <= 0:
+        raise SystemExit("no pitched drum slice found in sfx_stage_win.wav for the melody voice")
+    # Owner 2026-10-01: `sfx_stage_win` is right and stays; the card "作为
+    # 开场音乐非常不合适，必须更改出一个配套的". The 2026-09-16/09-25 card was a
+    # two-bar LOOP, and that is the mismatch: the stage end is a groove
+    # because a results screen keeps rolling, while a stage card has to
+    # ANNOUNCE and then hand over. A loop built from the groove's own
+    # samples reads as more of the same, arriving in the wrong place.
+    # So the card keeps everything that makes it a set with the stage end —
+    # the same kit, the same room, the measured ≈127 bpm sixteenth grid, the
+    # same ≈−21 dBFS level — and changes its FORM to a gesture with an arc:
+    # a run-up, a statement, and a crash that lands exactly where the intro
+    # hands over to play. Three shapes were built from the same strokes for
+    # the owner to choose between (all three are in the review doc and were
+    # sent for audition); SHAPE names the one that ships, so switching is
+    # one word here and a regeneration.
+    #
+    # Positions are in sixteenths and may be fractional: a run-up tightens
+    # below the grid, which a groove never does and which is most of what
+    # makes this read as an opening rather than a loop. "A" is the accent —
+    # kick, snare and the excerpt's own wash struck together.
+    HANDOFF = 26.5          # (card 2.3 s + reveal 0.45 s + title-out 0.4 s) / step
+    SHAPES = {
+        # Run-up, statement, drive, and a tightening fill into the crash.
+        "roll_hit": (
+            [(0.0, "T", 0.40), (2.0, "T", 0.46), (3.0, "T", 0.52), (4.0, "T", 0.60),
+             (4.5, "T", 0.68), (5.0, "T", 0.76), (5.5, "T", 0.84), (5.75, "T", 0.92)]
+            + [(6.0, "A", 1.00)]
+            + [(7.0, "H", 0.60), (8.0, "K", 0.90), (9.0, "H", 0.60), (10.0, "S", 0.95),
+               (11.0, "H", 0.60), (12.0, "K", 0.90), (13.0, "H", 0.60), (14.0, "S", 0.95)]
+            + [(15.0, "A", 0.90)]
+            + [(16.0, "H", 0.60), (17.0, "K", 0.90), (18.0, "H", 0.60), (19.0, "S", 0.95),
+               (20.0, "K", 0.90), (21.0, "H", 0.60), (22.0, "S", 0.95), (23.0, "K", 0.90)]
+            + [(24.0, "T", 0.80), (24.5, "T", 0.85), (25.0, "T", 0.90),
+               (25.5, "T", 0.95), (26.0, "T", 1.00)]
+            + [(HANDOFF, "A", 1.00)]),
+        # Four heavy strikes with a full beat of room between them, rolls
+        # bridging the last two. The least groove-like of the three.
+        "three_strikes": (
+            [(0.0, "A", 1.00), (4.0, "A", 1.00), (8.0, "A", 1.00)]
+            + [(12.0, "T", 0.70), (13.0, "T", 0.80), (14.0, "T", 0.90)]
+            + [(16.0, "A", 1.00)]
+            + [(20.0, "T", 0.70), (21.0, "T", 0.78), (22.0, "T", 0.86),
+               (23.0, "T", 0.92), (24.0, "T", 0.96), (25.0, "T", 1.00), (26.0, "T", 1.00)]
+            + [(HANDOFF, "A", 1.00)]),
+        # A TUNE on the kit. Owner 2026-10-01 asked for a melodic opening and
+        # pointed at the Battle City NES start theme. Its melody is not
+        # copied or paraphrased — the standing rule against that holds, and
+        # ADR-0011 records the owner settling the same question on
+        # 2026-09-10 — so the notes below are an original figure, and all
+        # that is taken from the reference is its FUNCTION: short, rising,
+        # announcing, resolving as play begins. It is played on the
+        # excerpt's own pitched drum rather than a synthesized instrument,
+        # which keeps the kit, the room and the 2026-09-16 rule against
+        # synthesized instruments in the card all intact. C minor
+        # pentatonic, because ADR-0011's measurements found this excerpt's
+        # own faint harmonic stabs near C5/G5/B♭5 — the key comes from our
+        # own material. Register C3-E♭4 (resampling ratios 1.2-2.8 off the
+        # measured 110.8 Hz), where a pitched tom still sounds like a drum.
+        "melodic": (
+            [(0.0, "M", 0.95, 130.81), (2.0, "M", 0.70, 155.56), (3.0, "M", 0.80, 196.00),
+             (6.0, "M", 0.90, 233.08), (8.0, "M", 1.00, 261.63), (10.0, "M", 0.75, 233.08),
+             (12.0, "M", 0.85, 196.00), (14.0, "M", 0.75, 233.08), (15.0, "M", 0.85, 261.63),
+             (18.0, "M", 1.00, 311.13), (20.0, "M", 0.85, 261.63), (22.0, "M", 0.80, 196.00)]
+            + [(float(q), "K", 0.80) for q in range(0, 21, 4)]
+            + [(float(q) + 2.0, "H", 0.45) for q in range(0, 21, 4)]
+            + [(24.0, "T", 0.80), (24.5, "T", 0.86), (25.0, "T", 0.92),
+               (25.5, "T", 0.96), (26.0, "T", 1.00)]
+            + [(HANDOFF, "A", 0.78), (HANDOFF, "M", 1.00, 261.63)]),
+        # One continuous accelerando from near-silence to the crash: pure
+        # anticipation, quarter-note kicks marking the time through it.
+        "crescendo": (
+            [(round(p, 3), "T", g) for p, g in _accelerando(HANDOFF)]
+            + [(float(q), "K", 0.55 + 0.1 * (q // 4)) for q in range(0, 25, 4)]
+            + [(HANDOFF, "A", 1.00)]),
+    }
+    MELODY_GAIN = 2.6
+    # A tune made of short pitched drum hits has a far higher crest factor
+    # than a drum pattern — one closing crash against twelve brief notes —
+    # and the peak cap below then costs it nearly 3 dB of level against the
+    # stage end. Soft saturation is applied per shape so only the shape that
+    # needs it gets it and the drum shapes stay byte-identical.
+    SHAPE_DRIVE = {"roll_hit": None, "three_strikes": None, "crescendo": None, "melodic": 1.9}
+    SHAPE = "melodic"
+    events = SHAPES[SHAPE]
+    # The closing crash rings four steps past the hand-off; a mid-card
+    # accent rings two, so the drive behind it stays readable.
+    accent_steps, mid_accent_steps = 4, 2
+    span = HANDOFF + accent_steps
 
     def stroke(index, steps=1, tail_ms=8):
         """One grid slice, gated so it starts and ends clean at the seam."""
         cut = passage[index * card_step:(index + steps) * card_step]
         return fade_out(fade_in(cut, 2), tail_ms)
 
-    card = [0.0] * ((accent_step + accent_steps) * card_step + samples(20))
+    def accent(wash_steps):
+        """Kick, snare and the excerpt's own wash struck as one stroke."""
+        return mix((stroke(kick), 1.0), (stroke(snare), 1.0),
+                   (stroke(wash, steps=wash_steps, tail_ms=150), 1.0))
+
+    card = [0.0] * (int(span * card_step) + samples(20))
 
     def place(step_position, cut, gain):
-        at = step_position * card_step
+        at = int(round(step_position * card_step))
         for i, s in enumerate(cut):
-            card[at + i] += s * gain
+            if at + i < len(card):
+                card[at + i] += s * gain
 
-    for position, symbol in enumerate(pattern):
-        if symbol == ".":
-            continue
-        place(position, stroke(voices[symbol]), 1.05 if position in fills else 1.0)
-    # Final accent: kick and snare together under four steps of the wash,
-    # sample-added first so the step is one stroke, then placed.
-    place(accent_step, mix((stroke(kick), 1.0), (stroke(snare), 1.0),
-                           (stroke(wash, steps=accent_steps, tail_ms=150), 1.0)), 1.0)
+    for event in events:
+        position, symbol, gain = event[0], event[1], event[2]
+        if symbol == "A":
+            place(position, accent(accent_steps if position >= HANDOFF else mid_accent_steps), gain)
+        elif symbol == "M":
+            # One melody note: the pitched slice replayed at the ratio that
+            # puts it on the note, which shortens it exactly as a faster
+            # replay does, so a higher note is also a shorter one. A single
+            # resampled tom carries far less energy than a kick and snare
+            # struck together, so the written gains are the tune's own
+            # dynamics and MELODY_GAIN lifts the voice as a whole — without
+            # it the melody sat 8 dB under the closing crash and the cue
+            # lost 3 dB of level to that one peak.
+            note_cut = resample(stroke(pitched, tail_ms=16), event[3] / melody_hz)
+            place(position, note_cut, gain * MELODY_GAIN)
+        else:
+            place(position, stroke(voices[symbol]), gain)
     # The room. The ending's rests are covered by a sampled room, so the
     # card's are too — and by the same room: grains of the excerpt's own
     # band above 2 kHz (its air and sample sheen, none of the kick or tom
@@ -813,6 +1017,8 @@ def build():
     # is below hearing, and the two cues can overlap at a stage change
     # (the results passage still rings when the next card starts) without
     # summing into the mixer's ceiling.
+    if SHAPE_DRIVE[SHAPE] is not None:
+        card = saturate(card, SHAPE_DRIVE[SHAPE])
     card = fade_out(card, 60)
     card_top = max(abs(s) for s in card)
     write("sfx_stage_card", card, peak=min(0.9, rms(passage) * card_top / rms(card)))
@@ -845,10 +1051,18 @@ def build():
                        env_db(n, [(0, -60), (180, -60), (220, -2), (500, -3), (800, -30)]))
         tone = apply(triangle(expo_sweep(200, 150, n)),
                      env_db(n, [(0, -60), (200, -60), (230, -6), (600, -8), (800, -36)]))
-        heavy = mix((hiss, 1.0), (rumble, 1.0), (tone, 0.6))
+        # The band above 2.5 kHz measured −2.8 dB against −15.2 under 150 Hz:
+        # the biggest explosion in the game was almost all hiss, where the
+        # reference's own explosions carry real weight (−11.3/−6.2 for the
+        # player's death). The hiss steps back, the rumble and tone come up,
+        # and a sub layer carries the collapse (2026-10-01 review).
+        sub_n = samples(500)
+        weight = apply(triangle(sweep(90, 45, sub_n, 1.3)),
+                       env_db(sub_n, [(0, -60), (150, -60), (200, -3), (500, -26)]))
+        heavy = mix((hiss, 0.5), (rumble, 1.6), (tone, 0.8), (weight, 0.8))
         later = [0.0] * samples(350) + apply(lowpass(noise(n, NATIVE_RATE, 0x94), 220, 3),
                                              env_db(n, [(0, -60), (30, -2), (500, -4), (800, -40)]))
-        write_native("sfx_base_destroyed", mix((heavy, 1.0), (later, 0.9)), peak=0.95)
+        write_native_rms("sfx_base_destroyed", mix((heavy, 1.0), (later, 0.9)), -12.6, ceiling=0.95)
 
         def jnote(freq, ms):
             # Triangle: the reference's notes carry only weak odd harmonics.
@@ -856,19 +1070,32 @@ def build():
         # Pickup appears (derived variant, not a measured event): a rising
         # C6 G6 C7 G6 figure in the arpeggio's voice.
         appear = concat(jnote(1047, 60), jnote(1568, 60), jnote(2093, 60), jnote(1568, 120))
-        write_native("sfx_pickup_spawn",
-                     apply(appear, env_db(len(appear), [(0, -4), (200, -6), (300, -30)])), peak=0.5)
+        # 2026-10-01 review: appearing was 3 dB LOUDER than collecting
+        # (−13.2 against the reference jingle's −16.3), which puts the
+        # announcement over the reward; it now sits under it.
+        write_native_rms("sfx_pickup_spawn",
+                         apply(appear, env_db(len(appear), [(0, -4), (200, -6), (300, -30)])),
+                         -16.5)
 
         n = samples(70)
         write_native("sfx_deflect",
                      apply(square(expo_sweep(2690, 2100, n), 0.5), env_decay(n, 1, 4)), peak=0.4)
 
         # Brick (derived): the first 120 ms of the enemy-explosion crunch.
+        # This is the most frequent impact in the game, so its character
+        # carries further than its level. It measured −4.3 dB in the band
+        # under 150 Hz — energy piled below the crack — which is the same
+        # muddiness the owner heard in the explosion cues (2026-10-01 review).
+        # Brick breaking is a dry clack, so the crack band leads and the low
+        # thud is halved; it stays the quietest impact in the set.
         n = samples(120)
-        write_native("sfx_hit_brick",
-                     mix((apply(lowpass(noise(n, NATIVE_RATE, 0x2F), 900, 2), env_decay(n, 1, 3)), 1.0),
-                         (apply(triangle(expo_sweep(240, 120, n)), env_decay(n, 1, 3)), 0.5)),
-                     peak=0.6)
+        write_native_rms("sfx_hit_brick",
+                         mix((apply(bandpass(noise(n, NATIVE_RATE, 0x2F), 1400, 0.7),
+                                    env_decay(n, 1, 3)), 2.2),
+                             (apply(lowpass(noise(n, NATIVE_RATE, 0x30), 2200, 1),
+                                    env_decay(n, 1, 3.4)), 0.7),
+                             (apply(triangle(expo_sweep(240, 120, n)), env_decay(n, 1, 3)), 0.25)),
+                         -19.3)
 
         # Results tally tick (derived from 3.14 kHz / 1.85 kHz blips heard
         # while the reference's kill table counts up).

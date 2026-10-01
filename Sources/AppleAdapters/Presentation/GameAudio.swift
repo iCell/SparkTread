@@ -55,7 +55,7 @@ public struct AVAudioBackend: AudioBackend {
 @MainActor
 public final class GameAudio {
     public nonisolated static let allSounds: [String] = [
-        "sfx_fire_normal", "sfx_fire_special", "sfx_fire_rapid",
+        "sfx_fire_normal", "sfx_fire_rapid",
         "sfx_fire_ap", "sfx_fire_explosion", "sfx_fire_flame",
         "sfx_flame_loop", "sfx_dry_fire",
         "sfx_hit_brick", "sfx_hit_steel", "sfx_deflect", "sfx_hit_tank",
@@ -81,11 +81,14 @@ public final class GameAudio {
     /// Monotonic clock (uptime) for throttles — never calendar time.
     private let clock: () -> TimeInterval
     private var pools: [String: [AudioVoice]] = [:]
-    /// Voices pre-warmed per sound. Rapid fire launches every 83 ms at the
-    /// fastest cadence while its 340 ms excerpt is still playing — up to
-    /// five clips overlap — so it needs more voices than any other cue for
-    /// every launch to stay audible (six: one of headroom); playback never
-    /// allocates beyond this.
+    /// Voices pre-warmed per sound. Rapid fire is still the fastest cadence
+    /// in the game, but no longer the one this pool was sized for: it fired
+    /// every 83 ms on a five-tick cooldown, overlapping up to five of its
+    /// own 340 ms clips, and R5.6 scaled that cooldown to 20/18/15/13 ticks
+    /// — a launch every 217 ms at LV3, so at most two clips sound at once.
+    /// The six are kept as headroom rather than retuned, because a pool
+    /// that comes up short stays short (R18-01) and two spare preloaded
+    /// voices cost less than that risk. Playback never allocates beyond it.
     nonisolated static func poolSize(for name: String) -> Int {
         name == "sfx_fire_rapid" ? 6 : 3
     }
@@ -268,7 +271,13 @@ public final class GameAudio {
                 case "ap": add("sfx_fire_ap")
                 case "explosion": add("sfx_fire_explosion")
                 case "fire": add("sfx_fire_flame")
-                default: add(channel == .special ? "sfx_fire_special" : "sfx_fire_normal")
+                // Every weapon R5 defines has its own voice above, and
+                // WeaponRules is code rather than content, so this branch is
+                // reachable only by adding a sixth weapon — which has to
+                // bring its own launch voice with it. `sfx_fire_special`, a
+                // third byte-identical copy of the shot excerpt kept for it,
+                // was dropped in the 2026-10-01 audio review.
+                default: add("sfx_fire_normal")
                 }
             case .dryFire(_, let owner, _):
                 if owner != nil { add("sfx_dry_fire") } // player only (§12.4)

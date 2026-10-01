@@ -210,8 +210,13 @@ private let origin = Vec2i(x: 0, y: 0)
         #expect(audio.play("sfx_fire_normal")) // a freed voice serves the next shot
     }
 
-    /// Rapid fire at 83 ms with a 340 ms clip overlaps up to five launches;
-    /// six voices keep every launch audible without hot-path allocation.
+    /// The rapid pool holds six voices, which is headroom rather than a fit:
+    /// the cadence it was sized for (83 ms on a five-tick cooldown, five
+    /// overlapping 340 ms clips) became 20/18/15/13 ticks in R5.6, so at
+    /// LV3 two clips overlap. What the test pins is the property that
+    /// matters either way — the pool is whatever `poolSize` says, every
+    /// voice in it serves a launch, and the one past it is dropped rather
+    /// than allocated on the hot path.
     @Test func rapidFireHasEnoughVoicesForItsCadence() {
         let backend = FakeBackend()
         let audio = GameAudio(backend: backend, clock: { 0 })

@@ -1,22 +1,22 @@
 {
   "creative_decision": "owner, 2026-09-10: the game's sounds are to be the original \u51b3\u6218\u5766\u514b sounds; excerpts of the public recording are used wherever it holds an isolated instance (attribution 'excerpt'); the rest is synthesized and provisional (ADR-0011, accepted by the owner 2026-09-10)",
   "extractor": "Tools/extract_reference_audio.py",
-  "extractor_sha256": "75cc81e4307783062866d0157fb1fb80fe4a398425ef171379aeecec41fc093e",
+  "extractor_sha256": "553e8f95e4d8940b9e48af57ec6a7d6170925009b78dad32674db05185b6f32a",
   "files": {
     "sfx_base_destroyed.wav": {
       "attribution": "derived",
       "milliseconds": 1150,
-      "sha256": "87ec7098f381cdee44a8dfe2aff5ddb842203994fab21b79b700d68beceb78cd"
+      "sha256": "a02728b8849e7aa09e03c0e50377cc7181a5e50e561807382cb2a15aa56e6047"
     },
     "sfx_base_hit.wav": {
       "attribution": "provisional",
       "milliseconds": 440,
-      "sha256": "55041dcb78eb10b8b2c239a73b7a20e6eafcb938ebfb185499edfde53264631a"
+      "sha256": "99c4026de5395b9847dd57519869db03b24dc23af8bb3d644a98388200b106f3"
     },
     "sfx_base_own_hit.wav": {
       "attribution": "provisional",
       "milliseconds": 200,
-      "sha256": "2b044f9d4ba413032f58ac8905973f88b43a8c261322ce189cb0fbdebe81f253"
+      "sha256": "edb4ad66f16555875bd6e00b45f84f690b79a42c0762cfcc09f593983f3d3d94"
     },
     "sfx_base_shield_on.wav": {
       "attribution": "provisional",
@@ -41,7 +41,7 @@
     "sfx_fire_ap.wav": {
       "attribution": "provisional",
       "milliseconds": 380,
-      "sha256": "86184c45650586d4cae37385a594ce4cba98d137efc5197d7458446cb24aeca6"
+      "sha256": "27c4d7f46e030381be0cab2a4aab5d7bab11a22b592a771cdd0f2dde9a808466"
     },
     "sfx_fire_explosion.wav": {
       "attribution": "provisional",
@@ -79,19 +79,6 @@
         185.63
       ]
     },
-    "sfx_fire_special.wav": {
-      "attribution": "excerpt",
-      "milliseconds": 340,
-      "note": "the same isolated shot instance; whether the reference has other launch sounds is not established",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
-      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        185.29,
-        185.63
-      ]
-    },
     "sfx_flame_loop.wav": {
       "attribution": "provisional",
       "milliseconds": 1200,
@@ -100,7 +87,7 @@
     "sfx_hit_brick.wav": {
       "attribution": "derived",
       "milliseconds": 120,
-      "sha256": "a8a26c9ff65f5a9756d094c799c4ed244e7b66ae2caaa9894cda0a75d0483714"
+      "sha256": "c5f075a9931c5e7c2b683ae8d0baf865d649271720d057c3b078a7c705f9c19a"
     },
     "sfx_hit_steel.wav": {
       "attribution": "excerpt",
@@ -136,7 +123,7 @@
     "sfx_pickup_spawn.wav": {
       "attribution": "derived",
       "milliseconds": 300,
-      "sha256": "46b16e7e8d5ab35f478d01b1e2bd749c50ab88b0348e6fcccd1d07b27c730e23"
+      "sha256": "98781f36199f924f45e91d7dd2f0b0ce9f3f700a61510b0621cdf28ee394273b"
     },
     "sfx_player_explode.wav": {
       "attribution": "excerpt",
@@ -154,13 +141,13 @@
     "sfx_spawn_warp.wav": {
       "attribution": "provisional",
       "milliseconds": 160,
-      "sha256": "cb8431d933c801c0e3b04a811946974b8309b616055de616015896cecf32b562"
+      "sha256": "64a60bb303f204a6814eac7b06c73999071b25431bdcedbb95c6958ce5d61f2a"
     },
     "sfx_stage_card.wav": {
       "attribution": "derived",
-      "milliseconds": 3320,
-      "note": "an original two-bar pattern re-sequenced from the results-passage excerpt's own drum strokes: grid-sliced at the measured \u22480.118 s sixteenth, kick/snare/tom/tick/wash slices chosen by deterministic band-energy analysis, two bars of twelve sixteenths (four-on-the-floor kick, backbeat snares, off-beat ticks, tom fills) and a closing accent that rings out on the excerpt's own wash, all laid over a room bed grain-built from the excerpt's own band above 2 kHz so no step is silent, and levelled to the excerpt's own RMS; same tempo, room, level and one-step-rest idiom as the stage end, denser and driving, with the accent landing where the intro hands over to play (owner 2026-09-16: not the same audio as the stage end \u2014 style-consistent and \u52a8\u611f; owner 2026-09-25: aligned to the stage end's room, level and flat drive)",
-      "sha256": "9b8a70760b9616e919eaf0651d2d83661a88f8ddfc37e8f482cd6df850c54e75"
+      "milliseconds": 3615,
+      "note": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased \u2014 standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured \u22480.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E\u266d4 \u2014 the key taken from this excerpt's own faint harmonic stabs \u2014 over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first \u2014 SHAPE in the generator selects",
+      "sha256": "9a2d285e5a1cb9f6b957447434354c08a3cfe83c3e69fa35acdf1cf113bf45b5"
     },
     "sfx_stage_win.wav": {
       "attribution": "excerpt",
@@ -195,7 +182,7 @@
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "504809b83d95ceaf5265da65b82cce25e29af0f863a5973ebc61e4ab9214580b",
+  "generator_sha256": "900ff6d5bf987ad155ceec0e18364355d3617a7874ed82569a111a4846941240",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
   "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",

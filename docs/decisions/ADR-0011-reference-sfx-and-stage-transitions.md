@@ -415,3 +415,129 @@ All three land on the loudness the 2026-09-25 pass set (−14.9, −12.3,
 comparison is timbre only. The other 14 synthesized cues and all 8
 excerpts are byte-identical; `check-audio`, its selftest and the full gate
 pass. The owner's listen on these three is pending.
+
+## Amendment 2026-10-01 (later): the whole set reviewed, and the card made a gesture
+
+The owner asked for the same standard to be applied to every cue — "确保他们
+符合当前使用场景，需要的话做出更改" — and settled the two stage cues:
+`sfx_stage_win` "是不用修改的很不错的音效", while `sfx_stage_card` "作为开场
+音乐非常不合适，必须更改出一个配套的".
+
+**The card is now a gesture, not a loop.** Three attempts had all been
+grooves: an original drum composition (2026-09-15), a slice of the results
+passage (2026-09-16, withdrawn the same day), and a two-bar pattern
+re-sequenced from the passage's own strokes (2026-09-16, aligned to the
+stage end's room, level and flat drive on 2026-09-25). The 2026-09-25 pass
+made the card measurably match the stage end on every axis — RMS, noise
+floor, band tilt, stroke density — and the owner still rejected it, which
+locates the fault somewhere the measurements were not looking: FORM. The
+stage end is a groove because a results screen keeps rolling; a stage card
+has to announce and then hand over. A loop built from the groove's own
+samples is the same music arriving in the wrong place, and no amount of
+matching its texture can fix that.
+
+So the card keeps everything that makes it a set with the stage end — the
+same kit, the same room bed, the measured ≈127 bpm sixteenth grid, the same
+≈−21 dBFS level, all of it still the excerpt's own strokes — and changes
+only its shape: a run-up that tightens BELOW the grid (which a groove never
+does, and which is most of what makes this read as an opening), a struck
+statement, a short drive split by a second accent, a tom fill, and a crash
+that lands at 3.12 s where the intro hands over to play, ringing 0.47 s
+into it. Measured against the stage end: −20.9 against −20.8 dBFS RMS,
+band tilt −7.6/−7.5/−8.6/−8.6/−6.2 against −7.0/−7.6/−8.7/−8.7/−6.4, and a
+250 ms envelope that now RISES (−27 to −17) where the ending's is flat —
+which is the intended difference, not a defect.
+
+Two further shapes were built from the same strokes and sent for audition,
+since this is the fourth attempt and the choice is the owner's:
+`three_strikes` (four heavy strikes with a beat of room between them, the
+least groove-like) and `crescendo` (one continuous accelerando from
+near-silence). `SHAPE` in the generator's stage-card block selects which
+one ships; `roll_hit` does, because its texture matches the stage end
+closest (noise floor −27.7 against −27.3, where `three_strikes` drops to
+−35.8) while still having an arc.
+
+**The rest of the set, by the same standard.** Every cue was measured for
+duration against its event's cadence, level against its importance, and
+band tilt against the reference excerpts. Seven changes:
+
+| cue | was | now | why |
+|---|---|---|---|
+| `sfx_fire_ap` | −10.1 dBFS | −12.8 | second-loudest cue in the product, over a tank exploding (−12.4); a launch is not a destruction |
+| `sfx_base_own_hit` | −20.0 | −15.0 | under every impact cue and barely over the dry-fire click; shooting your own base has to register |
+| `sfx_pickup_spawn` | −13.2 | −16.5 | 3 dB LOUDER than collecting (−16.3) — the announcement was over the reward |
+| `sfx_base_hit` | <150 Hz at −20.5 | −15.8 | the loudest cue in the game had no body; figure and pitches kept, the notes gained a bandpassed edge and the shell's impact arrives under the first stroke |
+| `sfx_spawn_warp` | crest 1.0 dB | 8.5 dB | a constant-amplitude bare square, the same signature as the shield whoop the owner called 滑稽 and the last one in the set; now struck and decaying, tonality 0.48 → 0.13 |
+| `sfx_hit_brick` | <150 Hz at −4.3 | −13.4 | the most frequent impact in the game piled its energy below the crack; brick breaking is a dry clack |
+| `sfx_base_destroyed` | >2.5 kHz at −2.8, <150 at −15.2 | −4.4 / −8.1 | the biggest explosion was almost all hiss where the reference's own carry weight |
+
+**`sfx_fire_special` is removed.** It was a third byte-identical copy of the
+shot excerpt, kept for a special-channel weapon id outside the five R5
+defines. `WeaponRules` is code rather than content, so no such id can
+appear without a code change that would bring its own voice: the cue could
+never play. Dropped from the extractor, the manifest and the bundle (the
+extractor's recorded hash is updated with it), and `GameAudio`'s fallback
+now points at the normal launch. The bundled set is 24 cues, 7 of them
+excerpts.
+
+`GameAudio.poolSize` also documented a cadence that no longer exists:
+rapid fire launched every 83 ms when its cooldown was five ticks, so six
+voices were warmed for five overlapping clips, and R5.6 scaled that cooldown
+to 20/18/15/13 ticks — a launch every 217 ms at LV3, two overlapping clips.
+The six voices are KEPT as headroom (R18-01: a pool that comes up short
+stays short, and two spare preloaded voices cost less than that risk); only
+the comment, and the test comment that repeated it, were corrected.
+
+Nothing here is an acceptance: the owner's listen on all of it is pending,
+and the audio mix is still unverified on hardware. The 7 excerpts are
+byte-identical, `check-audio` and its selftest pass, and so does the full
+gate.
+
+## Amendment 2026-10-01 (third): the card carries a tune, played on the kit
+
+The owner, having auditioned the three drum-only shapes, asked for a melodic
+opening and linked the Battle City NES "Game Start" theme as the model:
+"模仿这个旋律…做一个和胜利之后的音乐配套的".
+
+**Its melody is not copied, and not paraphrased either.** This is the third
+time the question has come up — the owner raised it on 2026-09-10 asking
+for a near-copy with slight changes "to avoid copyright", that was declined
+then, and the standing rule against Battle City audio or a note-for-note
+copy of its melody came out of it. Asking again does not change the answer,
+and a slightly-altered copy is worse than a copy because it writes the risk
+into the product while pretending not to. What IS taken from the reference
+is its function, which nobody owns: short, rising, announcing, resolving as
+play begins.
+
+**What ships instead.** The card now carries an original twelve-note figure
+in C minor pentatonic across C3–E♭4, rising through the first bar and
+answering itself in the second, over quarter-note kicks and off-beat ticks,
+a tom run-up, and the crash at the hand-off. The key is not borrowed
+either: ADR-0011's own 2026-09-15 measurements found this excerpt's faint
+harmonic stabs near C5/G5/B♭5, so C minor comes from our own material.
+
+The interesting part is the instrument. A tune normally needs a pitched
+voice, and composing the card from synthesized instruments is itself
+forbidden (owner 2026-09-16). Both rules hold at once by playing the melody
+on the excerpt's OWN pitched drum: the generator autocorrelates the tom band
+of every grid slice, takes the most cleanly pitched one (110.8 Hz ≈ A2,
+clarity 0.57 — a drum in a dense mix is never a pure tone, but enough for
+resampling to read as pitch) and resamples it per note, which shortens each
+note exactly as a faster replay does. Register C3–E♭4 keeps the ratios
+between 1.2 and 2.8, where a pitched tom still sounds like a drum. So the
+tune is in the stage end's own kit and room, with no synthesized instrument
+anywhere in the cue, and the pitch is measured rather than assumed — a
+re-extraction of the excerpt re-tunes the melody instead of detuning it.
+
+Two mechanics were added: `resample`/`tom_pitch` in the generator, and a
+per-shape saturation drive. Twelve short pitched hits against one closing
+crash give the melodic shape a 22.7 dB crest factor where the drum shapes
+have 19, and the peak cap then cost it 2.8 dB of level against the stage
+end; saturating only this shape recovers it. The three drum-only shapes are
+byte-identical after the change (`sfx_stage_card` under `roll_hit` hashes
+the same before and after), so the audition the owner already did still
+stands. Measured against `sfx_stage_win`: −20.8 dBFS RMS against −20.8,
+peak −3.4 against −1.9, band tilt −10.2/−9.4/−8.4/−7.9/−4.9 against
+−7.0/−7.6/−8.7/−8.7/−6.4 (resampling a tom upward naturally lightens the
+bottom), and a flat drive with the crash lifting at the end. `SHAPE` selects
+which of the four ships; `melodic` does. Owner listen pending.
