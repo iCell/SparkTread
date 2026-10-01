@@ -1,5 +1,5 @@
-/// Stable player identity (§6.4). V1 runtime contains only player 1; the
-/// data model holds capacity for 2 (D-018).
+/// Stable player identity. V1 runtime contains only player 1; the data
+/// model holds capacity for 2.
 public struct PlayerID: RawRepresentable, Codable, Hashable, Comparable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
@@ -13,21 +13,42 @@ public enum LifeState: String, Codable, Sendable {
     case active, awaitingRespawn, eliminated
 }
 
+/// Fixed lifecycle timings (GAME_RULES §9.3, §11.3).
+public enum LifecycleRules {
+    public static let playerRespawnDelayTicks = 60
+    public static let playerSpawnProtectionTicks = 120
+    public static let playerRespawnArmor = 3
+    public static let enemySpawnProtectionTicks = 45
+    public static let spawnProcessTicks = 45
+    public static let spawnBlockedSwitchTicks = 120
+    public static let spawnCadenceTicks = 30
+    /// MaxCombos: consecutive qualifying kills at most this far apart.
+    public static let comboWindowTicks = 120
+}
+
 public struct PlayerState: Codable, Equatable, Sendable {
     public let playerID: PlayerID
     public var active: Bool
+    /// Reserve tanks (GAME_RULES §11.3: one tank in play plus three reserve).
     public var lives: Int
     public var score: Int
     public var tankEntityID: Int?
     public var lifeState: LifeState
     public var specialAmmoByWeapon: [String: Int]
-    /// Ticks until respawn while `lifeState == .awaitingRespawn` (§6.5).
+    /// Ticks until respawn while `lifeState == .awaitingRespawn`.
     public var respawnCountdownTicks: Int
-    /// Upgrades retained across campaign respawns (§6.5 retention policy).
+    /// Growth retained across deaths and stages.
     public var retainedSpeedLevel: Int
     public var retainedPowerLevel: Int
     public var retainedEquipmentID: String?
     public var retainedSpecialWeaponID: String
+    /// §13 statistics: current and best consecutive shot hits, current and
+    /// best kill combo, and the tick of the last qualifying kill.
+    public var hitStreak: Int
+    public var maxHits: Int
+    public var comboStreak: Int
+    public var maxCombos: Int
+    public var lastComboKillTick: Int?
 
     public init(playerID: PlayerID, active: Bool = true, lives: Int = 3, score: Int = 0,
                 tankEntityID: Int? = nil, lifeState: LifeState = .active,
@@ -40,10 +61,15 @@ public struct PlayerState: Codable, Equatable, Sendable {
         self.lifeState = lifeState
         self.specialAmmoByWeapon = specialAmmoByWeapon
         self.respawnCountdownTicks = 0
-        self.retainedSpeedLevel = 0
+        self.retainedSpeedLevel = 1
         self.retainedPowerLevel = 0
         self.retainedEquipmentID = nil
         self.retainedSpecialWeaponID = "rapid"
+        self.hitStreak = 0
+        self.maxHits = 0
+        self.comboStreak = 0
+        self.maxCombos = 0
+        self.lastComboKillTick = nil
     }
 }
 
@@ -51,11 +77,28 @@ public enum FireChannel: String, Codable, Sendable {
     case normal, special
 }
 
-/// Authoritative tank state (§6.4). `positionSubunits` is the TOP-LEFT corner
-/// of the nominal 2048×2048-subunit footprint in the Y-down world; the
-/// collision box insets each side by the ruleset's collision inset. The
-/// turn-buffer and slide fields are serialized and checksummed from the first
-/// golden even while slide logic is inert (M1 deliverable).
+/// The attack a tank's death is attributed to (GAME_RULES §13).
+public struct KillAttribution: Codable, Equatable, Sendable {
+    public var playerID: PlayerID?
+    public var byBomb: Bool
+    public init(playerID: PlayerID?, byBomb: Bool = false) {
+        self.playerID = playerID
+        self.byBomb = byBomb
+    }
+}
+
+/// A pickup an enemy carries and drops on death.
+public struct CarriedPickup: Codable, Equatable, Sendable {
+    public var pickupID: String
+    public var critical: Bool
+    public init(pickupID: String, critical: Bool = false) {
+        self.pickupID = pickupID
+        self.critical = critical
+    }
+}
+
+/// Authoritative tank state. `positionSubunits` is the TOP-LEFT corner of
+/// the nominal 2048×2048 footprint; movement collision insets each side.
 public struct TankState: Codable, Equatable, Sendable {
     public let entityID: Int
     public var teamID: Int
@@ -66,33 +109,42 @@ public struct TankState: Codable, Equatable, Sendable {
     public var movementIntent: Direction?
     public var bufferedDirection: Direction?
     public var bufferedDirectionRemainingTicks: Int
+    /// Ice slide (§4.3): the saved slide direction, remaining budget, and
+    /// the accumulator increment saved when the slide began.
     public var slideDirection: Direction?
     public var slideMomentumSubunits: Int
-    /// Integer movement accumulator (§7.1) in 1/60000 subunit steps: each tick
-    /// adds base speed × permille multiplier; whole subunits are consumed.
+    public var slideIncrement: Int
+    /// Integer movement accumulator (§4.1).
     public var movementAccumulator: Int
     public var armor: Int
     public var maxArmor: Int
-    /// Damage shield carried by armored enemy tiers: absorbs non-explosive
-    /// hits point by point; explosion-class damage shatters it outright.
+    /// Extra damage shield (AP-C/D): non-explosive damage chips it, a blast
+    /// shatters it; neither overflows into armor.
     public var shieldHP: Int
     public var speedLevel: Int
     public var powerLevel: Int
     public var specialWeaponID: String
     public var equipmentID: String?
+    /// Timed statuses: "invincible", "frozen".
     public var statusEffects: [String: Int]
     public var fireCooldowns: [FireChannel: Int]
     public var activeProjectileCounts: [String: Int]
     public var spawnProtectionTicks: Int
-    /// Reference carrier rule (§11): a flashing enemy holds this pickup and
-    /// drops it when it dies — at a random interior cell by default
-    /// (`PickupRuleset.dropsSpawnAtRandomCells`, ADR-0010 item 7), near the
-    /// death cell when that flag is off. Nil for non-carriers and players.
-    public var carriedPickupID: String?
-    /// Mine launch (§8.6, ADR-0016): the nominal landing point while the
-    /// "airborne" status runs; the tank lands at the nearest legal cell to
-    /// it when the status expires. Nil on the ground.
-    public var landingSubunits: Vec2i?
+    /// The pickup this enemy drops on death (flashing carrier).
+    public var carriedPickup: CarriedPickup?
+    /// §4.4: set while the tank lost AmphiTank and still overlaps water.
+    public var leavingWater: Bool
+    /// §7.2: the first tick at which ground fire may hurt this tank again.
+    public var nextFireDamageTick: Int
+    /// §5.1 input: remaining ticks of the buffered normal press, whether the
+    /// special button was held last tick, and dry-fire feedback spacing.
+    public var normalFireBufferTicks: Int
+    public var specialHeldLastTick: Bool
+    public var dryFireFeedbackTicks: Int
+    /// Set by the attack that brought armor to zero.
+    public var killedBy: KillAttribution?
+
+    public var carriedPickupID: String? { carriedPickup?.pickupID }
 
     public init(entityID: Int, teamID: Int, ownerPlayerID: PlayerID?, archetypeID: String,
                 positionSubunits: Vec2i, facing: Direction) {
@@ -107,19 +159,25 @@ public struct TankState: Codable, Equatable, Sendable {
         self.bufferedDirectionRemainingTicks = 0
         self.slideDirection = nil
         self.slideMomentumSubunits = 0
+        self.slideIncrement = 0
         self.movementAccumulator = 0
-        self.armor = 3
+        self.armor = LifecycleRules.playerRespawnArmor
         self.maxArmor = 8
         self.shieldHP = 0
         self.speedLevel = 0
         self.powerLevel = 0
         self.specialWeaponID = "rapid"
-        self.landingSubunits = nil
         self.equipmentID = nil
         self.statusEffects = [:]
         self.fireCooldowns = [:]
         self.activeProjectileCounts = [:]
-        self.spawnProtectionTicks = 120
-        self.carriedPickupID = nil
+        self.spawnProtectionTicks = LifecycleRules.playerSpawnProtectionTicks
+        self.carriedPickup = nil
+        self.leavingWater = false
+        self.nextFireDamageTick = 0
+        self.normalFireBufferTicks = 0
+        self.specialHeldLastTick = false
+        self.dryFireFeedbackTicks = 0
+        self.killedBy = nil
     }
 }

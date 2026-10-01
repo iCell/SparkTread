@@ -51,11 +51,8 @@ public enum WorldInvariants {
         func entityID(_ id: Int, _ what: String) {
             if id < 1 || id >= world.nextEntityID { issues.append("\(what) entity id \(id) outside 1..<nextEntityID") }
         }
-        /// An owner reference: the same domain, or the documented "no
-        /// owner" sentinel −1 (stage-authored mines, ownerless ordnance).
-        func ownerID(_ id: Int, _ what: String) {
-            if id != -1 { entityID(id, what) }
-        }
+        /// An owner reference: the same domain (ordnance outlives its emitter).
+        func ownerID(_ id: Int, _ what: String) { entityID(id, what) }
 
         var seenEntityIDs = Set<Int>()
         var previousEntityID = Int.min
@@ -73,13 +70,10 @@ public enum WorldInvariants {
                 issues.append("tank \(id) outside arena bounds at (\(p.x),\(p.y))")
             }
             if tank.maxArmor < 1 || tank.maxArmor > maxArmor { issues.append("tank \(id) max armor \(tank.maxArmor) out of domain") }
-            if let landing = tank.landingSubunits,
-               landing.x < 0 || landing.y < 0 || landing.x > width - footprint || landing.y > height - footprint {
-                issues.append("tank \(id) landing target outside arena bounds")
-            }
-            if (tank.landingSubunits == nil) != (tank.statusEffects["airborne"] == nil) {
-                issues.append("tank \(id) airborne status and landing target disagree")
-            }
+            ticks(tank.normalFireBufferTicks, "tank \(id) fire buffer")
+            ticks(tank.dryFireFeedbackTicks, "tank \(id) dry-fire feedback")
+            if tank.nextFireDamageTick < 0 || tank.nextFireDamageTick > maxCounter { issues.append("tank \(id) fire cadence out of domain") }
+            if tank.slideIncrement < 0 || tank.slideIncrement > 1 << 40 { issues.append("tank \(id) slide increment out of domain") }
             if tank.shieldHP > maxArmor { issues.append("tank \(id) shield out of domain") }
             ticks(tank.bufferedDirectionRemainingTicks, "tank \(id) buffer ticks")
             ticks(tank.spawnProtectionTicks, "tank \(id) spawn protection")
@@ -154,45 +148,28 @@ public enum WorldInvariants {
             previousProjectileID = p.entityID
             entityID(p.entityID, "projectile")
             ownerID(p.ownerEntityID, "projectile \(p.entityID) owner")
-            if p.speedSubunitsPerTick < 0 || p.speedSubunitsPerTick > SpatialUnits.maxPerTickDisplacementSubunits {
+            if p.velocity60 < 0 || p.velocity60 > 60 * WeaponDefinition.maxSpeedMilliSubunits {
                 issues.append("projectile \(p.entityID) speed outside the per-tick displacement cap")
+            }
+            if p.travelRemainder < 0 || p.travelRemainder >= WeaponDefinition.travelUnitsPerSubunit {
+                issues.append("projectile \(p.entityID) travel remainder out of range")
             }
             if !inArena(p.positionSubunits) { issues.append("projectile \(p.entityID) outside the arena") }
             ticks(p.lifetimeRemainingTicks, "projectile \(p.entityID) lifetime")
-            if p.penetrationRemaining < 0 || p.penetrationRemaining > maxCount
-                || p.durability < 0 || p.durability > maxCount || !(0...3).contains(p.powerLevel) {
-                issues.append("projectile \(p.entityID) fields out of domain")
-            }
-            if p.hitTankIDs.count > maxCount { issues.append("projectile \(p.entityID) hit list out of domain") }
-            if p.hitTankIDs != p.hitTankIDs.sorted() {
-                issues.append("projectile \(p.entityID) hit list not ascending")
-            }
-            for hit in p.hitTankIDs.prefix(64) { entityID(hit, "projectile \(p.entityID) hit") }
+            if !(0...3).contains(p.powerLevel) { issues.append("projectile \(p.entityID) power level out of domain") }
             liveByOwner[p.ownerEntityID, default: [:]][p.weaponID, default: 0] += 1
-        }
-        for m in world.mines {
-            if !seenEntityIDs.insert(m.entityID).inserted { issues.append("duplicate entity id \(m.entityID)") }
-            entityID(m.entityID, "mine")
-            ownerID(m.ownerEntityID, "mine \(m.entityID) owner")
-            if !(0...3).contains(m.level) { issues.append("mine \(m.entityID) level \(m.level)") }
-            if !inArena(m.positionSubunits) { issues.append("mine \(m.entityID) outside the arena") }
-            ticks(m.phaseTicksRemaining, "mine \(m.entityID) phase ticks")
-            if m.triggerRadiusSubunits < 0 || m.triggerRadiusSubunits > maxRadiusSubunits {
-                issues.append("mine \(m.entityID) trigger radius out of domain")
-            }
-            liveByOwner[m.ownerEntityID, default: [:]]["mine", default: 0] += 1
         }
         for h in world.fireHazards {
             if !seenEntityIDs.insert(h.entityID).inserted { issues.append("duplicate entity id \(h.entityID)") }
             entityID(h.entityID, "fire hazard")
-            ownerID(h.ownerEntityID, "fire hazard \(h.entityID) owner")
-            if !inArena(h.positionSubunits) { issues.append("fire hazard \(h.entityID) outside the arena") }
-            if h.lifetimeRemainingTicks > maxTicks || h.lifetimeRemainingTicks < -1 {
+            if h.sourceKey >= 0 { entityID(h.sourceKey, "fire hazard \(h.entityID) source") }
+            if h.cell.x < 0 || h.cell.y < 0 || h.cell.x >= arena.cellsWide || h.cell.y >= arena.cellsHigh {
+                issues.append("fire hazard \(h.entityID) outside the arena")
+            }
+            if h.lifetimeRemainingTicks < 1 || h.lifetimeRemainingTicks > maxTicks {
                 issues.append("fire hazard \(h.entityID) lifetime out of domain")
             }
-            if h.damagePerTouch < 0 || h.damagePerTouch > 99 { issues.append("fire hazard \(h.entityID) damage out of domain") }
-            if let at = h.spreadsAtTicks, at < 0 || at > maxTicks { issues.append("fire hazard \(h.entityID) spread tick out of domain") }
-            liveByOwner[h.ownerEntityID, default: [:]]["fire", default: 0] += 1
+            if h.createdTick < 0 || h.createdTick > world.tick { issues.append("fire hazard \(h.entityID) created in the future") }
         }
         // Every live tank's stored counts equal its live entities over the
         // union of stored keys and live weapon IDs (missing key = 0).
@@ -218,14 +195,21 @@ public enum WorldInvariants {
                 issues.append("base outside the arena")
             }
             ticks(base.shieldRemainingTicks, "base shield")
-            ticks(base.burnCooldownTicks, "base burn cooldown")
-            if base.fortRingRestore.count > 12 { issues.append("fort ring record out of domain") }
+            if base.nextFireDamageTick < 0 || base.nextFireDamageTick > maxCounter { issues.append("base fire cadence out of domain") }
+            if base.fortRecord.count > arena.cellsWide * arena.cellsHigh { issues.append("fort record out of domain") }
+            for record in base.fortRecord
+            where record.cell.x < 0 || record.cell.y < 0 || record.cell.x >= arena.cellsWide || record.cell.y >= arena.cellsHigh
+                || record.hardenedMask < 0 || record.hardenedMask > 0b1111 {
+                issues.append("fort record cell (\(record.cell.x),\(record.cell.y)) out of domain")
+            }
         }
         for p in world.pickups {
             if !seenEntityIDs.insert(p.entityID).inserted { issues.append("duplicate entity id \(p.entityID)") }
             entityID(p.entityID, "pickup")
-            if !inArena(p.positionSubunits) { issues.append("pickup \(p.entityID) outside the arena") }
-            if p.lifetimeRemainingTicks > maxTicks || p.lifetimeRemainingTicks < -1 { issues.append("pickup \(p.entityID) lifetime out of domain") }
+            if p.cell.x < 0 || p.cell.y < 0 || p.cell.x > arena.cellsWide - 2 || p.cell.y > arena.cellsHigh - 2 {
+                issues.append("pickup \(p.entityID) outside the arena")
+            }
+            if p.lifetimeRemainingTicks > maxTicks || p.lifetimeRemainingTicks < 0 { issues.append("pickup \(p.entityID) lifetime out of domain") }
             ticks(p.graceTicksRemaining, "pickup \(p.entityID) grace")
         }
         for t in world.spawnTelegraphs {
@@ -270,6 +254,13 @@ public enum WorldInvariants {
             }
             if stage.spawnQueue.count > maxCount { issues.append("spawn queue out of domain") }
             if stage.dropChancePercent < 0 || stage.dropChancePercent > 100 { issues.append("drop chance out of domain") }
+            ticks(stage.spawnCooldownTicks, "spawn cooldown")
+            if stage.pendingPickups.count > maxCount || stage.nextPickupRequestID < 1 || stage.nextPickupRequestID > maxCounter {
+                issues.append("pending pickups out of domain")
+            }
+            for c in stage.fortTemplate where c.x < 0 || c.y < 0 || c.x >= arena.cellsWide || c.y >= arena.cellsHigh {
+                issues.append("fort template cell (\(c.x),\(c.y)) outside the arena")
+            }
             if !stage.carriedPickupQueue.isEmpty && stage.carriedPickupQueue.count != stage.spawnQueue.count {
                 issues.append("carried pickup queue does not pair with the spawn queue")
             }
@@ -282,7 +273,7 @@ public enum WorldInvariants {
         }
 
         for (index, cell) in world.terrain.cells.enumerated() {
-            if cell.quadrantMask < 0 || cell.quadrantMask > 0b1111 {
+            if cell.quadrantMask < 0 || cell.quadrantMask > 0b1111 || !cell.surface.isSurface {
                 issues.append("terrain cell \(index) invalid quadrant mask \(cell.quadrantMask)")
                 break // one report is enough; the grid is uniform storage
             }

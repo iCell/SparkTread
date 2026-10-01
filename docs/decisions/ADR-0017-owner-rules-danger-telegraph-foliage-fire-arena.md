@@ -1,5 +1,7 @@
 # ADR-0017: Owner Rules — No Danger Telegraph, Foliage Fire, Training Arena Spawner
 
+> **Superseded in part by ADR-0018 (2026-09-15).** Where this record conflicts with `GAME_RULES.md` R5, R5 wins; see ADR-0018 item 3 for the exact clauses.
+
 Status: Accepted (owner instructions of 2026-09-10 late evening, applied verbatim)
 
 Date: 2026-09-10

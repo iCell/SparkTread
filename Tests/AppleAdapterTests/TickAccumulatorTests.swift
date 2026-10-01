@@ -70,14 +70,18 @@ import GameCore
         #expect(acc.advance(to: 100 + frame60) == 1)
     }
 
-    /// R4-01: the raw stall comparison tolerates floating-point subtraction
-    /// at realistic uptimes — a six-tick frame is never a stall.
-    @Test func sixTickFrameIsNotAStallAtAnyUptime() {
+    /// GAME_RULES §15.3: a 250 ms frame (15 ticks) is caught up in full at
+    /// any uptime; anything longer is a stall the driver turns into a pause.
+    @Test func aQuarterSecondFrameIsCaughtUpAtAnyUptime() {
+        #expect(TickAccumulator.maxTicksPerCallback == 15)
+        #expect(abs(TickAccumulator.stallThresholdSeconds - 0.25) < 1e-9)
         for start in [0.0, 1.0, 1000.0, 100_000.0, 3_600_000.0] {
             var acc = TickAccumulator()
             _ = acc.advance(to: start)
-            #expect(acc.advance(to: start + TickAccumulator.stallThresholdSeconds) == 6, "start \(start)")
+            #expect(acc.advance(to: start + TickAccumulator.stallThresholdSeconds) == 15, "start \(start)")
             #expect(acc.droppedStalls == 0, "start \(start)")
+            #expect(acc.advance(to: start + TickAccumulator.stallThresholdSeconds + 0.3) == 0, "start \(start)")
+            #expect(acc.droppedStalls == 1, "start \(start)")
         }
     }
 

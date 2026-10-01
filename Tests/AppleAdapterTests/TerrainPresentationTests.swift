@@ -114,8 +114,7 @@ import GameCore
     @Test func equipmentIDsMapToDeliveryAttachmentNames() {
         #expect(MovementLabScene.equipmentArtName("amphi_tank") == "amphi")
         #expect(MovementLabScene.equipmentArtName("anti_skid") == "anti_skid")
-        #expect(MovementLabScene.equipmentArtName("shield_of_moon") == "moon")
-        #expect(MovementLabScene.equipmentArtName("memory_of_sea") == "memory")
+        #expect(MovementLabScene.equipmentArtName("shield_of_moon") == nil) // removed by GAME_RULES R5
         #expect(MovementLabScene.equipmentArtName(nil) == nil)
     }
 
@@ -182,5 +181,41 @@ import GameCore
         // The rig offset points along the facing: right of the anchor.
         let center = scene.muzzleScenePoint(entityID: 999, position: firedAt, facing: .right)
         #expect(anchored.x > center.x - 1)
+    }
+
+    /// The arena edge clips a 3×3 ground tile (56 is not a multiple of three).
+    /// The clip must be the tile's own TOP-LEFT corner: it once went through
+    /// `SKTexture(rect:in:)`, which resolves against the packed atlas page,
+    /// and drew a strip of the frozen/floodplain/citadel ground down the
+    /// right edge in the app. This pins the geometry; the ban on the call
+    /// itself lives in Scripts/check-architecture.sh.
+    @Test func clippedEdgeGroundKeepsTheTilesOwnTopLeftPixels() throws {
+        let (art, scene, _) = try makeScene()
+        let id = "px_ground_frontier_0"
+        let full = try art.texture(id).cgImage()
+        let clipped = try #require(scene.clippedGroundTexture(art, id: id, spanX: 2, spanY: 3))
+        let image = try #require(clipped.cgImage())
+        #expect(image.width == full.width * 2 / 3)
+        #expect(image.height == full.height)
+        // Same pixels as the full tile's left two thirds, so the clip can
+        // never be another sprite: compare the two as drawn bitmaps.
+        func pixels(_ source: CGImage, width: Int, height: Int) -> [UInt8] {
+            var bytes = [UInt8](repeating: 0, count: width * height * 4)
+            bytes.withUnsafeMutableBytes { raw in
+                let context = CGContext(data: raw.baseAddress, width: width, height: height,
+                                        bitsPerComponent: 8, bytesPerRow: width * 4,
+                                        space: CGColorSpaceCreateDeviceRGB(),
+                                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+                // Drawing the FULL tile into a narrower context would scale
+                // it, so the reference is cropped the same way first.
+                context?.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+            }
+            return bytes
+        }
+        let reference = try #require(full.cropping(to: CGRect(x: 0, y: 0,
+                                                              width: full.width * 2 / 3,
+                                                              height: full.height)))
+        #expect(pixels(image, width: image.width, height: image.height)
+                == pixels(reference, width: reference.width, height: reference.height))
     }
 }

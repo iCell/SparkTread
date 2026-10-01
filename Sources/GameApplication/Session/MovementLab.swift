@@ -8,8 +8,9 @@ public enum MovementLabFixture {
     public static let seed: UInt64 = 0x5041_524B_5452_4541 // stable lab seed
 
     /// Builds the lab world: steel border, brick corridor walls (2-cell
-    /// corridors matching the 2×2-cell tank), a water pool and an ice patch
-    /// (ice slide stays inert in M1), and the player tank on a spawn cell.
+    /// corridors matching the 2×2-cell tank), a water pool and an ice patch,
+    /// and the player tank on a spawn cell. Kept byte-stable for the M1
+    /// movement golden.
     public static func makeWorld() -> WorldState {
         let arena = ArenaSpecification.universal
         var terrain = TerrainGrid(arena: arena)
@@ -185,11 +186,13 @@ public struct MovementLabSession: Sendable {
     @discardableResult
     public mutating func advance(holding direction: Direction?,
                                  normalFire: Bool = false,
-                                 specialFire: Bool = false) -> [DomainEvent] {
+                                 specialFire: Bool = false,
+                                 sessionRequest: SessionRequest = .none) -> [DomainEvent] {
         let command = PlayerCommand(playerID: .one, targetTick: world.tick,
                                     moveDirection: direction,
                                     normalFirePressed: normalFire,
-                                    specialFirePressed: specialFire)
+                                    specialFirePressed: specialFire,
+                                    sessionRequest: sessionRequest)
         return advance(commands: [command])
     }
 
@@ -225,10 +228,13 @@ public struct MovementLabSession: Sendable {
         let ahead = Vec2i(x: tank.positionSubunits.x + footprint / 2, y: tank.positionSubunits.y + footprint / 2)
             + tank.facing.vector * (footprint / 2 + cell)
         var events: [DomainEvent] = []
-        let spawned = world.spawnStagePickup(pickupID, nearCell: Vec2i(x: ahead.x / cell, y: ahead.y / cell),
-                                             rules: pickups, events: &events)
-        if spawned { rebaseRecording() }
-        return spawned
+        let anchor = Vec2i(x: ahead.x / cell - 1, y: ahead.y / cell - 1)
+        for candidate in RingScan.cells(around: anchor, maxRadius: 4)
+        where world.spawnStagePickup(pickupID, atCell: candidate, rules: pickups, events: &events) {
+            rebaseRecording()
+            return true
+        }
+        return false
     }
 
     /// Training Arena: adds one enemy of `archetype` at the next spawn cell

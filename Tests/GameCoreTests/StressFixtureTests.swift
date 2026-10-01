@@ -3,7 +3,7 @@ import Testing
 @testable import GameCore
 
 /// Vertical-slice stress fixture (§17.1): 30 tanks, 200 active projectiles,
-/// 100 mines, and heavy terrain damage. Asserts validity and determinism,
+/// 100 burning cells, and heavy terrain damage. Asserts validity and determinism,
 /// and reports headless throughput (the ≥10×-real-time release-device gate
 /// runs on hardware; this debug-build bound is a coarse regression tripwire).
 @Suite struct StressFixtureTests {
@@ -39,32 +39,25 @@ import Testing
 
         // 200 projectiles criss-crossing, mixed weapons.
         let weaponIDs = ["normal", "rapid", "ap", "explosion"]
+        let owner = world.claimEntityID() // an emitter no longer on the field
         for i in 0..<200 {
             let weaponID = weaponIDs[i % 4]
             let weapon = WeaponRuleset.provisional.weapon(weaponID)!
             let id = world.claimEntityID()
             world.projectiles.append(ProjectileState(
-                entityID: id, weaponID: weaponID, ownerEntityID: -1, ownerPlayerID: nil,
+                entityID: id, weaponID: weaponID, ownerEntityID: owner, ownerPlayerID: nil,
                 teamID: i % 2 == 0 ? 1 : 2, powerLevel: i % 4,
                 positionSubunits: Vec2i(x: (3 + (i * 7) % 50) * 1024 + 300,
                                         y: (2 + (i * 5) % 23) * 1024 + 300),
                 direction: Direction(rawValue: i % 4)!,
-                speedSubunitsPerTick: weapon.level(weapon.initialSpeedSubunitsPerTick, i % 4),
-                lifetimeRemainingTicks: 600,
-                penetrationRemaining: weapon.level(weapon.penetrationCount, i % 4),
-                durability: weapon.level(weapon.projectileDurability, i % 4)))
+                velocity60: 60 * weapon.initialSpeedMilliSubunitsPerSecond,
+                lifetimeRemainingTicks: weapon.lifetimeTicks))
         }
 
-        // 100 armed mines.
+        // 100 burning cells.
         for i in 0..<100 {
-            let id = world.claimEntityID()
-            world.mines.append(MineState(
-                entityID: id, level: i % 4, ownerEntityID: -1, ownerPlayerID: nil,
-                teamID: i % 2 == 0 ? 2 : 1,
-                positionSubunits: Vec2i(x: (2 + (i * 11) % 52) * 1024 + 512,
-                                        y: (2 + (i * 13) % 23) * 1024 + 512),
-                phase: .armed, phaseTicksRemaining: 0,
-                triggerRadiusSubunits: 400, onWater: false))
+            world.addEnvironmentFire(cell: Vec2i(x: 2 + (i * 13) % 52, y: 1 + (i * 7) % 25), sourceKey: -(i + 1),
+                                     lifetimeTicks: 600)
         }
         return world
     }

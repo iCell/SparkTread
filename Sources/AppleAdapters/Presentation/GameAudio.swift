@@ -61,7 +61,7 @@ public final class GameAudio {
         "sfx_hit_brick", "sfx_hit_steel", "sfx_deflect", "sfx_hit_tank",
         "sfx_tank_explode", "sfx_player_explode", "sfx_explosion_blast",
         "sfx_base_hit", "sfx_base_own_hit", "sfx_base_destroyed", "sfx_base_shield_on",
-        "sfx_pickup_spawn", "sfx_pickup_collect", "sfx_mine_place",
+        "sfx_pickup_spawn", "sfx_pickup_collect",
         "sfx_spawn_warp", "sfx_stage_win",
         "sfx_tally_tick", "sfx_stage_card",
     ]
@@ -253,8 +253,8 @@ public final class GameAudio {
             switch impact {
             case .brick: "sfx_hit_brick"
             case .steel, .boundary: "sfx_hit_steel"
-            case .deflected, .projectile, .mine: "sfx_deflect"
-            case .tank, .base, .expired, .explosion: nil // carried by damage/explosion events
+            case .deflected, .projectile: "sfx_deflect"
+            case .tank, .base, .expired: nil // carried by damage/explosion events
             }
         }
         for event in events {
@@ -268,12 +268,11 @@ public final class GameAudio {
                 case "ap": add("sfx_fire_ap")
                 case "explosion": add("sfx_fire_explosion")
                 case "fire": add("sfx_fire_flame")
-                case "mine": break // minePlaced carries the sound
                 default: add(channel == .special ? "sfx_fire_special" : "sfx_fire_normal")
                 }
             case .dryFire(_, let owner, _):
                 if owner != nil { add("sfx_dry_fire") } // player only (§12.4)
-            case .projectileHit(_, _, _, let impact), .projectileDestroyed(_, _, _, let impact):
+            case .projectileDestroyed(_, _, _, let impact):
                 if let voice = impactVoice(impact) { add(voice) }
             case .tankDamaged:
                 add("sfx_hit_tank")
@@ -283,10 +282,6 @@ public final class GameAudio {
                 add(owner != nil ? "sfx_player_explode" : "sfx_tank_explode")
             case .explosion:
                 add("sfx_explosion_blast")
-            case .minePlaced:
-                add("sfx_mine_place")
-            case .mineRemoved:
-                add("sfx_deflect")
             case .baseDamaged(_, _, let allied):
                 // ADR-0005: an own-fire hit is never mistaken for a
                 // breakthrough — distinct voice, also on the killing blow.

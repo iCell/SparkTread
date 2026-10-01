@@ -1,4 +1,4 @@
-# ProjectGoldenEagle
+# SparkTread
 
 Single-player top-down tank action game for iPhone (landscape), then iPad and
 macOS. Design and planning documents live at the repository root and in
@@ -81,6 +81,6 @@ lab with `MOVEMENT_LAB=1` (debug overlay and weapon cheat panel exist only
 there). Input: touch stick + two fire buttons; keyboard arrows/WASD to move,
 J/U normal fire, K/I special fire; controller D-pad, A normal, B/X special.
 Launch env `MOVEMENT_LAB_AUTODRIVE=1` runs a scripted demo drive.
-Review state and open decisions: `docs/CURRENT_REVIEW.md`,
-`docs/decisions/ADR-0010-…` and `ADR-0011-…` (proposed). The
+Gameplay rules: `GAME_RULES.md` (the single rulebook, currently R5.9). Review state and
+open items: `docs/CURRENT_REVIEW.md`; decisions: `docs/decisions/`. The
 delivery's own preview renders remain in the source package's `Previews/`.

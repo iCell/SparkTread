@@ -1,8 +1,8 @@
-/// Combat entities (M2). All value types, Codable, kept in ascending
-/// entity-ID order inside WorldState (ADR-0003, §14.3).
+/// Combat entities. All value types, Codable, kept in ascending entity-ID
+/// order inside WorldState.
 
-/// A projectile in flight. `positionSubunits` is the CENTER of its collision
-/// box (half-extent from the weapon ruleset).
+/// A projectile in flight (GAME_RULES §5.2). `positionSubunits` is the
+/// CENTER of its collision box.
 public struct ProjectileState: Codable, Equatable, Sendable {
     public let entityID: Int
     public let weaponID: String
@@ -12,93 +12,107 @@ public struct ProjectileState: Codable, Equatable, Sendable {
     public let powerLevel: Int
     public var positionSubunits: Vec2i
     public let direction: Direction
-    public var speedSubunitsPerTick: Int
+    /// 60 × speed in mSU/s (the §5.2 integration variable W).
+    public var velocity60: Int
+    /// Travel accumulator in 1/3 600 000 subunit.
+    public var travelRemainder: Int
     public var lifetimeRemainingTicks: Int
-    public var penetrationRemaining: Int
-    public let durability: Int
-    /// Tanks this projectile has already penetrated (ascending). A
-    /// penetrating shell damages each distinct target once (§8.4) instead of
-    /// re-hitting the tank it is still overlapping.
-    public var hitTankIDs: [Int] = []
-}
+    /// The shooter's center on the spawn tick: the launch segment checked
+    /// for a muzzle inside a wall (§5.4); nil once the shell has moved.
+    public var launchOriginSubunits: Vec2i?
+    /// §13 MaxHits: whether this shell has damaged an enemy yet.
+    public var damagedEnemy: Bool
 
-public enum MinePhase: String, Codable, Sendable {
-    case arming, armed
-}
-
-/// A placed mine. Position is the center of its hardware box.
-public struct MineState: Codable, Equatable, Sendable {
-    public let entityID: Int
-    public let level: Int
-    public let ownerEntityID: Int
-    public let ownerPlayerID: PlayerID?
-    public let teamID: Int
-    public var positionSubunits: Vec2i
-    public var phase: MinePhase
-    public var phaseTicksRemaining: Int
-    public let triggerRadiusSubunits: Int
-    public let onWater: Bool
-}
-
-/// A lingering flame patch (fire family). Cell-sized area of denial.
-/// `ownerEntityID` is the emitting tank: active-count bookkeeping releases
-/// the slot on that tank when the patch burns out, whoever owns it.
-public struct FireHazardState: Codable, Equatable, Sendable {
-    public let entityID: Int
-    public let ownerEntityID: Int
-    public let ownerPlayerID: PlayerID?
-    public let teamID: Int
-    public let filter: FireTeamFilter
-    public var positionSubunits: Vec2i // center of a 1-cell patch
-    public var lifetimeRemainingTicks: Int
-    public let damagePerTouch: Int
-    /// Foliage fire (ADR-0017): when the remaining lifetime reaches this
-    /// value the flame spreads to the neighbouring foliage cells once; nil
-    /// on non-foliage cells and after spreading.
-    public var spreadsAtTicks: Int?
-
-    public init(entityID: Int, ownerEntityID: Int, ownerPlayerID: PlayerID?, teamID: Int, filter: FireTeamFilter,
-                positionSubunits: Vec2i, lifetimeRemainingTicks: Int, damagePerTouch: Int, spreadsAtTicks: Int? = nil) {
+    public init(entityID: Int, weaponID: String, ownerEntityID: Int, ownerPlayerID: PlayerID?,
+                teamID: Int, powerLevel: Int, positionSubunits: Vec2i, direction: Direction,
+                velocity60: Int, lifetimeRemainingTicks: Int, launchOriginSubunits: Vec2i? = nil) {
         self.entityID = entityID
+        self.weaponID = weaponID
         self.ownerEntityID = ownerEntityID
         self.ownerPlayerID = ownerPlayerID
         self.teamID = teamID
-        self.filter = filter
+        self.powerLevel = powerLevel
         self.positionSubunits = positionSubunits
+        self.direction = direction
+        self.velocity60 = velocity60
+        self.travelRemainder = 0
         self.lifetimeRemainingTicks = lifetimeRemainingTicks
-        self.damagePerTouch = damagePerTouch
-        self.spreadsAtTicks = spreadsAtTicks
+        self.launchOriginSubunits = launchOriginSubunits
+        self.damagedEnemy = false
     }
 }
 
-/// The defended base (§6.6). `topLeftSubunits` anchors a 2×2-cell structure.
+/// A ground-fire patch on one whole cell (GAME_RULES §7.2). Patches are
+/// keyed by (cell, color, source); presentation paints yellow+orange in one
+/// cell red, the rules never merge them.
+public struct FireHazardState: Codable, Equatable, Sendable {
+    public let entityID: Int
+    public let cell: Vec2i
+    public let color: FireColor
+    /// Stable source: the emitting tank's entity id, or a negative stage
+    /// environment-fire id.
+    public let sourceKey: Int
+    public let ownerPlayerID: PlayerID?
+    public let createdTick: Int
+    public var lifetimeRemainingTicks: Int
+
+    public init(entityID: Int, cell: Vec2i, color: FireColor, sourceKey: Int,
+                ownerPlayerID: PlayerID?, createdTick: Int, lifetimeRemainingTicks: Int) {
+        self.entityID = entityID
+        self.cell = cell
+        self.color = color
+        self.sourceKey = sourceKey
+        self.ownerPlayerID = ownerPlayerID
+        self.createdTick = createdTick
+        self.lifetimeRemainingTicks = lifetimeRemainingTicks
+    }
+
+    public var isEnvironment: Bool { sourceKey < 0 }
+
+    /// Center of the patch's cell.
+    public var positionSubunits: Vec2i {
+        let cell = SpatialUnits.subunitsPerCell
+        return Vec2i(x: self.cell.x * cell + cell / 2, y: self.cell.y * cell + cell / 2)
+    }
+}
+
+/// One Flag On Guard template cell (GAME_RULES §11.2): its full state when
+/// the cycle began, and the quadrants hardened since the last pickup.
+public struct FortCellRecord: Codable, Equatable, Sendable {
+    public let cell: Vec2i
+    public let original: TerrainCell
+    public var hardenedMask: Int
+
+    public init(cell: Vec2i, original: TerrainCell, hardenedMask: Int = 0) {
+        self.cell = cell
+        self.original = original
+        self.hardenedMask = hardenedMask
+    }
+}
+
+/// The defended base. `topLeftSubunits` anchors a 2×2-cell structure.
 public struct BaseState: Codable, Equatable, Sendable {
     public let teamID: Int
     public var topLeftSubunits: Vec2i
     public var durability: Int
     public var maxDurability: Int
     public var shieldRemainingTicks: Int
-    /// Pre-shield terrain kinds of the fort ring in `Stage.baseFortRingCells`
-    /// order, recorded when a shield hardens the ring and consumed when it
-    /// expires. Empty when no hardening is pending (a shield that started
-    /// active without hardening restores nothing).
-    public var fortRingRestore: [TerrainKind]
-    /// Flame cadence: the base burns at most once per fire-damage interval
-    /// across all overlapping patches.
-    public var burnCooldownTicks: Int
+    /// The Flag On Guard cycle: the template's original cells, recorded at
+    /// the first pickup and kept until every cell is restored.
+    public var fortRecord: [FortCellRecord]
+    /// §7.2: the first tick at which ground fire may hurt the base again.
+    public var nextFireDamageTick: Int
 
-    /// Campaign base durability is 3 (§6.6, PROVISIONAL); damage states are
-    /// visually distinct at 3/2/1/0.
     public init(teamID: Int, topLeftSubunits: Vec2i, durability: Int = 3,
                 maxDurability: Int = 3, shieldRemainingTicks: Int = 0,
-                fortRingRestore: [TerrainKind] = [], burnCooldownTicks: Int = 0) {
+                fortRecord: [FortCellRecord] = [], nextFireDamageTick: Int = 0) {
         self.teamID = teamID
         self.topLeftSubunits = topLeftSubunits
         self.durability = durability
         self.maxDurability = maxDurability
         self.shieldRemainingTicks = shieldRemainingTicks
-        self.fortRingRestore = fortRingRestore
-        self.burnCooldownTicks = burnCooldownTicks
+        self.fortRecord = fortRecord
+        self.nextFireDamageTick = nextFireDamageTick
     }
 
     public var sizeSubunits: Int { 2 * SpatialUnits.subunitsPerCell }

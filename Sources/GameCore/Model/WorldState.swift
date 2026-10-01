@@ -9,9 +9,8 @@ public struct WorldState: Codable, Equatable, Sendable {
     public internal(set) var players: [PlayerState]
     /// Sorted ascending by entityID; mutate through the accessors.
     public internal(set) var tanks: [TankState]
-    /// Combat entities, each sorted ascending by entityID (M2).
+    /// Combat entities, each sorted ascending by entityID.
     public internal(set) var projectiles: [ProjectileState]
-    public internal(set) var mines: [MineState]
     public internal(set) var fireHazards: [FireHazardState]
     public internal(set) var pickups: [PickupState]
     public internal(set) var spawnTelegraphs: [SpawnTelegraph]
@@ -26,7 +25,6 @@ public struct WorldState: Codable, Equatable, Sendable {
         self.players = []
         self.tanks = []
         self.projectiles = []
-        self.mines = []
         self.fireHazards = []
         self.pickups = []
         self.spawnTelegraphs = []

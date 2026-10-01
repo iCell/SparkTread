@@ -33,7 +33,9 @@ import GameCore
         #expect(world.tanks.filter { $0.ownerPlayerID == nil }.isEmpty) // enemies come from the panel
         // The roster lists every archetype once, resistance (armour + shield) ascending.
         let roster = TrainingArenaFixture.enemyRoster
-        #expect(roster.count == 24 && Set(roster.map(\.archetypeID)).count == 24)
+        #expect(roster.count == 20 && Set(roster.map(\.archetypeID)).count == 20)
+        #expect(roster.map(\.archetypeID) == ["normal", "rapid", "fire", "explosion", "ap"]
+            .flatMap { f in ["a", "b", "c", "d"].map { "\(f)_\($0)" } }) // GAME_RULES §1 order
         #expect(zip(roster, roster.dropFirst()).allSatisfy { $0.resistance <= $1.resistance })
         #expect(roster.first?.archetypeID == "normal_a" && roster.last?.archetypeID == "ap_d")
         #expect(roster.first { $0.archetypeID == "ap_c" }?.resistance == 8) // 6 armour + 2 shield
@@ -41,26 +43,26 @@ import GameCore
         #expect(world.base?.durability == TrainingArenaFixture.baseDurability && world.stage?.phase == .playing)
         #expect(world.stage?.spawnQueue.isEmpty == true)
         #expect(WorldInvariants.violations(in: world).isEmpty)
-        #expect(TrainingArenaFixture.pickupIDs.count == 25 && Set(TrainingArenaFixture.pickupIDs).isSubset(of: StageValidator.KnownIDs.reference.pickups))
+        #expect(TrainingArenaFixture.pickupIDs.count == 22 && Set(TrainingArenaFixture.pickupIDs).isSubset(of: StageValidator.KnownIDs.reference.pickups))
         // The M1 movement fixture is untouched by the arena.
         #expect(MovementLabFixture.makeWorld().stage == nil)
     }
 
     @Test func enemiesDriveAndFireTheirFamilyWeapons() {
         var session = MovementLabSession.trainingArena()
-        for family in ["normal", "rapid", "fire", "ap", "explosion", "mine"] {
+        for family in ["normal", "rapid", "fire", "ap", "explosion"] {
             let spawned = session.debugSpawnEnemy("\(family)_a")
             #expect(spawned)
         }
         let enemies = session.world.tanks.filter { $0.ownerPlayerID == nil }
-        #expect(enemies.count == 6)
+        #expect(enemies.count == 5)
         for enemy in enemies {
             let attributes = EnemyArchetypes.attributes(for: enemy.archetypeID)
             #expect(enemy.armor == attributes.armor && enemy.equipmentID == attributes.equipmentID)
             #expect(enemy.specialWeaponID == String(enemy.archetypeID.split(separator: "_").first!))
         }
         var events: [DomainEvent] = []
-        for _ in 0..<900 { events += session.advance(holding: nil) }
+        for _ in 0..<2700 { events += session.advance(holding: nil) } // R5.2 tempo: enemies need longer to line up
         let enemyShots = events.compactMap { e -> String? in
             if case .weaponFired(_, nil, let weaponID, _, _, _) = e { return weaponID }; return nil }
         #expect(enemyShots.count > 5)
@@ -98,11 +100,11 @@ import GameCore
 
     @Test func familiesSpawnWithTheChosenPowerAndEquipmentAndRespawnTheSame() throws {
         var session = MovementLabSession.trainingArena()
-        #expect(TrainingArenaFixture.enemyFamilies.count == 6 && TrainingArenaFixture.equipmentIDs.count == 4)
-        let added = session.debugSpawnEnemy(family: "rapid", powerLevel: 3, equipmentID: .some("shield_of_moon"))
+        #expect(TrainingArenaFixture.enemyFamilies.count == 5 && TrainingArenaFixture.equipmentIDs.count == 2)
+        let added = session.debugSpawnEnemy(family: "rapid", powerLevel: 3, equipmentID: .some("amphi_tank"))
         #expect(added)
         let tank = try #require(session.world.tanks.first { $0.ownerPlayerID == nil })
-        #expect(tank.archetypeID == "rapid_a" && tank.powerLevel == 3 && tank.equipmentID == "shield_of_moon"
+        #expect(tank.archetypeID == "rapid_a" && tank.powerLevel == 3 && tank.equipmentID == "amphi_tank"
                 && tank.specialWeaponID == "rapid")
         // Bare: the archetype's own values; explicit nil equipment strips it.
         let bare = session.debugSpawnEnemy(family: "ap", powerLevel: nil, equipmentID: nil)
@@ -116,7 +118,7 @@ import GameCore
         session.debugDestroyTank(tank.entityID)
         session.advance(holding: nil)
         let reborn = try #require(session.world.tanks.first { $0.archetypeID == "rapid_a" })
-        #expect(reborn.entityID != tank.entityID && reborn.powerLevel == 3 && reborn.equipmentID == "shield_of_moon")
+        #expect(reborn.entityID != tank.entityID && reborn.powerLevel == 3 && reborn.equipmentID == "amphi_tank")
     }
 
     @Test func pickupsSpawnAheadOfThePlayerOnDemand() throws {
@@ -132,5 +134,25 @@ import GameCore
         var stage = MovementLabSession(world: TrainingArenaFixture.makeWorld()) // not flagged: no arena rules
         let refused = stage.debugSpawnPickup("bomb")
         #expect(!refused && !stage.isTrainingArena)
+    }
+}
+
+@Suite struct TrainingArenaOneUpTests {
+    /// Owner report 2026-09-15: collecting 1UP could crash the app. The arena
+    /// starts at 999 reserve tanks; each 1UP must keep the world valid.
+    @Test func collectingOneUpsKeepsTheWorldValid() throws {
+        var session = MovementLabSession.trainingArena()
+        for _ in 0..<3 {
+            let spawned = session.debugSpawnPickup("extra_life")
+            #expect(spawned)
+            var ticks = 0
+            while !session.world.pickups.isEmpty, ticks < 600 {
+                let tank = try #require(session.world.player(.one)?.tankEntityID.flatMap { session.world.tank(entityID: $0) })
+                session.advance(holding: tank.facing)
+                ticks += 1
+            }
+            #expect(session.world.pickups.isEmpty)
+            #expect(WorldInvariants.violations(in: session.world).isEmpty, "\(WorldInvariants.violations(in: session.world))")
+        }
     }
 }

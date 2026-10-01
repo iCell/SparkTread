@@ -18,7 +18,7 @@ public struct SessionState: Codable, Equatable, Sendable {
     public var retainedSpecialWeaponID: String
 
     public init(lives: Int, score: Int, specialAmmoByWeapon: [String: Int],
-                retainedSpeedLevel: Int = 0, retainedPowerLevel: Int = 0,
+                retainedSpeedLevel: Int = 1, retainedPowerLevel: Int = 0,
                 retainedEquipmentID: String? = nil, retainedSpecialWeaponID: String = "rapid") {
         self.lives = lives
         self.score = score

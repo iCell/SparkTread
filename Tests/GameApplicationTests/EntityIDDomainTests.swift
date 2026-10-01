@@ -14,14 +14,13 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
 @Suite struct EntityIDDomainTests {
     /// One valid stage-world snapshot per entity kind, captured at the
     /// first tick where that collection is non-empty: projectiles from
-    /// routine fire, a flame patch from the "fire" special, a mine from the
-    /// "mine" special, spawn telegraphs from the stage's first wave.
+    /// routine fire, a flame patch from the "fire" special's landing, spawn
+    /// telegraphs from the stage's first wave.
     private func snapshots() throws -> [String: WorldState] {
         var session = MovementLabSession(world: try StageLoader.loadWorld(at: vs01URL))
         session.debugSelectSpecialWeapon("fire")
         var found: [String: WorldState] = [:]
         for i in 0..<420 {
-            if i == 150 { session.debugSelectSpecialWeapon("mine") }
             session.advance(holding: i % 90 < 45 ? .up : .right,
                             normalFire: i % 20 == 3, specialFire: i == 2 || i == 152)
             let world = session.world
@@ -29,7 +28,7 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
             let present: [(String, Bool)] = [
                 ("tanks", !world.tanks.isEmpty), ("projectiles", !world.projectiles.isEmpty),
                 ("spawnTelegraphs", !world.spawnTelegraphs.isEmpty), ("fireHazards", !world.fireHazards.isEmpty),
-                ("mines", !world.mines.isEmpty), ("pickups", !world.pickups.isEmpty),
+                ("pickups", !world.pickups.isEmpty),
                 ("enemies", world.tanks.contains { $0.teamID != 1 }),
             ]
             for (kind, has) in present where has && found[kind] == nil { found[kind] = world }
@@ -51,7 +50,7 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
 
     @Test func decodedOutOfDomainIDsAreRefusedForEveryEntityKind() throws {
         let worlds = try snapshots()
-        let kinds = ["tanks", "projectiles", "spawnTelegraphs", "fireHazards", "mines", "pickups"]
+        let kinds = ["tanks", "projectiles", "spawnTelegraphs", "fireHazards", "pickups"]
         var covered: [String] = []
         for kind in kinds {
             guard let world = worlds[kind] else { continue }
@@ -68,42 +67,38 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
             }
         }
         #expect(covered.contains("tanks") && covered.contains("projectiles") && covered.contains("spawnTelegraphs"))
-        #expect(covered.contains("fireHazards") && covered.contains("mines"))
+        #expect(covered.contains("fireHazards"))
     }
 
     @Test func outOfDomainReferencesAreRefusedButDeadOwnersAreNot() throws {
         let worlds = try snapshots()
-        var covered = 0
-        for kind in ["projectiles", "fireHazards", "mines"] {
-            guard let world = worlds[kind] else { continue }
-            let base = try json(world)
-            var entities = try #require(base[kind] as? [[String: Any]])
-            covered += 1
-            entities[0]["ownerEntityID"] = Int.min / 2
-            var mutated = base
-            mutated[kind] = entities
-            #expect(try violations(mutated).contains { $0.contains("owner entity id") }, "\(kind)")
-            // A dead owner (an id below nextEntityID with no live tank) is
-            // legal ordnance, and −1 is the documented "no owner" sentinel.
-            for legal in [world.nextEntityID - 1, -1] {
-                entities[0]["ownerEntityID"] = legal
-                mutated[kind] = entities
-                #expect(!(try violations(mutated).contains { $0.contains("owner entity id") }), "\(kind) owner \(legal)")
-            }
-        }
-        #expect(covered == 3)
         let world = try #require(worlds["projectiles"])
         var base = try json(world)
         var projectiles = try #require(base["projectiles"] as? [[String: Any]])
-        projectiles[0]["hitTankIDs"] = [-7]
+        projectiles[0]["ownerEntityID"] = Int.min / 2
         base["projectiles"] = projectiles
-        #expect(try violations(base).contains { $0.contains("hit entity id") })
+        #expect(try violations(base).contains { $0.contains("owner entity id") })
+        // A dead owner (an id below nextEntityID with no live tank) is legal ordnance.
+        projectiles[0]["ownerEntityID"] = world.nextEntityID - 1
+        base["projectiles"] = projectiles
+        #expect(!(try violations(base).contains { $0.contains("owner entity id") }))
+
+        // Fire sources: a tank id must lie in the domain; negative keys are stage fire.
+        let burning = try #require(worlds["fireHazards"])
+        var fireBase = try json(burning)
+        var patches = try #require(fireBase["fireHazards"] as? [[String: Any]])
+        patches[0]["sourceKey"] = burning.nextEntityID + 5
+        fireBase["fireHazards"] = patches
+        #expect(try violations(fireBase).contains { $0.contains("source entity id") })
+        patches[0]["sourceKey"] = -3
+        fireBase["fireHazards"] = patches
+        #expect(!(try violations(fireBase).contains { $0.contains("source entity id") }))
     }
 
     @Test func theBoundaryIsExactlyNextEntityID() throws {
         let world = try #require(try snapshots()["projectiles"])
         var base = try json(world)
-        let ids = (["tanks", "projectiles", "spawnTelegraphs", "fireHazards", "mines", "pickups"]
+        let ids = (["tanks", "projectiles", "spawnTelegraphs", "fireHazards", "pickups"]
             .flatMap { base[$0] as? [[String: Any]] ?? [] }
             .compactMap { $0["entityID"] as? Int })
         let top = try #require(ids.max())

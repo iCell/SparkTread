@@ -24,8 +24,18 @@ final class TouchControlsUIView: UIView {
     private let specialButton = CAShapeLayer()
     private let normalLabel = UILabel()
     private let specialLabel = UILabel()
+    private let normalIcon = UIImageView()
+    private let specialIcon = UIImageView()
+    /// Weapon icons (GAME_RULES §15.2): the normal round and the current
+    /// special weapon's projectile art replace text placeholders.
+    var iconProvider: ((String) -> CGImage?)?
+    private var shownSpecialWeapon: String?
 
+    /// Visible 66 pt buttons; 45 pt hit radius (90 pt circles) whose centres
+    /// sit 96 pt apart so the two hit areas never overlap (§15.2).
     private let buttonRadius: CGFloat = 33
+    private let hitPadding: CGFloat = 12
+    private let buttonGap: CGFloat = 30
     private var normalCenter: CGPoint = .zero
     private var specialCenter: CGPoint = .zero
 
@@ -45,6 +55,25 @@ final class TouchControlsUIView: UIView {
 
         configureButton(normalButton, label: normalLabel, text: "普", color: .systemCyan)
         configureButton(specialButton, label: specialLabel, text: "特", color: .systemOrange)
+        for icon in [normalIcon, specialIcon] {
+            icon.contentMode = .scaleAspectFit
+            icon.layer.magnificationFilter = .nearest
+            addSubview(icon)
+        }
+    }
+
+    /// Shows the weapon icons; the text labels remain only as a fallback
+    /// when the art is not loaded yet.
+    func updateIcons(specialWeaponID: String) {
+        guard let iconProvider else { return }
+        if normalIcon.image == nil, let image = iconProvider("normal") {
+            normalIcon.image = UIImage(cgImage: image)
+            normalLabel.isHidden = true
+        }
+        guard shownSpecialWeapon != specialWeaponID, let image = iconProvider(specialWeaponID) else { return }
+        shownSpecialWeapon = specialWeaponID
+        specialIcon.image = UIImage(cgImage: image)
+        specialLabel.isHidden = true
     }
 
     @available(*, unavailable)
@@ -67,20 +96,21 @@ final class TouchControlsUIView: UIView {
         let inset = safeAreaInsets
         normalCenter = CGPoint(x: bounds.width - inset.right - 24 - buttonRadius,
                                y: bounds.height - inset.bottom - 16 - buttonRadius)
-        specialCenter = CGPoint(x: normalCenter.x, y: normalCenter.y - buttonRadius * 2 - 18)
-        for (shape, label, center) in [(normalButton, normalLabel, normalCenter),
-                                       (specialButton, specialLabel, specialCenter)] {
+        specialCenter = CGPoint(x: normalCenter.x, y: normalCenter.y - buttonRadius * 2 - buttonGap)
+        for (shape, label, icon, center) in [(normalButton, normalLabel, normalIcon, normalCenter),
+                                             (specialButton, specialLabel, specialIcon, specialCenter)] {
             shape.path = UIBezierPath(arcCenter: center, radius: buttonRadius,
                                       startAngle: 0, endAngle: .pi * 2, clockwise: true).cgPath
             label.frame = CGRect(x: center.x - buttonRadius, y: center.y - buttonRadius,
                                  width: buttonRadius * 2, height: buttonRadius * 2)
+            icon.frame = label.frame.insetBy(dx: 12, dy: 12)
         }
     }
 
     private func buttonHit(_ point: CGPoint, center: CGPoint) -> Bool {
         // Touch target padded past the visible art (≥44pt rule, §17.3).
         let dx = point.x - center.x, dy = point.y - center.y
-        return dx * dx + dy * dy <= (buttonRadius + 12) * (buttonRadius + 12)
+        return dx * dx + dy * dy <= (buttonRadius + hitPadding) * (buttonRadius + hitPadding)
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -168,6 +198,8 @@ final class TouchControlsUIView: UIView {
 
 struct TouchControlsView: UIViewRepresentable {
     let controller: MovementLabController
+    var art: PixelArt?
+    var specialWeaponID: String = "rapid"
 
     func makeUIView(context: Context) -> TouchControlsUIView {
         let view = TouchControlsUIView(frame: .zero)
@@ -182,6 +214,13 @@ struct TouchControlsView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: TouchControlsUIView, context: Context) {}
+    func updateUIView(_ uiView: TouchControlsUIView, context: Context) {
+        if let art {
+            uiView.iconProvider = { weaponID in
+                try? art.texture("px_projectile_" + weaponID).cgImage()
+            }
+        }
+        uiView.updateIcons(specialWeaponID: specialWeaponID)
+    }
 }
 #endif

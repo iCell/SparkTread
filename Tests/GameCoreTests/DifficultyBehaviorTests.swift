@@ -32,7 +32,7 @@ private func tick(_ world: inout WorldState, _ n: Int, events: inout [DomainEven
     @Test func theStandardProfileIsTheAuthoredBehaviourAndValidates() {
         let p = EnemyBehaviorProfile.standard
         #expect(p.decisionIntervalTicks == 30 && p.baseFocusPercent == 100 && p.wanderPercent == 10
-                && p.fireWindowPercent == 100 && p.minePlacePercent == 20 && p.courseCommitPercent == 55)
+                && p.fireWindowPercent == 100 && p.courseCommitPercent == 55)
         #expect(p.validationIssues().isEmpty)
         var bad = p
         bad.decisionIntervalTicks = 0; bad.wanderPercent = 101; bad.fireWindowPercent = -1
@@ -91,31 +91,32 @@ private func tick(_ world: inout WorldState, _ n: Int, events: inout [DomainEven
 }
 
 @Suite struct DirectorPhaseTests {
+    /// ADR-0015 phases under the GAME_RULES §9.3 cadence: the first wave
+    /// starts together, later processes one per 30 ticks at free points.
     @Test func phasesFireOnceInOrderPushReinforcementsRaiseTheCapAndRepairTheBase() {
         let phases = [
-            DirectorPhase(id: "elite", afterSpawned: 2, reinforcements: ["ap_c", "mine_c"], maxAliveEnemies: 4, repairsBase: true),
+            DirectorPhase(id: "elite", afterSpawned: 2, reinforcements: ["ap_c", "explosion_c"], maxAliveEnemies: 4, repairsBase: true),
             DirectorPhase(id: "late", afterSpawned: 3, reinforcements: ["rapid_a"]),
         ]
         var world = makeStageWorld(enemies: ["normal_a", "normal_a", "normal_a", "normal_a"], phases: phases,
                                    maxAlive: 2, base: 1)
         world.base?.maxDurability = 3
         var events: [DomainEvent] = []
-        tick(&world, 1, events: &events) // two telegraphs scheduled (cap 2): spawned count 2
+        tick(&world, 1, events: &events) // first wave: both points (cap 2)
         #expect(world.stage?.directorSpawned == 2 && world.stage?.directorPhasesFired == 0)
+        #expect(world.spawnTelegraphs.count == 2)
         tick(&world, 1, events: &events) // the phase fires at the next director pass
         let stage = world.stage!
         #expect(stage.directorPhasesFired == 1)
-        // The reinforcements jumped the queue and, with the cap raised in the
-        // same pass, were scheduled at once: the normals wait behind them.
-        #expect(world.spawnTelegraphs.map(\.archetypeID) == ["normal_a", "normal_a", "ap_c", "mine_c"])
-        #expect(stage.spawnQueue == ["normal_a", "normal_a"] && stage.directorSpawned == 4)
+        #expect(stage.spawnQueue == ["ap_c", "explosion_c", "normal_a", "normal_a"] && stage.directorSpawned == 2)
+        #expect(world.spawnTelegraphs.count == 2) // both points still reserved
         #expect(stage.maxAliveEnemies == 4)
         #expect(world.base?.durability == 3)
         #expect(events.contains(.directorPhaseStarted(id: "elite", reinforcements: 2)))
         #expect(events.contains(.baseRepaired(restored: 2)))
-        // Spawned 4 ≥ 3: the second phase fires on the next pass.
-        tick(&world, 1, events: &events)
+        tick(&world, 60, events: &events) // a point frees at ~45 ticks: ap_c starts, then the late phase fires
         #expect(world.stage?.directorPhasesFired == 2)
+        #expect(world.spawnTelegraphs.contains { $0.archetypeID == "ap_c" } || world.tanks.contains { $0.archetypeID == "ap_c" })
         #expect(world.stage?.spawnQueue.first == "rapid_a")
         tick(&world, 600, events: &events)
         #expect(world.stage?.directorPhasesFired == 2) // never again
@@ -138,12 +139,12 @@ private func tick(_ world: inout WorldState, _ n: Int, events: inout [DomainEven
     @Test func carriedPickupsStayPairedWhenReinforcementsJumpTheQueue() {
         var world = makeStageWorld(enemies: ["normal_a", "normal_b", "normal_c"],
                                    phases: [DirectorPhase(id: "e", afterSpawned: 1, reinforcements: ["ap_a"])], maxAlive: 1)
-        world.stage?.carriedPickupQueue = [nil, "power_up", nil]
+        world.stage?.carriedPickupQueue = [nil, CarriedPickup(pickupID: "power_up"), nil]
         var events: [DomainEvent] = []
         tick(&world, 2, events: &events)
         let stage = world.stage!
         #expect(stage.spawnQueue == ["ap_a", "normal_b", "normal_c"])
-        #expect(stage.carriedPickupQueue == [nil, "power_up", nil])
+        #expect(stage.carriedPickupQueue == [nil, CarriedPickup(pickupID: "power_up"), nil])
         #expect(WorldInvariants.violations(in: world).isEmpty)
     }
 }

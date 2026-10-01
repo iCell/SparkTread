@@ -1,76 +1,62 @@
-# Project Golden Eagle 文档索引
+# SparkTread 文档索引
 
 ## 阅读顺序
 
-1. `PROJECT_MASTER_SUMMARY_ZH.md`：中文总览，汇总全部已确认方向。
-2. `PRODUCT_IMPLEMENTATION_PLAN.md`：产品、架构、范围、里程碑和验收的最终实施权威。
-3. `ASSET_REQUIREMENTS_LIST_ZH.md`：只列举全部素材需求，不授权生成。
-4. `ASSET_PRODUCTION_MANIFEST.md`：素材技术规格、生产边界和来源台账要求。
-5. `GAME_RULES.md`：**唯一的规则文档**——原版事实（反编译/说明书 B/C + 通关录像逐帧实测 V）、现行实现对照、以及 §18 待所有者裁决的差异清单。合并自原 `GAME_MECHANICS_SPEC.md`、`RESEARCH_SUMMARY.md`、`docs/REFERENCE_GAMEPLAY_RULES_ZH.md`（2026-09-11）。
-6. `STAGE_52_METADATA.csv`：52 个候选参考关卡元数据。
-7. `docs/CURRENT_REVIEW.md`：当前实现审查（2026-09-09 Claude/PI 联合评审）、验证证据与未完成项。
-8. `docs/agent_handoffs/2026-09-09-joint-review.md`：联合评审交接：已完成、验证命令、地雷区、下一步。
+1. `GAME_RULES.md`：**唯一的游戏规则**（R5.9，2026-09-16）。地图、四档墙、五类武器、两种装备、20 型敌人、22 类宝物、基地与胜负、tick 内结算顺序、计分、12 关内容预算、iPhone 适配与验收场景都以此为准。
+2. `PRODUCT_IMPLEMENTATION_PLAN.md`：架构、模块边界、内容格式、存档与回放、测试策略与里程碑。其中的玩法章节只保留指向 `GAME_RULES.md` 的索引。
+3. `docs/decisions/`：架构与产品决定记录（ADR）。
+4. `docs/CURRENT_REVIEW.md`：实现审查日志、验证证据与未完成项；回放金样重算必须在此记录原因。
+5. `ASSET_PRODUCTION_MANIFEST.md`、`ASSET_REQUIREMENTS_LIST_ZH.md`：素材规格与清单，不授权生成；运行素材来自 `Vendor/SparkTreadPixel`（ADR-0008），接入方法见 `docs/pixel/`。
+6. `STAGE_52_METADATA.csv`：原版 52 个候选关卡的研究元数据，只供日后原版关卡内容包参考。
+7. `docs/agent_handoffs/`：带日期的交接记录，属于历史。
 
 ## 权威顺序
 
 出现冲突时：
 
-1. 已接受的 ADR；
-2. `PRODUCT_IMPLEMENTATION_PLAN.md`；
-3. `PROJECT_MASTER_SUMMARY_ZH.md`；
-4. 自动测试和已固定内容 schema；
-5. `GAME_RULES.md` 中的参考事实（【V】/【B】/【C】行）。同一文件里的“现行实现”段落只是对照描述（真正的权威是代码、测试与已接受 ADR），§18 差异清单是提案；
-6. 其他清单、提示词、聊天记录和非正式说明。
+1. 玩法规则：`GAME_RULES.md`；
+2. 已接受的 ADR（ADR-0018 起，与 `GAME_RULES.md` 冲突的旧 ADR 条款失效）；
+3. `PRODUCT_IMPLEMENTATION_PLAN.md`（架构、流程、格式）；
+4. 自动测试与已固定的内容 schema；
+5. 其他清单、提示词、聊天记录和非正式说明。
 
-原版研究事实不能覆盖现代产品中已经固定的平台、地图、视角、单人范围、美术和架构决定。
+参考游戏的研究材料不能覆盖 `GAME_RULES.md` 的定案。旧版研究总纲（原 `GAME_RULES.md`）与中文总览 `PROJECT_MASTER_SUMMARY_ZH.md` 已于 2026-09-15 退役，内容可在提交 4f2705e 中查阅。
 
-## 已接受 ADR
+## ADR 状态
 
-- `docs/decisions/ADR-0001-spatial-unit-system.md`：1 格 = 1024 子单位，象限 = 512。
-- `docs/decisions/ADR-0002-command-contract-and-input-buffering.md`：`PlayerCommand` 唯一外部输入契约；缓冲由核心持有。
-- `docs/decisions/ADR-0003-serializable-world-state.md`：权威状态可完整序列化，支持挂起恢复与快速重模拟。
-- `docs/decisions/ADR-0004-arena-rendering-and-device-floor.md`：全屏渲染；设备基线 390 点级别。
-- `docs/decisions/ADR-0005-allied-base-damage-by-difficulty.md`：己方火力对基地按难度生效——Casual 免疫，Standard/Veteran 开启。
+已接受：
 
-- `docs/decisions/ADR-0006-legibility-gate-pixel-scale.md`：像素素材可读性验收。
-- `docs/decisions/ADR-0007-simulation-clock-driver.md`：独立显示时钟驱动固定步模拟。
-- `docs/decisions/ADR-0008-a0-satisfied-by-pixelproduction.md`：PixelProduction 交付满足 A0 风格锁定。
-- `docs/decisions/ADR-0009-universal-arena-56x27.md`：V1 竞技场固定为 56×27 格。
+- ADR-0001 空间单位：1 格＝1024 子单位，象限＝512（R5 另定义 1 子单位＝1000 毫子单位用于速度）。
+- ADR-0002 `PlayerCommand` 是唯一外部输入契约；输入缓冲由核心持有。
+- ADR-0003 权威状态可完整序列化，支持挂起恢复与快速重模拟。
+- ADR-0004 设备基线 390 点级别（全屏渲染条款被 ADR-0018 取代：关键对象必须在安全矩形内）。
+- ADR-0005 己方火力伤基地按难度生效。
+- ADR-0006 18pt 可见宽度门槛。
+- ADR-0007 显示时钟驱动固定步模拟（停顿阈值以 R5 §15.3 为准）。
+- ADR-0008 PixelProduction 交付满足 A0 风格锁定。
+- ADR-0009 竞技场固定 56×27 格。
+- ADR-0010 所有者战斗规则（部分被 ADR-0018 取代）。
+- ADR-0011 参照原作的音效集与关卡过场。
+- ADR-0012 结算表与过关奖励（部分被 ADR-0018 取代）。
+- ADR-0017 无危险预警、草丛燃烧、训练场（部分被 ADR-0018 取代）。
+- ADR-0018 `GAME_RULES.md` R5 成为唯一玩法权威；地雷、月之盾、海之记忆移出 V1。
+- ADR-0019 所有者真机调参：坦克与弹速降到 R5 的 40%，射程不变；普通弹、快弹冷却同比放大；穿甲 C 提速一倍（GAME_RULES R5.8）。
+- ADR-0020 所有者决定：AP 打红砖、白砖深度加倍；白砖浅灰石砖、精钢抛光银钢（GAME_RULES R5.6）。
+- ADR-0021 所有者决定：弹弹相遇按强弱对抗、火焰弹遇弹落火；无敌 20 秒；已在出生占位内的坦克可驶出；去掉增援提示（GAME_RULES R5.7）。
+- ADR-0022 所有者决定：战场整屏等比居中，边区精钢装饰，系统遮挡只覆盖装饰带（GAME_RULES R5.9）。
 
-- `docs/decisions/ADR-0010-owner-combat-rules-and-fort-ring.md`：特殊弹药耗尽回退普通弹、基地护盾加固堡垒环与占用格策略（到期恢复为记录材质，所有者决定 B）、隐藏宝物揭示条件、地雷可见性。所有者 2026-09-10 接受。
-- `docs/decisions/ADR-0017-owner-rules-danger-telegraph-foliage-fire-arena.md`：所有者 2026-09-10 的三条指令——移除红圈危险预警；火焰点燃相邻草丛并烧毁（回放格式 7）；训练场按抵抗力排序逐个添加敌人。已接受。
-- `docs/decisions/ADR-0011-reference-sfx-and-stage-transitions.md`：参照原作的音效集（八段原作录音节选、原创开场曲、其余合成）、事件映射、关卡过场时间线（开场卡片/十字揭幕/任务完成/战斗成绩）。所有者 2026-09-10 接受，并记录了版权使用决定。
+提议中（尚待所有者接受）：
 
-- `docs/decisions/ADR-0012-results-table-and-stage-clear-bonuses.md`：参照原作结算画面的战斗成绩表（8 个奖励类别的坦克图标、4 行 ×1…×4、加权总计）与过关奖励（结算加分 + Reward，按关卡区间 200/330、600/660、1000/1000）。所有者 2026-09-10 接受（分档规则授权决定；不做 MaxHits/MaxCombos；用坦克图标）。
-
-## 提议中的 ADR（待所有者接受，尚不具备权威）
-
-- `docs/decisions/ADR-0016-traversal-ice-foliage-and-mine-launch.md`：装备通行档案（两栖过水、防滑不打滑）、冰面惯性（松键或转向后滑行 1.5 格）、植被前景遮挡（坦克之上、地雷之下，覆盖玩家处淡化）、地雷弹射（触雷坦克沿行进方向抛飞、空中免疫一切交互、落地环扫、减速）；回放格式 6。
-- `docs/decisions/ADR-0015-difficulty-profiles-and-director-phases.md`：难度档案（休闲/标准/老兵：敌人决策间隔、基地倾向、游走、开火窗口、布雷概率、编成变体、预警时长、误伤基地开关）作为关卡状态数据；导演阶段（精英增援插队、存活上限、基地修复）；回放格式 5。
-- `docs/decisions/ADR-0014-checkpoint-save-and-suspended-session.md`：检查点存档（每关通关后写 `campaign_progress.json`）与中断快照（游戏中离开前台写 `suspended_session.json`，关卡结束或放弃时删除；标题页提供"继续上次战斗"，恢复后处于暂停）；文件带版本号、原子写入、损坏或异版本文件报错不崩溃。
-- `docs/decisions/ADR-0013-campaign-progression-and-session-state.md`：战役推进——三关顺序内容（VS-02 隐于草丛、VS-03 沙漠阶梯，按原作地图适配 56×27）、跨关携带状态（生命、分数、弹药、保留升级；护甲不携带）、胜利自动进入下一关、失败从关卡起点检查点重来、回放格式 4 与链式战役回放。
-- `Tools/reference_measure/README.md`：参照原作录像的测量流程与脚本（不含媒体），复现 ADR-0011 / CURRENT_REVIEW 中的音效与过场数据。
+- ADR-0013 战役推进与跨关状态。
+- ADR-0014 检查点存档与中断快照。
+- ADR-0015 难度档案与导演阶段（部分被 ADR-0018 取代）。
+- ADR-0016 通行档案与冰面惯性（地雷弹射部分已被 ADR-0018 移除）。
 
 ## 当前固定摘要
 
-- Swift + SpriteKit + SwiftUI；
-- iPhone 横屏首发，之后 iPad、macOS；
-- 2D 正俯视；
-- 统一一种固定竞技场；
-- 完整地图和所有活动坦克始终可见；
-- V1 仅单人；
-- 后续两人在线合作；
-- 一套现代游戏规则；
-- 当前运行素材为 `Vendor/SparkTreadPixel` 的像素交付，A0 已满足（ADR-0008）；
-- `Assets/Design` 和 `styleboards` 为历史设计参考，不是当前运行图集；新增素材生成仍需单独授权；
-- 1 格 = 1024 子单位；`PlayerCommand` 为唯一外部输入契约；
-- 权威状态可完整序列化并支持快速重模拟；
-- 设备基线 390 点级别；竞技场全屏渲染。
-
-## 风格参考
-
-- `styleboards/golden_eagle_arena_styleboard_v2_soft.png`
-- `styleboards/golden_eagle_tank_family_styleboard_v2_soft.png`
-
-风格图不是正式精灵表。
-
+- Swift＋SpriteKit＋SwiftUI；iPhone 横屏首发，之后 iPad、macOS；
+- 2D 正俯视，统一 56×27 竞技场，完整地图与全部活动坦克始终可见；
+- V1 仅单人，无联网、无本地双人；
+- 一套现代规则（`GAME_RULES.md`）；
+- 运行素材为 `Vendor/SparkTreadPixel` 像素交付；新增素材生成需单独授权；
+- 60 Hz 固定 tick，整数权威状态，`PlayerCommand` 为唯一外部输入。

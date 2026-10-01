@@ -23,25 +23,31 @@ private func hold(_ world: inout WorldState, _ direction: Direction?, ticks: Int
 }
 
 @Suite struct MovementAccumulatorTests {
-    @Test func level0Moves48SubunitsPerTickExactly() {
+    /// GAME_RULES §4.1: the level-0 speed is an exact integer rate; whole
+    /// subunits move each tick and the fraction stays in the accumulator.
+    @Test func level0MovesItsExactIntegerSpeed() {
+        let increment = MovementRuleset.provisional.accumulatorIncrement(speedLevel: 0)
+        let units = MovementRuleset.accumulatorUnitsPerSubunit
         var world = makeWorld()
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3072, y: 3072), facing: .right)
         hold(&world, .right, ticks: 1)
-        #expect(world.tanks[0].positionSubunits.x == 3072 + 48) // 2880/60
-        hold(&world, .right, ticks: 59)
-        #expect(world.tanks[0].positionSubunits.x == 3072 + 2880)
+        #expect(world.tanks[0].positionSubunits.x == 3072 + increment / units)
+        hold(&world, .right, ticks: 124)
+        #expect(world.tanks[0].positionSubunits.x == 3072 + 125 * increment / units)
+        #expect(world.tanks[0].movementAccumulator == 125 * increment % units)
     }
 
     @Test func fractionalMultiplierAccumulatesWithoutDrift() {
         var world = makeWorld()
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: 3072, y: 3072), facing: .right)
-        world.withTank(entityID: 1) { $0.speedLevel = 1 } // ×1.260 → 60.48/tick
-        hold(&world, .right, ticks: 100)
-        // 100 × 2880×1260 = 362,880,000; ÷60,000 = 6,048 subunits exactly.
-        #expect(world.tanks[0].positionSubunits.x == 3072 + 6048)
-        #expect(world.tanks[0].movementAccumulator == 0)
+        world.withTank(entityID: 1) { $0.speedLevel = 1 } // ×1.260
+        hold(&world, .right, ticks: 125)
+        let increment = MovementRuleset.provisional.accumulatorIncrement(speedLevel: 1)
+        let units = MovementRuleset.accumulatorUnitsPerSubunit
+        #expect(world.tanks[0].positionSubunits.x == 3072 + 125 * increment / units)
+        #expect(world.tanks[0].movementAccumulator == 125 * increment % units)
     }
 
     @Test func noMovementWithoutHeldDirection() {

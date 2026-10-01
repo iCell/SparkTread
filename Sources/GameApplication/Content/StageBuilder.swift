@@ -30,18 +30,19 @@ public enum StageBuilder {
             terrain[0, y] = TerrainCell(kind: borderKind)
             terrain[arena.cellsWide - 1, y] = TerrainCell(kind: borderKind)
         }
+        // Layers stack (GAME_RULES §2.3): a surface layer replaces the cell;
+        // a wall, foliage or base layer sits on the surface already there.
         for layer in def.terrain.layers {
             let cellKind = try kind(layer.kind)
+            func place(_ cx: Int, _ cy: Int) {
+                guard terrain.isInside(cellX: cx, cellY: cy) else { return }
+                terrain[cx, cy] = cellKind.isSurface ? TerrainCell(kind: cellKind)
+                    : TerrainCell(kind: cellKind, surface: terrain[cx, cy].surface)
+            }
             for rect in layer.rects ?? [] {
-                for cy in rect[1]...rect[3] {
-                    for cx in rect[0]...rect[2] where terrain.isInside(cellX: cx, cellY: cy) {
-                        terrain[cx, cy] = TerrainCell(kind: cellKind)
-                    }
-                }
+                for cy in rect[1]...rect[3] { for cx in rect[0]...rect[2] { place(cx, cy) } }
             }
-            for cell in layer.cells ?? [] where terrain.isInside(cellX: cell[0], cellY: cell[1]) {
-                terrain[cell[0], cell[1]] = TerrainCell(kind: cellKind)
-            }
+            for cell in layer.cells ?? [] { place(cell[0], cell[1]) }
         }
 
         guard let seed = UInt64(def.seed) else { throw BuildError.badSeed(def.seed) }
@@ -80,11 +81,11 @@ public enum StageBuilder {
         }
 
         // Carrier assignments index into the interleaved queue.
-        var carriedQueue: [String?] = []
+        var carriedQueue: [CarriedPickup?] = []
         if let drops = def.carriedDrops, !drops.isEmpty {
             carriedQueue = Array(repeating: nil, count: queue.count)
             for drop in drops where drop.queueIndex >= 0 && drop.queueIndex < queue.count {
-                carriedQueue[drop.queueIndex] = drop.pickup
+                carriedQueue[drop.queueIndex] = CarriedPickup(pickupID: drop.pickup, critical: drop.critical ?? false)
             }
         }
 
@@ -99,8 +100,9 @@ public enum StageBuilder {
             dropChancePercent: def.dropChancePercent,
             carriedPickupQueue: carriedQueue,
             hiddenPickups: (def.hiddenPickups ?? []).map {
-                HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id)
+                HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id, critical: $0.critical ?? false)
             },
+            fortTemplate: (def.fortTemplate ?? []).map { Vec2i(x: $0[0], y: $0[1]) },
             // Validated present above; the fallback is unreachable data hygiene.
             clearBonus: ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 1),
             enemyBehavior: difficulty.enemyBehavior,
@@ -112,8 +114,12 @@ public enum StageBuilder {
 
         var events: [DomainEvent] = []
         for pickup in def.pickupSpawns {
-            world.spawnStagePickup(pickup.id, nearCell: Vec2i(x: pickup.cell[0], y: pickup.cell[1]),
-                                   rules: rules, events: &events)
+            world.spawnStagePickup(pickup.id, atCell: Vec2i(x: pickup.cell[0], y: pickup.cell[1]),
+                                   critical: pickup.critical ?? false, rules: rules, events: &events)
+        }
+        for (index, fire) in (def.environmentFires ?? []).enumerated() {
+            world.addEnvironmentFire(cell: Vec2i(x: fire.cell[0], y: fire.cell[1]), sourceKey: -(index + 1),
+                                     lifetimeTicks: fire.lifetimeTicks)
         }
         return world
     }

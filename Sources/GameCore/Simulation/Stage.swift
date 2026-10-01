@@ -1,105 +1,89 @@
-/// Stage systems (M3): EnemyBrain intents (step 3), player respawn (step 4),
-/// pickup collection (step 11), death/score/drops (step 12 extension),
-/// EnemyDirector spawning (step 13), and win/loss resolution (step 14).
-/// Deterministic: ascending entity order, named RNG streams only.
+/// Stage systems: EnemyBrain intents, player respawn, pickups and their
+/// placement queue, Flag On Guard, deaths and statistics, the enemy
+/// director, and win/loss (GAME_RULES §9–§13). Deterministic: ascending
+/// entity order, named RNG streams only.
 enum Stage {
-    /// The weapon family an enemy archetype fights with (its own family).
+    /// The weapon family an enemy archetype fights with.
     static func enemyFamily(_ archetypeID: String) -> String {
         String(archetypeID.split(separator: "_").first ?? "normal")
     }
 
-    // MARK: - Step 3: EnemyBrain
+    /// §9.2: which wall materials a family's weapon can open.
+    static func digAbility(family: String) -> Navigation.DigAbility {
+        switch family {
+        case "fire": Navigation.DigAbility(brick: false, steel: false)
+        case "ap": Navigation.DigAbility(brick: true, steel: true)
+        default: Navigation.DigAbility(brick: true, steel: false)
+        }
+    }
 
-    /// Emits internal TankIntents for enemy tanks (ADR-0002: never through
-    /// the external command API). Movement re-decides on a per-enemy cadence
-    /// by descending a deterministic cost field toward the chosen target
-    /// (§10.4 — the base or the player; brick is dug through, steel and
-    /// water are routed around); local steering resolves blocking tanks and
-    /// a small wander slice keeps groups from grinding on one lane. Fire is
-    /// evaluated every tick from alignment. Frozen enemies idle.
+    // MARK: - Step 2: EnemyBrain
+
     static func computeIntents(
-        _ world: inout WorldState, ruleset: MovementRuleset
+        _ world: inout WorldState, ruleset: MovementRuleset, weapons: WeaponRuleset
     ) -> [Int: (normal: Bool, special: Bool)] {
         guard let stage = world.stage, stage.phase == .playing else { return [:] }
-        let profile = stage.enemyBehavior // difficulty-shaped data (ADR-0015)
+        let profile = stage.enemyBehavior
         var fire: [Int: (normal: Bool, special: Bool)] = [:]
-        let playerTank = world.players.first.flatMap { p in
-            p.tankEntityID.flatMap { id in world.tank(entityID: id) }
-        }.flatMap { $0.statusEffects["airborne"] == nil ? $0 : nil } // untargetable in flight (§8.6)
+        let playerTank = world.players.first.flatMap { p in p.tankEntityID.flatMap { world.tank(entityID: $0) } }
         let footprint = SpatialUnits.standardTankFootprintSubunits
+        let burning = Navigation.burningCells(world, hurtingTeam: 2)
         for index in world.tanks.indices where world.tanks[index].ownerPlayerID == nil {
             var tank = world.tanks[index]
-            guard tank.teamID != 1 else { continue }
-            if tank.statusEffects["frozen"] != nil || tank.statusEffects["airborne"] != nil {
+            guard tank.teamID != 1, tank.armor > 0 else { continue }
+            if tank.statusEffects["frozen"] != nil {
                 tank.movementIntent = nil
                 world.tanks[index] = tank
                 continue
             }
-            // Movement decision cadence (the profile's reaction interval),
-            // staggered by entity ID. Draw count per decision is fixed (3)
-            // so the ai stream stays aligned.
+            let family = enemyFamily(tank.archetypeID)
+            let dig = digAbility(family: family)
+            let selfCenter = Vec2i(x: tank.positionSubunits.x + footprint / 2, y: tank.positionSubunits.y + footprint / 2)
+
             if (world.tick + tank.entityID * 13) % max(1, profile.decisionIntervalTicks) == 0 {
-                let roll = world.rng.ai.next(upperBound: 100)
-                let jitter = world.rng.ai.next(upperBound: 4)
-                let commit = world.rng.ai.next(upperBound: 100)
+                // Three draws per decision, in rule order: target, wander, keep course.
+                let targetRoll = world.rng.ai.next(upperBound: 100)
+                let wanderRoll = world.rng.ai.next(upperBound: 100)
+                let commitRoll = world.rng.ai.next(upperBound: 100)
                 let attributes = EnemyArchetypes.attributes(for: tank.archetypeID)
-                // Flame cannot break brick (weapon data), so the fire family
-                // routes around it; every other family digs.
-                let canDig = enemyFamily(tank.archetypeID) != "fire"
-                let traversal = TraversalProfile(equipmentID: tank.equipmentID) // same rules as players (§7.5)
+                let traversal = TraversalProfile(equipmentID: tank.equipmentID)
+                let context = Navigation.Context(dig: dig, profile: traversal, burning: burning)
                 let targetCenter: Vec2i
                 let goals: [Vec2i]
-                let baseFocus = min(100, attributes.baseFocusPercent * profile.baseFocusPercent / 100)
-                if let base = world.base, roll < baseFocus || playerTank == nil {
+                let baseFocus = min(100, max(0, attributes.baseFocusPercent * profile.baseFocusPercent / 100))
+                if let base = world.base, targetRoll < baseFocus || playerTank == nil {
                     targetCenter = Vec2i(x: base.topLeftSubunits.x + base.sizeSubunits / 2,
                                          y: base.topLeftSubunits.y + base.sizeSubunits / 2)
-                    goals = Navigation.baseApproachGoals(world, canDig: canDig, profile: traversal)
+                    goals = Navigation.baseApproachGoals(world, context: context)
                 } else if let player = playerTank {
                     targetCenter = Vec2i(x: player.positionSubunits.x + footprint / 2,
                                          y: player.positionSubunits.y + footprint / 2)
-                    goals = Navigation.nearGoals(world, around: Navigation.anchor(of: player.positionSubunits),
-                                                 canDig: canDig, profile: traversal)
+                    goals = Navigation.nearGoals(world, around: Navigation.anchor(of: player.positionSubunits), context: context)
                 } else {
-                    targetCenter = Vec2i(x: world.arena.widthSubunits / 2,
-                                         y: world.arena.heightSubunits / 2)
+                    targetCenter = Vec2i(x: world.arena.widthSubunits / 2, y: world.arena.heightSubunits / 2)
                     goals = []
                 }
-                let selfCenter = Vec2i(x: tank.positionSubunits.x + footprint / 2,
-                                       y: tank.positionSubunits.y + footprint / 2)
                 let dx = targetCenter.x - selfCenter.x, dy = targetCenter.y - selfCenter.y
-                let primary: Direction = abs(dx) >= abs(dy)
-                    ? (dx >= 0 ? .right : .left)
-                    : (dy >= 0 ? .down : .up)
-                let secondary: Direction = abs(dx) >= abs(dy)
-                    ? (dy >= 0 ? .down : .up)
-                    : (dx >= 0 ? .right : .left)
-                // Local steering: prefer the primary axis; a blocked forward
-                // probe falls to the secondary, then a jittered legal turn
-                // (Retreat/Reposition resolution is the jitter, §10.4).
-                let field = Simulation.ObstacleField(world: world, excludingTank: tank.entityID)
+                let primary: Direction = abs(dx) >= abs(dy) ? (dx >= 0 ? .right : .left) : (dy >= 0 ? .down : .up)
+                let secondary: Direction = abs(dx) >= abs(dy) ? (dy >= 0 ? .down : .up) : (dx >= 0 ? .right : .left)
+                let field = Simulation.ObstacleField(world: world, excludingTank: tank.entityID,
+                                                     movingWithInset: ruleset.collisionInsetSubunits)
                 func freeFrom(_ origin: Vec2i, _ direction: Direction) -> Bool {
                     let probe = origin + direction.vector * 129
                     let inset = ruleset.collisionInsetSubunits
-                    return !field.blocksTank(
-                        minX: min(origin.x, probe.x) + inset,
-                        minY: min(origin.y, probe.y) + inset,
-                        maxX: max(origin.x, probe.x) + footprint - inset,
-                        maxY: max(origin.y, probe.y) + footprint - inset)
+                    return !field.blocksTank(minX: min(origin.x, probe.x) + inset, minY: min(origin.y, probe.y) + inset,
+                                             maxX: max(origin.x, probe.x) + footprint - inset,
+                                             maxY: max(origin.y, probe.y) + footprint - inset)
                 }
-                /// A direction counts as free if the move is legal here OR
-                /// from the lane the movement system would snap to (half- or
-                /// full-cell, within the assist window), so a tank 20
-                /// subunits off a dug opening does not think the opening is
-                /// closed. This is an OPTIMISTIC APPROXIMATION of
-                /// `Simulation.snapAssistedVectorIsFree`, not the same
-                /// query: movement sweeps the lateral nudge and probes
-                /// `2 * collisionInset + 1` ahead, while this checks the
-                /// snapped endpoint's one-quadrant box and also tries the
-                /// snap for same-axis travel. Authoritative movement still
-                /// rejects any illegal move, so a wrong "free" costs at most
-                /// a wasted decision, never tunnelling.
+                /// Legal here or from the lane the movement system would snap
+                /// to. The snap exists only for PERPENDICULAR turns (§4.2):
+                /// counting it for a parallel candidate makes the AI believe
+                /// in a sidestep movement will never take, so a tank pushed
+                /// off-lane by another tank stalls against its blocker
+                /// forever (owner stall report 2026-09-16).
                 func free(_ direction: Direction) -> Bool {
                     if freeFrom(tank.positionSubunits, direction) { return true }
+                    guard direction.isPerpendicular(to: tank.facing) else { return false }
                     let travelAxisIsX = direction == .up || direction == .down
                     let coordinate = travelAxisIsX ? tank.positionSubunits.x : tank.positionSubunits.y
                     for granularity in [SpatialUnits.subunitsPerQuadrant, SpatialUnits.subunitsPerCell] {
@@ -111,69 +95,52 @@ enum Stage {
                     }
                     return false
                 }
-                let all: [Direction] = [.up, .right, .down, .left]
-                let legal = all.filter(free)
-                // Reversing direction reads as "stuck jittering in a corner"
-                // (owner report), so jittered turns avoid the about-face
-                // unless it is the only legal move.
+                let legal = Direction.allCases.filter(free)
                 func steer() -> Direction {
                     guard !legal.isEmpty else { return primary }
                     let forward = legal.filter { $0 != tank.facing.opposite }
                     let pool = forward.isEmpty ? legal : forward
-                    return pool[jitter % pool.count]
+                    return pool[wanderRoll % pool.count]
                 }
-                // Course commitment only while it doesn't drive AWAY from
-                // the target — otherwise a committed enemy cruises past the
-                // base it rolled to attack.
                 let keepCourse: Bool = {
-                    guard let current = tank.movementIntent, free(current), commit < profile.courseCommitPercent
+                    guard let current = tank.movementIntent, free(current), commitRoll < profile.courseCommitPercent
                     else { return false }
                     let v = current.vector
                     return v.x * dx + v.y * dy >= 0
                 }()
-                // Dig mode (§10.4 BreakTerrain): a target direction blocked
-                // by BRICK is still worth facing — stand at the wall and
-                // shoot through. Without this an enemy above the fort just
-                // slides away sideways and never sieges the base.
-                func brickBlocked(_ direction: Direction) -> Bool {
-                    guard canDig else { return false }
-                    let probe = selfCenter + direction.vector
-                        * (footprint / 2 + SpatialUnits.subunitsPerCell / 2)
-                    let cx = probe.x / SpatialUnits.subunitsPerCell
-                    let cy = probe.y / SpatialUnits.subunitsPerCell
-                    return world.terrain.isInside(cellX: cx, cellY: cy)
-                        && world.terrain[cx, cy].kind.isBrickFamily
+                /// A direction blocked by a wall this family can open is
+                /// still worth facing: stand and shoot through. The probe is
+                /// the same sweep the shot itself uses, so "worth facing"
+                /// and "the shot will connect" can never disagree (a point
+                /// probe past a thin wall left tanks standing without ever
+                /// firing — owner stall report 2026-09-16).
+                func wallAhead(_ direction: Direction) -> TerrainKind? {
+                    guard let hit = Combat.firstSolidQuadrant(
+                        world.terrain, from: selfCenter, vector: direction.vector,
+                        remaining: footprint / 2 + SpatialUnits.subunitsPerCell,
+                        half: weapons.projectileHalfExtentSubunits) else { return nil }
+                    return world.terrain[hit.qx / 2, hit.qy / 2].kind
                 }
-                // Cost-field descent (§10.4): the best neighbour anchor that
-                // is free, or brick to dig through; a neighbour blocked by
-                // another tank yields to the next-best, then to steering.
+                func diggable(_ direction: Direction) -> Bool {
+                    wallAhead(direction).map(dig.opens) ?? false
+                }
                 let selfAnchor = Navigation.anchor(of: tank.positionSubunits)
-                let costField = goals.isEmpty ? [] : Navigation.distanceField(world, goals: goals, canDig: canDig, profile: traversal)
+                let costField = goals.isEmpty ? [] : Navigation.distanceField(world, goals: goals, context: context)
                 let descent = costField.isEmpty ? []
                     : Navigation.descent(field: costField, world: world, anchor: selfAnchor,
-                                         preferred: tank.facing, canDig: canDig, profile: traversal)
-                // Permissive digging heuristic: a neighbour that is free, or
-                // brick this family can dig through, is taken; a neighbour
-                // blocked only by another tank yields to the next option.
-                let guided: Direction? = descent.first { free($0.direction) || brickBlocked($0.direction) }?.direction
+                                         preferred: tank.facing, context: context)
+                let guided = descent.first { free($0.direction) || diggable($0.direction) }?.direction
                 let atGoal = !costField.isEmpty && Navigation.isAtGoal(field: costField, world: world, anchor: selfAnchor)
-                if roll >= 100 - profile.wanderPercent {
-                    // Wander (§10.4): a slice of decisions roams instead of
-                    // bee-lining, so enemies don't grind at the same wall.
+                if wanderRoll < profile.wanderPercent {
                     tank.movementIntent = steer()
                 } else if atGoal {
-                    // In firing position: face the target and hold (the
-                    // structure blocks the move; the fire pass does the rest).
                     tank.movementIntent = primary
                 } else if let guided {
                     tank.movementIntent = guided
                 } else if keepCourse {
-                    // No field guidance (unreachable / at the goal): stay the
-                    // course — classic drive-until-blocked feel.
-                } else if free(primary) {
+                    // Stay the course.
+                } else if free(primary) || diggable(primary) {
                     tank.movementIntent = primary
-                } else if brickBlocked(primary) {
-                    tank.movementIntent = primary // dig toward the target
                 } else if free(secondary) {
                     tank.movementIntent = secondary
                 } else {
@@ -181,80 +148,72 @@ enum Stage {
                 }
             }
 
-            // Fire evaluation every tick, throttled by a per-enemy duty
-            // cycle (staggered by entity ID) so an aligned enemy squeezes
-            // off single shots instead of hosing at the weapon's cooldown
-            // cap. Rapid keeps a wider window — bursts are its identity.
-            let cadencePhase = world.tick + tank.entityID * 11
-            let family = enemyFamily(tank.archetypeID)
-            // The open part of each duty cycle scales with the profile
-            // (authored: rapid 16/32, others 12/48, break 12/64), clamped
-            // to the cycle so 0 % never fires and 400 % never exceeds it.
+            // Fire windows (§9.2), staggered by entity id and scaled by the
+            // difficulty, then the shot conditions.
+            guard tank.spawnProtectionTicks == 0 else { world.tanks[index] = tank; continue }
+            let phase = world.tick + tank.entityID * 11
             func open(_ base: Int, of period: Int) -> Int { min(period, base * profile.fireWindowPercent / 100) }
-            let alignedWindowOpen = family == "rapid"
-                ? cadencePhase % 32 < open(16, of: 32)
-                : cadencePhase % 48 < open(12, of: 48)
-            let breakWindowOpen = cadencePhase % 64 < open(12, of: 64)
-            var shouldFire = false
-            let selfCenter = Vec2i(x: tank.positionSubunits.x + footprint / 2,
-                                   y: tank.positionSubunits.y + footprint / 2)
-            func aligned(with center: Vec2i) -> Bool {
+            let alignedWindowOpen = family == "rapid" ? phase % 32 < open(16, of: 32) : phase % 48 < open(12, of: 48)
+            let breakWindowOpen = phase % 64 < open(12, of: 64)
+            let weaponID = family == "normal" ? "normal" : family
+            let weapon = weapons.weapon(weaponID)
+            func canDamage(_ kind: TerrainKind) -> Bool {
+                guard let weapon else { return false }
+                if weapon.family == .explosion { return kind.isBrickFamily }
+                return weapon.damages(kind)
+            }
+            /// A shot at a target: the facing points at it within a cell of
+            /// centre line, and the first wall on the way (if any) decides
+            /// between the aligned window and the wall-breaking window.
+            func shotAt(_ center: Vec2i) -> Bool {
                 let dx = center.x - selfCenter.x, dy = center.y - selfCenter.y
+                let along: Int
                 switch tank.facing {
-                case .right: return dx > 0 && abs(dy) < footprint / 2
-                case .left: return dx < 0 && abs(dy) < footprint / 2
-                case .down: return dy > 0 && abs(dx) < footprint / 2
-                case .up: return dy < 0 && abs(dx) < footprint / 2
+                case .right: guard dx > 0 && abs(dy) < footprint / 2 else { return false }; along = dx
+                case .left: guard dx < 0 && abs(dy) < footprint / 2 else { return false }; along = -dx
+                case .down: guard dy > 0 && abs(dx) < footprint / 2 else { return false }; along = dy
+                case .up: guard dy < 0 && abs(dx) < footprint / 2 else { return false }; along = -dy
                 }
+                if let wall = Combat.firstSolidQuadrant(world.terrain, from: selfCenter, vector: tank.facing.vector,
+                                                        remaining: max(0, along - footprint / 2),
+                                                        half: weapons.projectileHalfExtentSubunits) {
+                    return breakWindowOpen && canDamage(world.terrain[wall.qx / 2, wall.qy / 2].kind)
+                }
+                return alignedWindowOpen
             }
-            if alignedWindowOpen, let player = playerTank {
-                shouldFire = aligned(with: Vec2i(x: player.positionSubunits.x + footprint / 2,
-                                                 y: player.positionSubunits.y + footprint / 2))
+            var shouldFire = false
+            if let player = playerTank {
+                shouldFire = shotAt(Vec2i(x: player.positionSubunits.x + footprint / 2, y: player.positionSubunits.y + footprint / 2))
             }
-            if !shouldFire, alignedWindowOpen, let base = world.base {
-                shouldFire = aligned(with: Vec2i(x: base.topLeftSubunits.x + base.sizeSubunits / 2,
-                                                 y: base.topLeftSubunits.y + base.sizeSubunits / 2))
+            if !shouldFire, let base = world.base {
+                shouldFire = shotAt(Vec2i(x: base.topLeftSubunits.x + base.sizeSubunits / 2,
+                                          y: base.topLeftSubunits.y + base.sizeSubunits / 2))
             }
             if !shouldFire, breakWindowOpen {
-                // BreakTerrain: brick directly ahead within three cells.
-                let probe = selfCenter + tank.facing.vector * (footprint / 2 + SpatialUnits.subunitsPerCell)
-                let cx = probe.x / SpatialUnits.subunitsPerCell, cy = probe.y / SpatialUnits.subunitsPerCell
-                if world.terrain.isInside(cellX: cx, cellY: cy),
-                   world.terrain[cx, cy].kind.isBrickFamily {
+                // Break terrain: a wall this weapon damages right ahead,
+                // found by the shot's own sweep — a point probe one cell
+                // past the muzzle skipped over adjacent thin walls, so the
+                // tank stood facing a wall it never fired at (owner stall
+                // report 2026-09-16).
+                if let hit = Combat.firstSolidQuadrant(
+                    world.terrain, from: selfCenter, vector: tank.facing.vector,
+                    remaining: footprint / 2 + SpatialUnits.subunitsPerCell,
+                    half: weapons.projectileHalfExtentSubunits),
+                   canDamage(world.terrain[hit.qx / 2, hit.qy / 2].kind) {
                     shouldFire = true
                 }
             }
-            // Each family fights with its own weapon (§8, §10.6). Normal
-            // uses the free normal channel; the rest use the special channel
-            // carrying their family weapon. Mine layers drop mines on a
-            // throttled roll while driving (reference 20% cadence, §9.1) and
-            // still take basic shots when aligned.
-            var pressNormal = false, pressSpecial = false
-            switch family {
-            case "normal":
-                pressNormal = shouldFire
-            case "mine":
-                pressNormal = shouldFire
-                if (world.tick + tank.entityID * 7) % 24 == 0
-                    && world.rng.ai.next(upperBound: 100) < profile.minePlacePercent {
-                    pressSpecial = true // lay a mine (§9.1; the profile's percent)
-                }
-            default: // rapid, fire, ap, explosion
-                pressSpecial = shouldFire
-            }
-            if pressNormal || pressSpecial {
-                fire[tank.entityID] = (normal: pressNormal, special: pressSpecial)
+            if shouldFire {
+                fire[tank.entityID] = family == "normal" ? (normal: true, special: false) : (normal: false, special: true)
             }
             world.tanks[index] = tank
         }
         return fire
     }
 
-    // MARK: - Step 4: player respawn
+    // MARK: - Step 2: player respawn
 
-    static func processRespawns(
-        _ world: inout WorldState, events: inout [DomainEvent]
-    ) {
+    static func processRespawns(_ world: inout WorldState, events: inout [DomainEvent]) {
         guard let stage = world.stage, stage.phase == .playing else { return }
         for i in world.players.indices {
             var player = world.players[i]
@@ -264,20 +223,18 @@ enum Stage {
                 world.players[i] = player
                 continue
             }
-            // Nearest legal cell by deterministic ring scan (§6.5).
             let cell = SpatialUnits.subunitsPerCell
             let footprint = SpatialUnits.standardTankFootprintSubunits
             let field = Simulation.ObstacleField(world: world, excludingTank: -1)
             var position: Vec2i?
             for candidate in RingScan.cells(around: stage.playerRespawnCell, maxRadius: 6) {
                 let p = Vec2i(x: candidate.x * cell, y: candidate.y * cell)
-                if !field.blocksTank(minX: p.x + 64, minY: p.y + 64,
-                                     maxX: p.x + footprint - 64, maxY: p.y + footprint - 64) {
+                if !field.blocksTank(minX: p.x + 64, minY: p.y + 64, maxX: p.x + footprint - 64, maxY: p.y + footprint - 64) {
                     position = p
                     break
                 }
             }
-            guard let position else { // fully blocked: retry next tick
+            guard let position else { // no room: stay pending, retry next tick
                 player.respawnCountdownTicks = 1
                 world.players[i] = player
                 continue
@@ -285,151 +242,38 @@ enum Stage {
             player.lifeState = .active
             player.respawnCountdownTicks = 0
             world.players[i] = player
-            let id = world.spawnTank(teamID: 1, ownerPlayerID: player.playerID,
-                                     archetypeID: "player", positionSubunits: position,
-                                     facing: .up)
-            // Retention (§6.5): upgrades persist; armor resets; protection on.
+            let id = world.spawnTank(teamID: 1, ownerPlayerID: player.playerID, archetypeID: "player",
+                                     positionSubunits: position, facing: .up)
             world.withTank(entityID: id) {
                 $0.speedLevel = player.retainedSpeedLevel
                 $0.powerLevel = player.retainedPowerLevel
                 $0.equipmentID = player.retainedEquipmentID
                 $0.specialWeaponID = player.retainedSpecialWeaponID
-                $0.armor = 3
+                $0.armor = LifecycleRules.playerRespawnArmor
+                $0.spawnProtectionTicks = LifecycleRules.playerSpawnProtectionTicks
             }
-            events.append(.tankSpawned(entityID: id, ownerPlayerID: player.playerID,
-                                       position: position, facing: .up))
+            events.append(.tankSpawned(entityID: id, ownerPlayerID: player.playerID, position: position, facing: .up))
         }
     }
 
-    // MARK: - Step 11: pickup collection
+    // MARK: - Step 8: pickups
 
-    static func processPickups(
-        _ world: inout WorldState, weapons: WeaponRuleset, rules: PickupRuleset,
-        events: inout [DomainEvent]
-    ) {
-        let cell = SpatialUnits.subunitsPerCell
+    static func processPickups(_ world: inout WorldState, weapons: WeaponRuleset, rules: PickupRuleset,
+                               events: inout [DomainEvent]) {
         let footprint = SpatialUnits.standardTankFootprintSubunits
-        for i in world.pickups.indices {
-            world.pickups[i].lifetimeRemainingTicks -= 1
-            if world.pickups[i].graceTicksRemaining > 0 { world.pickups[i].graceTicksRemaining -= 1 }
-        }
-        var collected: [Int] = []
-        for pickup in world.pickups {
-            guard pickup.graceTicksRemaining == 0, pickup.lifetimeRemainingTicks > 0 else { continue }
-            // Only player-owned tanks collect in V1 (§9.3; the Memory-of-Sea
-            // enemy-collection reference behavior is ruleset-off). A tank
-            // killed earlier this tick collects nothing.
-            for tank in world.tanks where tank.ownerPlayerID != nil && tank.armor > 0
-                && tank.statusEffects["airborne"] == nil {
+        var collected = Set<Int>()
+        for pickup in world.pickups where pickup.graceTicksRemaining == 0 {
+            let origin = Vec2i(x: pickup.cell.x * SpatialUnits.subunitsPerCell, y: pickup.cell.y * SpatialUnits.subunitsPerCell)
+            for tank in world.tanks where tank.ownerPlayerID != nil && tank.armor > 0 {
                 let p = tank.positionSubunits
-                let hx = pickup.positionSubunits.x - cell / 2, hy = pickup.positionSubunits.y - cell / 2
-                guard p.x < hx + cell && p.x + footprint > hx
-                    && p.y < hy + cell && p.y + footprint > hy else { continue }
-                applyPickup(&world, pickup: pickup, toTank: tank.entityID,
-                            weapons: weapons, rules: rules, events: &events)
-                collected.append(pickup.entityID)
+                guard p.x < origin.x + pickup.sizeSubunits && p.x + footprint > origin.x
+                    && p.y < origin.y + pickup.sizeSubunits && p.y + footprint > origin.y else { continue }
+                applyPickup(&world, pickup: pickup, toTank: tank.entityID, weapons: weapons, rules: rules, events: &events)
+                collected.insert(pickup.entityID)
                 break
             }
         }
-        world.pickups.removeAll { collected.contains($0.entityID) || $0.lifetimeRemainingTicks <= 0 }
-    }
-
-    // MARK: - Fort ring (base shield, §6.6 / ADR-0010)
-
-    /// The ring of cells around the 2×2 base (the fort walls): every
-    /// in-bounds, non-border cell in the surrounding 4×4 box — 12 cells for
-    /// an interior base, fewer when the base touches the border.
-    static func baseFortRingCells(_ world: WorldState) -> [(x: Int, y: Int)] {
-        guard let base = world.base else { return [] }
-        let cell = SpatialUnits.subunitsPerCell
-        let bx = base.topLeftSubunits.x / cell, by = base.topLeftSubunits.y / cell
-        var ring: [(x: Int, y: Int)] = []
-        for y in (by - 1)...(by + 2) {
-            for x in (bx - 1)...(bx + 2) {
-                if x >= bx && x <= bx + 1 && y >= by && y <= by + 1 { continue }
-                guard x >= 1, x < world.arena.cellsWide - 1,
-                      y >= 1, y < world.arena.cellsHigh - 1 else { continue }
-                ring.append((x, y))
-            }
-        }
-        return ring
-    }
-
-    /// Whether restoring terrain into this cell would entomb something
-    /// (§6.6: never into a cell occupied by a tank, mine, or pickup).
-    static func fortRingCellOccupied(
-        _ world: WorldState, cellX: Int, cellY: Int, mineHalfExtent: Int
-    ) -> Bool {
-        let cell = SpatialUnits.subunitsPerCell
-        let footprint = SpatialUnits.standardTankFootprintSubunits
-        let minX = cellX * cell, minY = cellY * cell, maxX = minX + cell, maxY = minY + cell
-        for tank in world.tanks {
-            let p = tank.positionSubunits
-            if p.x < maxX && p.x + footprint > minX && p.y < maxY && p.y + footprint > minY { return true }
-        }
-        for mine in world.mines {
-            let p = mine.positionSubunits
-            if p.x - mineHalfExtent < maxX && p.x + mineHalfExtent > minX
-                && p.y - mineHalfExtent < maxY && p.y + mineHalfExtent > minY { return true }
-        }
-        for pickup in world.pickups
-        where pickup.positionSubunits.x / cell == cellX && pickup.positionSubunits.y / cell == cellY {
-            return true
-        }
-        return false
-    }
-
-    /// Shield activation hardens the fort ring to steel (reference shovel
-    /// rule; owner decision). Occupied cells are skipped and simply keep
-    /// their state. The pre-shield kinds are recorded once per activation
-    /// (a refresh while shielded keeps the original record) so expiry can
-    /// restore what was there.
-    static func hardenBaseFortRing(
-        _ world: inout WorldState, weapons: WeaponRuleset, events: inout [DomainEvent]
-    ) {
-        guard var base = world.base else { return }
-        let ring = baseFortRingCells(world)
-        if base.fortRingRestore.isEmpty {
-            base.fortRingRestore = ring.map { world.terrain[$0.x, $0.y].kind }
-        }
-        world.base = base
-        for (x, y) in ring
-        where world.terrain[x, y] != TerrainCell(kind: .steel) // damaged steel is rebuilt whole
-            && !fortRingCellOccupied(world, cellX: x, cellY: y, mineHalfExtent: weapons.mineHalfExtentSubunits) {
-            world.terrain[x, y] = TerrainCell(kind: .steel)
-            events.append(.terrainChanged(cellX: x, cellY: y,
-                                          quadrantMask: world.terrain[x, y].quadrantMask))
-        }
-    }
-
-    /// Shield expiry rebuilds the ring: with `fortRingRestoresRecordedKinds`
-    /// (ADR-0010, owner decision B — the default) cells recorded as steel or
-    /// water at activation come back as themselves and every other
-    /// unoccupied cell becomes full brick; without it every unoccupied cell
-    /// becomes full brick (the reference rebuilds the walls unconditionally).
-    /// Occupied cells are skipped and keep their current state with no
-    /// retry. Nothing happens when no hardening is pending.
-    static func restoreBaseFortRing(
-        _ world: inout WorldState, weapons: WeaponRuleset, rules: PickupRuleset,
-        events: inout [DomainEvent]
-    ) {
-        guard var base = world.base, !base.fortRingRestore.isEmpty else { return }
-        let ring = baseFortRingCells(world)
-        for (i, (x, y)) in ring.enumerated() {
-            let recorded: TerrainKind? = i < base.fortRingRestore.count ? base.fortRingRestore[i] : nil
-            let preserved = rules.fortRingRestoresRecordedKinds
-                && (recorded?.isSteelFamily == true || recorded == .water)
-            let target: TerrainKind = preserved ? recorded! : .brick
-            guard !fortRingCellOccupied(world, cellX: x, cellY: y,
-                                        mineHalfExtent: weapons.mineHalfExtentSubunits) else { continue }
-            let current = world.terrain[x, y]
-            if current.kind == target && current.quadrantMask == TerrainCell(kind: target).quadrantMask { continue }
-            world.terrain[x, y] = TerrainCell(kind: target)
-            events.append(.terrainChanged(cellX: x, cellY: y,
-                                          quadrantMask: world.terrain[x, y].quadrantMask))
-        }
-        base.fortRingRestore = []
-        world.base = base
+        world.pickups.removeAll { collected.contains($0.entityID) }
     }
 
     private static func applyPickup(
@@ -454,7 +298,7 @@ enum Stage {
         }
         switch pickup.pickupID {
         case "speed_up": withTank { $0.speedLevel = min(3, $0.speedLevel + 1) }
-        case "armor_up": withTank { $0.armor = min($0.maxArmor, $0.armor + min(rules.armorUpAmount, $0.maxArmor)) }
+        case "armor_up": withTank { $0.armor = min($0.maxArmor, $0.armor + rules.armorUpAmount) }
         case "power_up": withTank { $0.powerLevel = min(3, $0.powerLevel + 1) }
         case "level_up": withTank {
             $0.speedLevel = min(3, $0.speedLevel + 1)
@@ -462,8 +306,14 @@ enum Stage {
             $0.armor = min($0.maxArmor, $0.armor + 1)
         }
         case "max_speed_power": withTank { $0.speedLevel = 3; $0.powerLevel = 3 }
-        case "amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea":
+        case "amphi_tank", "anti_skid":
             withTank { $0.equipmentID = pickup.pickupID }
+            if pickup.pickupID != "amphi_tank", let tank = world.tank(entityID: tankID) {
+                let box = Simulation.collisionBox(position: tank.positionSubunits, ruleset: .provisional)
+                if world.terrain.waterOverlapArea(minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY) > 0 {
+                    withTank { $0.leavingWater = true } // §4.4
+                }
+            }
             events.append(.equipmentChanged(entityID: tankID, equipmentID: pickup.pickupID))
         case "score_200": award(200)
         case "score_500": award(500)
@@ -476,47 +326,47 @@ enum Stage {
             }
         case "base_shield":
             if var base = world.base {
-                // Refresh short, extend long (§6.6): additive with a floor.
+                let wasActive = base.shieldRemainingTicks > 0
                 base.shieldRemainingTicks = rules.baseShieldTicks(afterPickupWith: base.shieldRemainingTicks)
                 world.base = base
-                // Reference shovel rule: the fort ring hardens to steel while
-                // the shield lasts; expiry restores it (Simulation step 2).
-                hardenBaseFortRing(&world, weapons: weapons, events: &events)
-                events.append(.baseShieldChanged(active: true))
+                activateFort(&world, events: &events)
+                if !wasActive { events.append(.baseShieldChanged(active: true)) }
             }
         case "freeze_enemy":
-            for i in world.tanks.indices where world.tanks[i].teamID != 1 {
-                world.tanks[i].statusEffects["frozen"] = rules.freezeTicks
+            for i in world.tanks.indices where world.tanks[i].teamID != 1 && world.tanks[i].armor > 0 {
+                world.tanks[i].statusEffects["frozen"] = max(world.tanks[i].statusEffects["frozen"] ?? 0, rules.freezeTicks)
             }
         case "bomb":
-            // Damages every qualified active enemy (§9.4): spawning and
-            // invincible tanks are not qualified — the shared damage policy
-            // deflects them; shields shatter first (bomb is explosion-class).
-            for i in world.tanks.indices where world.tanks[i].teamID != 1 {
-                Combat.applyTankDamage(&world, tankIndex: i, damage: rules.bombDamage,
-                                       sourceWeaponID: "bomb", events: &events)
+            // §10.4: every spawned enemy outside spawn protection and
+            // invincibility is cleared, shields ignored.
+            for i in world.tanks.indices where world.tanks[i].teamID != 1 && world.tanks[i].armor > 0
+                && !Combat.isProtected(world.tanks[i]) {
+                let tank = world.tanks[i]
+                world.tanks[i].armor = 0
+                world.tanks[i].shieldHP = 0
+                world.tanks[i].killedBy = KillAttribution(playerID: ownerID, byBomb: true)
+                events.append(.tankDamaged(entityID: tank.entityID, ownerPlayerID: nil, damage: tank.armor,
+                                           sourceWeaponID: "bomb", position: tank.positionSubunits))
             }
-        case "extra_life": withPlayer { $0.lives += 1 }
+        case "extra_life":
+            // Never past the state domain: the Training Arena starts at 999
+            // reserves and a second 1UP used to break the invariant (a crash
+            // in debug builds, owner report 2026-09-15).
+            withPlayer { $0.lives = min(WorldInvariants.maxLives, $0.lives + 1) }
         case "max_armor_ammo":
-            // Max armor, and the current special weapon filled to its cap
-            // (reference "MAX Caisson / Armor"; §9.4), unlike ammo_crate's
-            // single refill.
             withTank { $0.armor = $0.maxArmor }
-            if let current = world.tank(entityID: tankID)?.specialWeaponID,
-               let weapon = weapons.weapon(current) {
+            if let current = world.tank(entityID: tankID)?.specialWeaponID, let weapon = weapons.weapon(current) {
                 withPlayer { $0.specialAmmoByWeapon[current] = weapon.maxAmmo }
             }
         case "ammo_crate":
             if let current = world.tank(entityID: tankID)?.specialWeaponID { refill(current) }
-        case "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "mine_weapon":
+        case "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon":
             let weaponID = String(pickup.pickupID.dropLast("_weapon".count))
             withTank { $0.specialWeaponID = weaponID }
-            withPlayer { $0.retainedSpecialWeaponID = weaponID }
             refill(weaponID)
         default:
             break
         }
-        // Keep retained upgrades in sync for respawn (§6.5).
         if let tank = world.tank(entityID: tankID) {
             withPlayer {
                 $0.retainedSpeedLevel = tank.speedLevel
@@ -527,44 +377,231 @@ enum Stage {
         }
     }
 
-    // MARK: - Step 11 extension: hidden treasures
+    // MARK: - Pickup placement (§10.2)
 
-    /// Reveals treasures whose covering brick has been destroyed (the
-    /// reference editor's hidden-treasure layer, §11): the covering cell
-    /// counts as destroyed once it could hold a pickup — the same legality
-    /// `spawnPickup` uses (destruction normalizes an emptied cell to
-    /// `.ground`). A cell that merely changed material (fort hardening to
-    /// steel) keeps the treasure hidden. The record is consumed only once the
-    /// pickup was actually placed.
-    static func revealHiddenPickups(
-        _ world: inout WorldState, rules: PickupRuleset, events: inout [DomainEvent]
-    ) {
-        guard var stage = world.stage, !stage.hiddenPickups.isEmpty else { return }
-        var revealed: [Int] = []
-        for (i, hidden) in stage.hiddenPickups.enumerated() {
-            guard world.terrain.isInside(cellX: hidden.cell.x, cellY: hidden.cell.y) else { continue }
-            guard world.terrain[hidden.cell.x, hidden.cell.y].kind.canHoldPickup else { continue }
-            if spawnPickup(&world, pickupID: hidden.pickupID, nearCell: hidden.cell,
-                           rules: rules, events: &events) {
-                revealed.append(i)
+    /// Whether a pickup may occupy the 2×2 area at `cell`: legal surface with
+    /// no structure, and (when asked) clear of tanks, the base, spawn
+    /// reservations, other pickups and fire.
+    static func pickupAreaIsLegal(_ world: WorldState, cell: Vec2i, avoidDynamic: Bool) -> Bool {
+        let size = SpatialUnits.subunitsPerCell
+        for dy in 0..<2 {
+            for dx in 0..<2 {
+                let cx = cell.x + dx, cy = cell.y + dy
+                guard world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].canHoldPickup else { return false }
             }
         }
-        for i in revealed.reversed() { stage.hiddenPickups.remove(at: i) }
+        guard avoidDynamic else { return true }
+        let minX = cell.x * size, minY = cell.y * size, maxX = minX + 2 * size, maxY = minY + 2 * size
+        func overlaps(_ x: Int, _ y: Int, _ w: Int) -> Bool { minX < x + w && maxX > x && minY < y + w && maxY > y }
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        if world.tanks.contains(where: { overlaps($0.positionSubunits.x, $0.positionSubunits.y, footprint) }) { return false }
+        if let base = world.base, overlaps(base.topLeftSubunits.x, base.topLeftSubunits.y, base.sizeSubunits) { return false }
+        if world.spawnTelegraphs.contains(where: { overlaps($0.positionSubunits.x, $0.positionSubunits.y, footprint) }) { return false }
+        if world.pickups.contains(where: { overlaps($0.cell.x * size, $0.cell.y * size, $0.sizeSubunits) }) { return false }
+        if world.fireHazards.contains(where: { $0.cell.x >= cell.x && $0.cell.x <= cell.x + 1 && $0.cell.y >= cell.y && $0.cell.y <= cell.y + 1 }) {
+            return false
+        }
+        return true
+    }
+
+    static func placePickup(_ world: inout WorldState, pickupID: String, cell: Vec2i, critical: Bool,
+                            graceTicks: Int, rules: PickupRuleset, events: inout [DomainEvent]) {
+        let id = world.claimEntityID()
+        let pickup = PickupState(entityID: id, pickupID: pickupID, cell: cell,
+                                 lifetimeRemainingTicks: rules.pickupLifetimeTicks,
+                                 graceTicksRemaining: graceTicks, critical: critical)
+        world.pickups.append(pickup)
+        events.append(.pickupSpawned(entityID: id, pickupID: pickupID, position: pickup.positionSubunits))
+    }
+
+    /// Queues a drop (§10.2); placement happens in step 8.
+    static func requestPickup(_ world: inout WorldState, pickupID: String, critical: Bool) {
+        guard var stage = world.stage else { return }
+        stage.pendingPickups.append(PendingPickup(requestID: stage.nextPickupRequestID, requestTick: world.tick,
+                                                  pickupID: pickupID, critical: critical))
+        stage.nextPickupRequestID += 1
         world.stage = stage
     }
 
-    // MARK: - Step 12 extension: enemy score/drops and player lifecycle
+    /// Places queued drops at random legal interior areas the player can
+    /// reach with the current equipment; waits while no player tank lives
+    /// or no area qualifies.
+    static func placePendingPickups(_ world: inout WorldState, ruleset: MovementRuleset, rules: PickupRuleset,
+                                    events: inout [DomainEvent]) {
+        guard var stage = world.stage, !stage.pendingPickups.isEmpty else { return }
+        guard let player = world.players.first(where: { $0.active }),
+              let tank = player.tankEntityID.flatMap({ world.tank(entityID: $0) }), tank.armor > 0 else { return }
+        let reachable = Navigation.reachableLanes(world, from: tank, ruleset: ruleset)
+        let lane = SpatialUnits.subunitsPerQuadrant
+        let lanesWide = (world.arena.widthSubunits - SpatialUnits.standardTankFootprintSubunits) / lane + 1
+        var remaining: [PendingPickup] = []
+        for request in stage.pendingPickups.sorted(by: { ($0.requestTick, $0.requestID) < ($1.requestTick, $1.requestID) }) {
+            var candidates: [Vec2i] = []
+            if world.arena.cellsHigh >= 4 && world.arena.cellsWide >= 4 {
+                for cy in 1...(world.arena.cellsHigh - 3) {
+                    for cx in 1...(world.arena.cellsWide - 3) {
+                        let laneIndex = (cy * 2) * lanesWide + cx * 2
+                        guard reachable.contains(laneIndex),
+                              pickupAreaIsLegal(world, cell: Vec2i(x: cx, y: cy), avoidDynamic: true) else { continue }
+                        candidates.append(Vec2i(x: cx, y: cy))
+                    }
+                }
+            }
+            guard !candidates.isEmpty else {
+                remaining.append(request)
+                continue
+            }
+            let pick = candidates[world.rng.drops.next(upperBound: candidates.count)]
+            placePickup(&world, pickupID: request.pickupID, cell: pick, critical: request.critical,
+                        graceTicks: 0, rules: rules, events: &events)
+        }
+        stage = world.stage ?? stage
+        stage.pendingPickups = remaining
+        world.stage = stage
+    }
 
-    /// Called with the tanks that died this tick, before removal.
-    static func processDeaths(
-        _ world: inout WorldState, deadTanks: [TankState], rules: PickupRuleset,
-        events: inout [DomainEvent]
-    ) {
-        guard let stage = world.stage else { return }
-        let cell = SpatialUnits.subunitsPerCell
-        for tank in deadTanks {
+    /// §10.2 hidden pickups: revealed in place once their 2×2 area holds no
+    /// wall, with an avoidance window when a tank sits on them.
+    static func revealHiddenPickups(_ world: inout WorldState, rules: PickupRuleset, events: inout [DomainEvent]) {
+        guard var stage = world.stage, !stage.hiddenPickups.isEmpty else { return }
+        let size = SpatialUnits.subunitsPerCell
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        var kept: [HiddenPickup] = []
+        for hidden in stage.hiddenPickups {
+            let cell = hidden.cell
+            guard pickupAreaIsLegal(world, cell: cell, avoidDynamic: false),
+                  !world.pickups.contains(where: { abs($0.cell.x - cell.x) < 2 && abs($0.cell.y - cell.y) < 2 }) else {
+                kept.append(hidden)
+                continue
+            }
+            let minX = cell.x * size, minY = cell.y * size
+            let underTank = world.tanks.contains {
+                minX < $0.positionSubunits.x + footprint && minX + footprint > $0.positionSubunits.x
+                    && minY < $0.positionSubunits.y + footprint && minY + footprint > $0.positionSubunits.y
+            }
+            placePickup(&world, pickupID: hidden.pickupID, cell: cell, critical: hidden.critical,
+                        graceTicks: underTank ? rules.revealGraceTicks : 0, rules: rules, events: &events)
+        }
+        stage = world.stage ?? stage
+        stage.hiddenPickups = kept
+        world.stage = stage
+    }
+
+    // MARK: - Flag On Guard (§11.2)
+
+    /// Whether a quadrant of a template cell would bury a tank, a pickup or a
+    /// spawn reservation.
+    private static func quadrantOccupied(_ world: WorldState, cell: Vec2i, bit: Int) -> Bool {
+        let q = SpatialUnits.subunitsPerQuadrant
+        let minX = cell.x * 2 * q + (bit % 2) * q, minY = cell.y * 2 * q + (bit / 2) * q
+        func overlaps(_ x: Int, _ y: Int, _ w: Int) -> Bool { minX < x + w && minX + q > x && minY < y + w && minY + q > y }
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        if world.tanks.contains(where: { overlaps($0.positionSubunits.x, $0.positionSubunits.y, footprint) }) { return true }
+        if world.pickups.contains(where: { overlaps($0.cell.x * 2 * q, $0.cell.y * 2 * q, $0.sizeSubunits) }) { return true }
+        if world.spawnTelegraphs.contains(where: { overlaps($0.positionSubunits.x, $0.positionSubunits.y, footprint) }) { return true }
+        return false
+    }
+
+    /// A pickup starts or continues the cycle: the first one records the
+    /// template's original cells; every one re-arms hardening.
+    static func activateFort(_ world: inout WorldState, events: inout [DomainEvent]) {
+        guard var base = world.base, let stage = world.stage else { return }
+        if base.fortRecord.isEmpty {
+            base.fortRecord = stage.fortTemplate
+                .filter { world.terrain.isInside(cellX: $0.x, cellY: $0.y) }
+                .map { FortCellRecord(cell: $0, original: world.terrain[$0.x, $0.y]) }
+        } else {
+            for i in base.fortRecord.indices { base.fortRecord[i].hardenedMask = 0 }
+        }
+        world.base = base
+        hardenFort(&world, events: &events)
+    }
+
+    /// Step 1 each tick: harden while shielded, restore after.
+    static func updateFort(_ world: inout WorldState, events: inout [DomainEvent]) {
+        guard let base = world.base, !base.fortRecord.isEmpty else { return }
+        if base.shieldRemainingTicks > 0 { hardenFort(&world, events: &events) } else { restoreFort(&world, events: &events) }
+    }
+
+    /// Hardens every template quadrant not hardened since the last pickup
+    /// and not occupied; a quadrant broken after hardening stays broken.
+    private static func hardenFort(_ world: inout WorldState, events: inout [DomainEvent]) {
+        guard var base = world.base else { return }
+        for i in base.fortRecord.indices {
+            let record = base.fortRecord[i]
+            guard record.original.kind != .whiteSteel else { continue }
+            var newly = 0
+            for bit in 0..<4 where record.hardenedMask & (1 << bit) == 0
+                && !quadrantOccupied(world, cell: record.cell, bit: bit) {
+                newly |= 1 << bit
+            }
+            guard newly != 0 else { continue }
+            let current = world.terrain[record.cell.x, record.cell.y]
+            let standing = current.kind.isWall ? current.quadrantMask : 0
+            let surface: TerrainKind = current.surface == .water ? .ground : current.surface
+            world.terrain[record.cell.x, record.cell.y] = TerrainCell(kind: .steel, quadrantMask: standing | newly, surface: surface)
+            base.fortRecord[i].hardenedMask |= newly | standing
+            events.append(.terrainChanged(cellX: record.cell.x, cellY: record.cell.y,
+                                          quadrantMask: world.terrain[record.cell.x, record.cell.y].quadrantMask))
+        }
+        world.base = base
+    }
+
+    /// Restores template cells to their recorded state, quadrant by quadrant;
+    /// what would bury something stays pending. The cycle ends when all match.
+    private static func restoreFort(_ world: inout WorldState, events: inout [DomainEvent]) {
+        guard var base = world.base else { return }
+        var allRestored = true
+        for record in base.fortRecord {
+            let c = record.cell
+            let current = world.terrain[c.x, c.y]
+            let original = record.original
+            if current == original { continue }
+            var target = original
+            if original.kind.isSolidStructure {
+                let standing = current.kind.isSolidStructure ? current.quadrantMask : 0
+                var blocked = 0
+                for bit in 0..<4 where original.quadrantMask & (1 << bit) != 0 && standing & (1 << bit) == 0
+                    && quadrantOccupied(world, cell: c, bit: bit) {
+                    blocked |= 1 << bit
+                }
+                if blocked != 0 {
+                    let mask = original.quadrantMask & ~blocked
+                    target = mask == 0 ? TerrainCell(kind: original.surface == .water ? .ground : original.surface)
+                        : TerrainCell(kind: original.kind, quadrantMask: mask, crackMask: original.crackMask, surface: original.surface)
+                }
+            } else if original.surface == .water {
+                let size = SpatialUnits.subunitsPerCell
+                let minX = c.x * size, minY = c.y * size
+                let footprint = SpatialUnits.standardTankFootprintSubunits
+                let buried = world.tanks.contains { tank in
+                    TraversalProfile(equipmentID: tank.equipmentID) != .amphibious
+                        && minX < tank.positionSubunits.x + footprint - 64 && minX + size > tank.positionSubunits.x + 64
+                        && minY < tank.positionSubunits.y + footprint - 64 && minY + size > tank.positionSubunits.y + 64
+                } || world.pickups.contains { minX < $0.cell.x * size + $0.sizeSubunits && minX + size > $0.cell.x * size
+                    && minY < $0.cell.y * size + $0.sizeSubunits && minY + size > $0.cell.y * size }
+                if buried { target = TerrainCell(kind: .ground) }
+            }
+            if target != current {
+                world.terrain[c.x, c.y] = target
+                events.append(.terrainChanged(cellX: c.x, cellY: c.y, quadrantMask: target.quadrantMask))
+            }
+            if target != original { allRestored = false }
+        }
+        if allRestored { base.fortRecord = [] }
+        world.base = base
+    }
+
+    // MARK: - Step 7: deaths, score, drops, statistics
+
+    static func processDeaths(_ world: inout WorldState, events: inout [DomainEvent]) {
+        let dead = world.tanks.filter { $0.armor <= 0 }
+        guard !dead.isEmpty else { return }
+        for tank in dead {
+            events.append(.tankDestroyed(entityID: tank.entityID, ownerPlayerID: tank.ownerPlayerID, position: tank.positionSubunits))
+        }
+        for tank in dead {
             if let ownerID = tank.ownerPlayerID {
-                // Player death (§6.5).
                 world.withPlayer(ownerID) { player in
                     player.retainedSpeedLevel = tank.speedLevel
                     player.retainedPowerLevel = tank.powerLevel
@@ -573,164 +610,91 @@ enum Stage {
                     if player.lives > 0 {
                         player.lives -= 1
                         player.lifeState = .awaitingRespawn
-                        player.respawnCountdownTicks = 60
+                        player.respawnCountdownTicks = LifecycleRules.playerRespawnDelayTicks
                     } else {
                         player.lifeState = .eliminated
-                        events.append(.playerEliminated(playerID: ownerID))
                     }
+                }
+                if world.player(ownerID)?.lifeState == .eliminated {
+                    events.append(.playerEliminated(playerID: ownerID))
                 }
             } else if tank.teamID != 1 {
-                // Enemy death: score and drop roll (drops stream, §9.3).
                 let attributes = EnemyArchetypes.attributes(for: tank.archetypeID)
-                for i in world.players.indices {
-                    world.players[i].score += attributes.score
+                if let killer = tank.killedBy, let playerID = killer.playerID {
+                    let tick = world.tick
+                    world.withPlayer(playerID) { player in
+                        player.score += attributes.score
+                        if !killer.byBomb {
+                            if let last = player.lastComboKillTick, tick - last <= LifecycleRules.comboWindowTicks {
+                                player.comboStreak += 1
+                            } else {
+                                player.comboStreak = 1
+                            }
+                            player.maxCombos = max(player.maxCombos, player.comboStreak)
+                            player.lastComboKillTick = tick
+                        }
+                    }
+                    events.append(.scoreChanged(delta: attributes.score))
                 }
-                events.append(.scoreChanged(delta: attributes.score))
-                let footprint = SpatialUnits.standardTankFootprintSubunits
-                let originCell = Vec2i(x: (tank.positionSubunits.x + footprint / 2) / cell,
-                                       y: (tank.positionSubunits.y + footprint / 2) / cell)
-                if let carriedID = tank.carriedPickupID {
-                    // Carrier rule (§11): the flashing tank's item drops —
-                    // guaranteed, no roll — somewhere on the map (owner
-                    // rule) or where it died (plan text), per the ruleset.
-                    spawnDrop(&world, pickupID: carriedID, deathCell: originCell,
-                              rules: rules, events: &events)
-                } else if !stage.dropTable.isEmpty {
+                if let carried = tank.carriedPickup {
+                    requestPickup(&world, pickupID: carried.pickupID, critical: carried.critical)
+                } else if let stage = world.stage, !stage.dropTable.isEmpty {
                     let roll = world.rng.drops.next(upperBound: 100)
-                    let pickIndex = world.rng.drops.next(upperBound: stage.dropTable.count)
+                    let pick = world.rng.drops.next(upperBound: stage.dropTable.count)
                     if roll < stage.dropChancePercent {
-                        let pickupID = stage.dropTable[pickIndex]
-                        spawnDrop(&world, pickupID: pickupID, deathCell: originCell,
-                                  rules: rules, events: &events)
+                        requestPickup(&world, pickupID: stage.dropTable[pick], critical: false)
                     }
                 }
             }
         }
+        for tank in dead { world.removeTank(entityID: tank.entityID) }
     }
 
-    /// A kill/carrier drop. Random policy (the reference rule): up to eight
-    /// draws from the `drops` stream for an interior seed cell, each placed
-    /// by the ring scan restricted to interior cells never under the base or
-    /// a tank; then the same restricted scan around the death cell; if no
-    /// such cell exists anywhere near, the item is lost (documented — only
-    /// a map with no free interior cell can reach this). Plan policy
-    /// (`dropsSpawnAtRandomCells == false`): the plan §9.3 text, the death
-    /// cell by ring scan, tanks not excluded (the grace period handles them).
-    static func spawnDrop(
-        _ world: inout WorldState, pickupID: String, deathCell: Vec2i,
-        rules: PickupRuleset, events: inout [DomainEvent]
-    ) {
-        guard rules.dropsSpawnAtRandomCells else {
-            spawnPickup(&world, pickupID: pickupID, nearCell: deathCell, rules: rules, events: &events)
-            return
-        }
-        let arena = world.arena
-        for _ in 0..<8 {
-            let x = 1 + world.rng.drops.next(upperBound: max(1, arena.cellsWide - 2))
-            let y = 1 + world.rng.drops.next(upperBound: max(1, arena.cellsHigh - 2))
-            if spawnPickup(&world, pickupID: pickupID, nearCell: Vec2i(x: x, y: y), rules: rules,
-                           avoidTanks: true, interiorOnly: true, events: &events) {
-                return
-            }
-        }
-        spawnPickup(&world, pickupID: pickupID, nearCell: deathCell, rules: rules,
-                    avoidTanks: true, interiorOnly: true, events: &events)
-    }
+    // MARK: - Step 9: EnemyDirector (§9.3)
 
-    /// Whether a pickup at `cell` would sit under the base structure or, when
-    /// asked, under a tank.
-    private static func cellIsCoveredForPickup(_ world: WorldState, cell: Vec2i, avoidTanks: Bool) -> Bool {
-        let size = SpatialUnits.subunitsPerCell
-        let minX = cell.x * size, minY = cell.y * size
-        if let base = world.base {
-            let b = base.topLeftSubunits
-            if minX < b.x + base.sizeSubunits && minX + size > b.x
-                && minY < b.y + base.sizeSubunits && minY + size > b.y { return true }
-        }
-        if avoidTanks {
-            let footprint = SpatialUnits.standardTankFootprintSubunits
-            for tank in world.tanks {
-                let p = tank.positionSubunits
-                if minX < p.x + footprint && minX + size > p.x && minY < p.y + footprint && minY + size > p.y {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    /// Places a pickup at the nearest free ground/ice/foliage cell by the
-    /// deterministic ring scan — never under the base structure. Returns
-    /// false when nothing within the scan radius can hold it (the caller
-    /// keeps its record and retries later).
-    @discardableResult
-    static func spawnPickup(
-        _ world: inout WorldState, pickupID: String, nearCell: Vec2i,
-        rules: PickupRuleset, avoidTanks: Bool = false, interiorOnly: Bool = false,
-        events: inout [DomainEvent]
-    ) -> Bool {
-        let cell = SpatialUnits.subunitsPerCell
-        let arena = world.arena
-        for candidate in RingScan.cells(around: nearCell, maxRadius: 4) {
-            guard world.terrain.isInside(cellX: candidate.x, cellY: candidate.y) else { continue }
-            if interiorOnly, candidate.x == 0 || candidate.y == 0
-                || candidate.x == arena.cellsWide - 1 || candidate.y == arena.cellsHigh - 1 { continue }
-            guard world.terrain[candidate.x, candidate.y].kind.canHoldPickup else { continue }
-            guard !cellIsCoveredForPickup(world, cell: candidate, avoidTanks: avoidTanks) else { continue }
-            let center = Vec2i(x: candidate.x * cell + cell / 2, y: candidate.y * cell + cell / 2)
-            guard !world.pickups.contains(where: { $0.positionSubunits == center }) else { continue }
-            let id = world.claimEntityID()
-            world.pickups.append(PickupState(entityID: id, pickupID: pickupID, positionSubunits: center,
-                                             lifetimeRemainingTicks: rules.pickupLifetimeTicks,
-                                             graceTicksRemaining: rules.pickupGraceTicks))
-            events.append(.pickupSpawned(entityID: id, pickupID: pickupID, position: center))
-            return true
-        }
-        return false
-    }
-
-    // MARK: - Step 13: EnemyDirector
-
-    static func runDirector(
-        _ world: inout WorldState, events: inout [DomainEvent]
-    ) {
+    static func runDirector(_ world: inout WorldState, ruleset: MovementRuleset, events: inout [DomainEvent]) {
         guard var stage = world.stage, stage.phase == .playing else { return }
         defer { world.stage = stage }
-
         if stage.enemyStartDelayTicks > 0 {
             stage.enemyStartDelayTicks -= 1
             return
         }
+        if stage.spawnCooldownTicks > 0 { stage.spawnCooldownTicks -= 1 }
         let cell = SpatialUnits.subunitsPerCell
         let footprint = SpatialUnits.standardTankFootprintSubunits
+        func reserved(_ pointIndex: Int, except telegraphID: Int? = nil) -> Bool {
+            world.spawnTelegraphs.contains { $0.spawnPointIndex == pointIndex && $0.entityID != telegraphID }
+        }
 
-        // Advance telegraphs (ascending entity order by construction).
-        var spawnedIndices: [Int] = []
+        var spawnedIDs = Set<Int>()
         for i in world.spawnTelegraphs.indices {
             var telegraph = world.spawnTelegraphs[i]
             telegraph.ticksRemaining -= 1
             if telegraph.ticksRemaining <= 0 {
-                let field = Simulation.ObstacleField(world: world, excludingTank: -1)
+                let field = Simulation.ObstacleField(world: world, excludingTank: -1, excludingTelegraph: telegraph.entityID)
                 let p = telegraph.positionSubunits
-                let blocked = field.blocksTank(minX: p.x + 64, minY: p.y + 64,
-                                               maxX: p.x + footprint - 64, maxY: p.y + footprint - 64)
-                if blocked {
-                    // Deferred spawn (§6.8): hold, then rotate spawn point.
+                let inset = ruleset.collisionInsetSubunits
+                if field.blocksTank(minX: p.x + inset, minY: p.y + inset,
+                                    maxX: p.x + footprint - inset, maxY: p.y + footprint - inset) {
                     telegraph.deferTicks += 1
                     telegraph.ticksRemaining = 1
-                    if telegraph.deferTicks >= 120 {
-                        telegraph.spawnPointIndex = (telegraph.spawnPointIndex + 1) % stage.spawnPointsCells.count
-                        let cellPos = stage.spawnPointsCells[telegraph.spawnPointIndex]
-                        telegraph.positionSubunits = Vec2i(x: cellPos.x * cell, y: cellPos.y * cell)
-                        telegraph.ticksRemaining = 15 // shortened re-telegraph
-                        telegraph.deferTicks = 0
+                    if telegraph.deferTicks >= LifecycleRules.spawnBlockedSwitchTicks, stage.spawnPointsCells.count > 1 {
+                        let count = stage.spawnPointsCells.count
+                        for offset in 1..<count {
+                            let candidate = (telegraph.spawnPointIndex + offset) % count
+                            guard !reserved(candidate, except: telegraph.entityID) else { continue }
+                            telegraph.spawnPointIndex = candidate
+                            let cellPos = stage.spawnPointsCells[candidate]
+                            telegraph.positionSubunits = Vec2i(x: cellPos.x * cell, y: cellPos.y * cell)
+                            telegraph.ticksRemaining = stage.telegraphTicks
+                            telegraph.deferTicks = 0
+                            break
+                        }
                     }
                 } else {
                     let attributes = EnemyArchetypes.attributes(for: telegraph.archetypeID)
-                    let id = world.spawnTank(teamID: 2, ownerPlayerID: nil,
-                                             archetypeID: telegraph.archetypeID,
-                                             positionSubunits: telegraph.positionSubunits,
-                                             facing: .down)
+                    let id = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: telegraph.archetypeID,
+                                             positionSubunits: telegraph.positionSubunits, facing: .down)
                     world.withTank(entityID: id) {
                         $0.armor = attributes.armor
                         $0.maxArmor = attributes.armor
@@ -739,29 +703,24 @@ enum Stage {
                         $0.speedLevel = attributes.speedLevel
                         $0.powerLevel = attributes.powerLevel
                         $0.specialWeaponID = enemyFamily(telegraph.archetypeID)
-                        $0.spawnProtectionTicks = 30
-                        $0.carriedPickupID = telegraph.carriedPickupID
+                        $0.spawnProtectionTicks = LifecycleRules.enemySpawnProtectionTicks
+                        $0.carriedPickup = telegraph.carriedPickup
                     }
-                    events.append(.tankSpawned(entityID: id, ownerPlayerID: nil,
-                                               position: telegraph.positionSubunits, facing: .down))
-                    spawnedIndices.append(i)
+                    events.append(.tankSpawned(entityID: id, ownerPlayerID: nil, position: telegraph.positionSubunits, facing: .down))
+                    spawnedIDs.insert(telegraph.entityID)
                 }
             }
             world.spawnTelegraphs[i] = telegraph
         }
-        for i in spawnedIndices.reversed() { world.spawnTelegraphs.remove(at: i) }
+        world.spawnTelegraphs.removeAll { spawnedIDs.contains($0.entityID) }
 
-        // Authored director phases (ADR-0015): once enough enemies have
-        // been scheduled, reinforcements jump the queue (elite wave), the
-        // alive cap may change, and the base may be repaired — each phase
-        // once, in order.
         while stage.directorPhasesFired < stage.directorPhases.count,
               stage.directorPhases[stage.directorPhasesFired].afterSpawned <= stage.directorSpawned {
             let phase = stage.directorPhases[stage.directorPhasesFired]
             stage.directorPhasesFired += 1
             stage.spawnQueue.insert(contentsOf: phase.reinforcements, at: 0)
             if !stage.carriedPickupQueue.isEmpty {
-                stage.carriedPickupQueue.insert(contentsOf: [String?](repeating: nil, count: phase.reinforcements.count), at: 0)
+                stage.carriedPickupQueue.insert(contentsOf: [CarriedPickup?](repeating: nil, count: phase.reinforcements.count), at: 0)
             }
             if let cap = phase.maxAliveEnemies { stage.maxAliveEnemies = cap }
             if phase.repairsBase, var base = world.base, base.durability > 0 {
@@ -773,54 +732,65 @@ enum Stage {
             events.append(.directorPhaseStarted(id: phase.id, reinforcements: phase.reinforcements.count))
         }
 
-        // Schedule new telegraphs up to the alive cap.
-        let aliveEnemies = world.tanks.filter { $0.teamID != 1 }.count
-        while !stage.spawnQueue.isEmpty,
-              aliveEnemies + world.spawnTelegraphs.count < stage.maxAliveEnemies {
-            let archetypeID = stage.spawnQueue.removeFirst()
-            stage.directorSpawned += 1
-            let carried = stage.carriedPickupQueue.isEmpty
-                ? nil : stage.carriedPickupQueue.removeFirst()
-            let pointIndex = stage.nextSpawnPointIndex % stage.spawnPointsCells.count
-            stage.nextSpawnPointIndex += 1
-            let cellPos = stage.spawnPointsCells[pointIndex]
-            let id = world.claimEntityID()
-            world.spawnTelegraphs.append(SpawnTelegraph(
-                entityID: id, archetypeID: archetypeID, spawnPointIndex: pointIndex,
-                positionSubunits: Vec2i(x: cellPos.x * cell, y: cellPos.y * cell),
-                ticksRemaining: stage.telegraphTicks, carriedPickupID: carried))
-            events.append(.enemyWaveStarted(archetypeID: archetypeID,
-                                            position: Vec2i(x: cellPos.x * cell, y: cellPos.y * cell)))
+        /// Starts one spawn process at the next unreserved point; false when
+        /// every point is reserved.
+        func startProcess() -> Bool {
+            let count = stage.spawnPointsCells.count
+            guard count > 0 else { return false }
+            for offset in 0..<count {
+                let pointIndex = (stage.nextSpawnPointIndex + offset) % count
+                guard !reserved(pointIndex) else { continue }
+                stage.nextSpawnPointIndex = (pointIndex + 1) % count
+                let archetypeID = stage.spawnQueue.removeFirst()
+                let carried = stage.carriedPickupQueue.isEmpty ? nil : stage.carriedPickupQueue.removeFirst()
+                stage.directorSpawned += 1
+                let cellPos = stage.spawnPointsCells[pointIndex]
+                let position = Vec2i(x: cellPos.x * cell, y: cellPos.y * cell)
+                world.spawnTelegraphs.append(SpawnTelegraph(
+                    entityID: world.claimEntityID(), archetypeID: archetypeID, spawnPointIndex: pointIndex,
+                    positionSubunits: position, ticksRemaining: stage.telegraphTicks, carriedPickup: carried))
+                events.append(.enemyWaveStarted(archetypeID: archetypeID, position: position))
+                return true
+            }
+            return false
+        }
+        func roomForAnother() -> Bool {
+            !stage.spawnQueue.isEmpty
+                && world.tanks.filter({ $0.teamID != 1 }).count + world.spawnTelegraphs.count < stage.maxAliveEnemies
+        }
+        if !stage.firstWaveStarted {
+            // The first wave starts together at distinct points.
+            stage.firstWaveStarted = true
+            while roomForAnother(), startProcess() {}
+            stage.spawnCooldownTicks = LifecycleRules.spawnCadenceTicks
+        } else if stage.spawnCooldownTicks == 0, roomForAnother(), startProcess() {
+            stage.spawnCooldownTicks = LifecycleRules.spawnCadenceTicks
         }
     }
 
-    // MARK: - Step 14: win/loss
+    // MARK: - Step 9: win/loss (§11.4)
 
-    /// Resolved after all damage and death events (§6.7). Simultaneity:
-    /// base-zero on the last-enemy tick is a LOSS; player elimination on the
-    /// last-enemy tick with a surviving base is a WIN (ruleset defaults).
-    static func resolveObjective(
-        _ world: inout WorldState, events: inout [DomainEvent]
-    ) {
+    static func resolveObjective(_ world: inout WorldState, events: inout [DomainEvent]) {
         guard var stage = world.stage, stage.phase == .playing else { return }
         defer { world.stage = stage }
 
-        let baseAlive = (world.base?.durability ?? 0) > 0
-        if !baseAlive {
+        if (world.base?.durability ?? 0) <= 0 {
             stage.phase = .lost
             events.append(.stageLost(reason: "base_destroyed"))
             return
         }
-        let playerAlive = world.players.contains { $0.lifeState != .eliminated }
-        let enemiesRemain = !stage.spawnQueue.isEmpty
-            || !world.spawnTelegraphs.isEmpty
-            || world.tanks.contains { $0.teamID != 1 }
+        let activePlayers = world.players.filter(\.active)
+        if !activePlayers.isEmpty, activePlayers.allSatisfy({ $0.lifeState == .eliminated }) {
+            stage.phase = .lost
+            events.append(.stageLost(reason: "player_eliminated"))
+            return
+        }
+        let unfiredReinforcements = stage.directorPhases.dropFirst(stage.directorPhasesFired).contains { !$0.reinforcements.isEmpty }
+        let enemiesRemain = !stage.spawnQueue.isEmpty || !world.spawnTelegraphs.isEmpty
+            || world.tanks.contains { $0.teamID != 1 } || unfiredReinforcements
         if !enemiesRemain {
-            stage.phase = .won // includes the player-elimination-same-tick case
+            stage.phase = .won
             events.append(.stageWon)
-            // Clear bonuses (ADR-0012): the tally bonus and the reward are
-            // stage data, paid to every active player on the deciding tick;
-            // presentation paces their display, the score is final here.
             let bonus = stage.clearBonus
             if bonus.total > 0 {
                 for i in world.players.indices where world.players[i].active {
@@ -828,11 +798,6 @@ enum Stage {
                 }
                 events.append(.stageClearBonus(tally: bonus.tally, reward: bonus.reward))
             }
-            return
-        }
-        if !playerAlive {
-            stage.phase = .lost
-            events.append(.stageLost(reason: "player_eliminated"))
         }
     }
 }

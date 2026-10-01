@@ -7,10 +7,9 @@
     "baseFocusPercent": 70,
     "wanderPercent": 20,
     "fireWindowPercent": 70,
-    "minePlacePercent": 12,
     "courseCommitPercent": 70
   },
-  "telegraphTicksPercent": 140,
+  "telegraphTicksPercent": 100,
   "composition": "forgiving",
   "alliedBaseDamage": false,
   "enemySpecialAmmoPercent": 70

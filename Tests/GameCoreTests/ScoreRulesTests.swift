@@ -52,7 +52,7 @@ private func stepOnce(_ world: inout WorldState) -> [DomainEvent] {
     @Test func rewardCategoriesFollowTheSpecTableAndTheRowMultiplier() {
         let expected: [String: Int] = [
             "normal_a": 0, "normal_b": 0, "normal_c": 1, "normal_d": 1,
-            "rapid_a": 2, "rapid_d": 2, "mine_a": 3, "mine_d": 3,
+            "rapid_a": 2, "rapid_b": 2, "rapid_c": 3, "rapid_d": 3,
             "explosion_a": 4, "explosion_d": 4, "fire_a": 5, "fire_d": 5,
             "ap_a": 6, "ap_b": 6, "ap_c": 7, "ap_d": 7,
         ]
@@ -100,18 +100,5 @@ private func stepOnce(_ world: inout WorldState) -> [DomainEvent] {
         var bad = b
         bad.stage?.clearBonus = .init(tally: -1, reward: 330)
         #expect(WorldInvariants.violations(in: bad).contains { $0.contains("clear bonus") })
-    }
-
-    @Test func recordingsWithoutTheBonusKeyStillDecode() throws {
-        let stage = makeWinnableWorld(bonus: .init(tally: 600, reward: 660), enemies: ["normal_a"]).stage!
-        let data = try JSONEncoder().encode(stage)
-        #expect(try JSONDecoder().decode(StageState.self, from: data) == stage)
-        var json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        json.removeValue(forKey: "clearBonus")
-        let legacy = try JSONDecoder().decode(StageState.self, from: JSONSerialization.data(withJSONObject: json))
-        #expect(legacy.clearBonus == .none)
-        var expected = stage
-        expected.clearBonus = .none
-        #expect(legacy == expected)
     }
 }

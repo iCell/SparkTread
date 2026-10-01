@@ -287,7 +287,6 @@ public final class MovementLabController {
 
     private func replaceSession(_ next: MovementLabSession) {
         isPaused = false
-        directorNotice = nil
         pendingEvents.removeAll()
         audio.resetForNewWorld()
         session = next
@@ -303,9 +302,13 @@ public final class MovementLabController {
     /// Provisional stage HUD data (§12.2): everything the player panel and
     /// the shared HUD show, read from the authoritative world.
     public struct HUDSnapshot: Equatable {
+        /// Reserve tanks (GAME_RULES §11.3).
         public var lives: Int
         public var score: Int
         public var enemiesLeft: Int
+        /// §15.2: enemies not yet on the field, and on the field now.
+        public var enemiesWaiting: Int
+        public var enemiesOnField: Int
         public var baseHP: Int
         public var baseMaxHP: Int
         public var shield: Bool
@@ -321,16 +324,26 @@ public final class MovementLabController {
         public var lifeState: LifeState
     }
 
+    /// The player's §13 statistics for the results panel.
+    public var stats: (maxHits: Int, maxCombos: Int) {
+        let player = session.world.player(.one)
+        return (player?.maxHits ?? 0, player?.maxCombos ?? 0)
+    }
+
     public var hud: HUDSnapshot {
         let world = session.world
         let player = world.player(.one)
         let tank = playerTank
-        let enemiesLeft = (world.stage?.spawnQueue.count ?? 0)
-            + world.spawnTelegraphs.count
-            + world.tanks.filter { $0.teamID != 1 }.count
+        let unfired = world.stage.map { stage in
+            stage.directorPhases.dropFirst(stage.directorPhasesFired).reduce(0) { $0 + $1.reinforcements.count }
+        } ?? 0
+        let waiting = (world.stage?.spawnQueue.count ?? 0) + world.spawnTelegraphs.count + unfired
+        let onField = world.tanks.filter { $0.teamID != 1 }.count
+        let enemiesLeft = waiting + onField
         let weaponID = tank?.specialWeaponID ?? player?.retainedSpecialWeaponID ?? "rapid"
         return HUDSnapshot(
             lives: player?.lives ?? 0, score: displayedScore, enemiesLeft: enemiesLeft,
+            enemiesWaiting: waiting, enemiesOnField: onField,
             baseHP: world.base?.durability ?? 0, baseMaxHP: world.base?.maxDurability ?? 0,
             shield: (world.base?.shieldRemainingTicks ?? 0) > 0,
             armor: tank?.armor ?? 0, maxArmor: tank?.maxArmor ?? 8,
@@ -375,15 +388,21 @@ public final class MovementLabController {
     /// physical callback OBSERVED while inactive but delivered after this
     /// point is dropped: admission is decided by when the event happened,
     /// not by when the main actor got to it.
+    /// The next simulated tick follows a (re)start of the clock: its command
+    /// carries `.continue` so the core drops buffered presses (§5.1).
+    private var resumePending = false
+
     public func start() {
         guard !isRunning else { return }
         isRunning = true
+        resumePending = true
         activityGeneration &+= 1
         syncInputAdmission()
         audio.resume()
         haptics.resume()
         #if canImport(UIKit)
-        let driver = DisplayLinkSimulationDriver { [weak self] in self?.stepOneTick() }
+        let driver = DisplayLinkSimulationDriver(stepTick: { [weak self] in self?.stepOneTick() },
+                                                 onStall: { [weak self] in self?.handleStall() })
         driver.start()
         self.driver = driver
         #endif
@@ -437,6 +456,13 @@ public final class MovementLabController {
     /// Toggle for the pause/back action.
     public func togglePause() { isPaused ? resume() : pause() }
 
+    /// A frame gap past the stall threshold (GAME_RULES §15.3): mid-play it
+    /// becomes the player-visible pause; elsewhere the clock just goes on.
+    func handleStall() {
+        guard isRunning, flow.allowsSimulation, stagePhase == .playing else { return }
+        pause()
+    }
+
     /// §17.5: losing the active state pauses immediately; mid-play it
     /// becomes a PLAYER-visible pause (the overlay waits for "继续"), while
     /// an intro, outro or results screen simply resumes on return.
@@ -488,21 +514,16 @@ public final class MovementLabController {
         let events = session.advance(
             holding: holding,
             normalFire: normalPulse || scriptedNormal,
-            specialFire: input.specialFireHeld || scriptedSpecial)
+            specialFire: input.specialFireHeld || scriptedSpecial,
+            sessionRequest: resumePending ? .continue : .none)
+        resumePending = false
         tally.observe(events)
         pendingEvents += events
         for event in events {
             if case .stageClearBonus(let tally, let reward) = event {
                 clearBonus = ScoreRules.ClearBonus(tally: tally, reward: reward)
             }
-            if case .directorPhaseStarted(let id, let reinforcements) = event {
-                directorNotice = (HUDLabels.directorPhase(id, reinforcements: reinforcements), session.world.tick)
-            }
-            if case .baseRepaired = event, directorNotice == nil {
-                directorNotice = ("基地已修复", session.world.tick)
-            }
         }
-        if let notice = directorNotice, session.world.tick - notice.tick > Self.directorNoticeTicks { directorNotice = nil }
         for event in events {
             if case .stageWon = event {
                 flow.beginOutro(won: true, resultRows: KillTally.tableRows, rewardLine: clearBonus.reward > 0)
@@ -534,11 +555,6 @@ public final class MovementLabController {
         }
     }
 
-    /// HUD wave/pressure cue (plan §12.2): the last director phase, shown
-    /// for `directorNoticeTicks` simulation ticks.
-    public private(set) var directorNotice: (text: String, tick: Int)?
-    public static let directorNoticeTicks = 180
-
     /// The won stage's clear bonuses (ADR-0012), already in the world's
     /// score; the HUD withholds them until the results panel pays them out
     /// (tally bonus with the total line, reward with the reward line) the
@@ -566,7 +582,7 @@ public final class MovementLabController {
 
     // MARK: - Weapon debug panel (lab only)
 
-    public let specialWeaponIDs = ["rapid", "fire", "ap", "explosion", "mine"]
+    public let specialWeaponIDs = ["rapid", "fire", "ap", "explosion"]
 
     public func selectWeapon(_ id: String) { if isLab { session.debugSelectSpecialWeapon(id) } }
     public func setPower(_ level: Int) { if isLab { session.debugSetPowerLevel(level) } }
@@ -603,7 +619,6 @@ enum HUDLabels {
         case "fire": "燃烧"
         case "ap": "穿甲"
         case "explosion": "爆破"
-        case "mine": "地雷"
         default: id
         }
     }
@@ -612,21 +627,18 @@ enum HUDLabels {
         switch id {
         case "amphi_tank": "两栖"
         case "anti_skid": "防滑"
-        case "shield_of_moon": "月牙"
-        case "memory_of_sea": "海忆"
         default: "无"
         }
     }
 
-    /// Results-table reward categories (ADR-0012; GAME_RULES §8.2
-    /// last column): 0/1 the two Normal pairs, 2 Rapid, 3 Mine,
-    /// 4 Explosion, 5 Fire, 6/7 the two AP pairs.
+    /// Results-table categories (GAME_RULES §13): ×1 Normal A/B | C/D,
+    /// ×2 Rapid A/B | C/D, ×3 Explosion | Fire, ×4 AP A/B | C/D.
     static func rewardCategory(_ category: Int) -> String {
         switch category {
         case 0: "普通Ⅰ"
         case 1: "普通Ⅱ"
-        case 2: "快弹"
-        case 3: "地雷"
+        case 2: "快弹Ⅰ"
+        case 3: "快弹Ⅱ"
         case 4: "爆破"
         case 5: "燃烧"
         case 6: "穿甲Ⅰ"
@@ -691,11 +703,8 @@ enum HUDLabels {
         case "fire_weapon": "火焰枪"
         case "ap_weapon": "穿甲枪"
         case "explosion_weapon": "爆破枪"
-        case "mine_weapon": "地雷枪"
         case "amphi_tank": "两栖"
         case "anti_skid": "防滑"
-        case "shield_of_moon": "月牙"
-        case "memory_of_sea": "海忆"
         case "invincibility": "无敌"
         case "base_shield": "基地盾"
         case "freeze_enemy": "冻结"
@@ -707,15 +716,6 @@ enum HUDLabels {
         case "score_2000": "+2000"
         default: id
         }
-    }
-
-    /// Wave/pressure cue text for a director phase (plan §12.2).
-    static func directorPhase(_ id: String, reinforcements: Int) -> String {
-        let base: String = switch id {
-        case "elite_minelayer": "精英布雷车来袭"
-        default: id.hasPrefix("elite") ? "精英部队来袭" : "敌军增援"
-        }
-        return reinforcements > 0 ? "\(base) ×\(reinforcements)" : base
     }
 
     /// One line under the stamped outcome title: why the stage ended.
@@ -740,7 +740,6 @@ enum HUDLabels {
         case "ap": "穿甲"
         case "explosion": "爆破"
         case "fire": "喷火"
-        case "mine": "布雷"
         default: family
         }
         return base + "坦克"
@@ -807,26 +806,14 @@ public struct MovementLabView: View {
                 // The reference shows no controls over its card or results;
                 // the simulation does not step there either (ADR-0011).
                 if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused {
-                    TouchControlsView(controller: controller)
+                    TouchControlsView(controller: controller, art: scene?.loadedArt,
+                                      specialWeaponID: controller.hud.weaponID)
                         .ignoresSafeArea()
                 }
                 #endif
                 if controller.isLab { weaponDebugPanel }
                 stageHUD
                 if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused { pauseButton }
-                if let notice = controller.directorNotice, !Self.isDimmed(flowPhase) {
-                    Text(notice.text)
-                        .font(.system(size: 22, weight: .heavy))
-                        .foregroundStyle(Color.red)
-                        .shadow(color: .black, radius: 0, x: 2, y: 2)
-                        .padding(.horizontal, 16).padding(.vertical, 6)
-                        .background(Capsule().fill(Color.black.opacity(0.55)))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, geometry.size.height * 0.16)
-                        .allowsHitTesting(false)
-                        .id(notice.tick)
-                        .transition(.scale(scale: 1.5).combined(with: .opacity))
-                }
                 stageFlowOverlay(size: geometry.size)
                 if paused { pauseOverlay }
             }
@@ -921,9 +908,12 @@ public struct MovementLabView: View {
             let hud = controller.hud
             VStack(spacing: 4) {
                 HStack(spacing: 14) {
-                    Label("\(hud.lives)", systemImage: "heart.fill").foregroundStyle(.red)
-                    Label("\(hud.enemiesLeft)", systemImage: "shield.lefthalf.filled").foregroundStyle(.orange)
-                    Label("\(hud.baseHP)/\(hud.baseMaxHP)\(hud.shield ? "🛡" : "")", systemImage: "house.fill")
+                    Text("备用\(hud.lives)").foregroundStyle(.red)
+                    Label("待出\(hud.enemiesWaiting) 场上\(hud.enemiesOnField)", systemImage: "shield.lefthalf.filled")
+                        .foregroundStyle(.orange)
+                    Label((hud.baseMaxHP <= 8
+                           ? String(repeating: "■", count: max(0, hud.baseHP)) + String(repeating: "□", count: max(0, hud.baseMaxHP - hud.baseHP))
+                           : "\(hud.baseHP)/\(hud.baseMaxHP)") + (hud.shield ? "🛡" : ""), systemImage: "house.fill")
                         .foregroundStyle(hud.baseHP > 1 ? .green : .red)
                     Text("\(hud.score)").foregroundStyle(.yellow)
                 }
@@ -1131,6 +1121,10 @@ public struct MovementLabView: View {
                 Text(verbatim: "得分 \(String(controller.hud.score))")
                     .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
+                // GAME_RULES §13 statistics.
+                Text(verbatim: "MaxHits \(String(controller.stats.maxHits))  MaxCombos \(String(controller.stats.maxCombos))")
+                    .font(.system(size: compact ? 12 : 14, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
                 Spacer()
                 if controller.campaignComplete {
                     Text("战役完成")
@@ -1274,6 +1268,7 @@ public struct MovementLabView: View {
 
     /// One scene per view; surface changes are delivered explicitly through
     /// `surfaceDidChange` (never by re-creating the scene from `body`).
+    /// The scene reads the safe-area insets from its SKView (GAME_RULES §15.1).
     private func liveScene(for size: CGSize) -> MovementLabScene {
         if let scene { return scene }
         // Scene matches the real device surface so the uniform fit is

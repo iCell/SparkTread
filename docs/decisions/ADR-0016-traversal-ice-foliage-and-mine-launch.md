@@ -1,5 +1,7 @@
 # ADR-0016: Traversal Profiles, Ice Inertia, Foliage Cover and Mine Launch
 
+> **Superseded in part by ADR-0018 (2026-09-15).** Where this record conflicts with `GAME_RULES.md` R5, R5 wins; see ADR-0018 item 3 for the exact clauses.
+
 Status: Proposed (drafted 2026-09-10 late evening, M4 item 5 — the mechanics M3 deferred)
 
 Date: 2026-09-10

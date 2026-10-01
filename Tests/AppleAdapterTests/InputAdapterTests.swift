@@ -67,13 +67,20 @@ import GameApplication
         return world
     }
 
-    private let totalTicks = 220 // 160 ticks down + press right and roll to the lane
+    /// Drive down until the tank is within the 512-subunit assist window
+    /// above the lane at y = 11264 (GAME_RULES §4.1 level-0 speed), then
+    /// press right and roll through the opening.
+    private var perTick: Double {
+        Double(MovementRuleset.provisional.accumulatorIncrement(speedLevel: 0)) / Double(MovementRuleset.accumulatorUnitsPerSubunit)
+    }
+    private var turnTick: Int { Int((7_700 / perTick).rounded(.up)) }
+    private var totalTicks: Int { turnTick + Int((3_000 / perTick).rounded(.up)) }
 
     /// Keyboard: discrete press/release events (what GCKeyboard delivers).
     private func keyboardWorld() -> WorldState {
         run(applying: { tick, store in
             if tick == 0 { store.press(.down) }
-            if tick == 160 { store.release(.down); store.press(.right) }
+            if tick == turnTick { store.release(.down); store.press(.right) }
         }, ticks: totalTicks)
     }
 
@@ -81,7 +88,7 @@ import GameApplication
     private func touchWorld() -> WorldState {
         run(applying: { tick, store in
             switch tick {
-            case 0..<160: store.updateFromAnalog(dx: 4, dy: 38, deadZone: 12)
+            case 0..<turnTick: store.updateFromAnalog(dx: 4, dy: 38, deadZone: 12)
             default: store.updateFromAnalog(dx: 41, dy: 6, deadZone: 12)
             }
         }, ticks: totalTicks)
@@ -91,7 +98,7 @@ import GameApplication
     /// flipped by the adapter, as PhysicalInputAdapter does).
     private func controllerWorld() -> WorldState {
         run(applying: { tick, store in
-            let (x, y): (Float, Float) = tick < 160 ? (0, -1) : (1, 0)
+            let (x, y): (Float, Float) = tick < turnTick ? (0, -1) : (1, 0)
             store.updateFromAnalog(dx: Double(x), dy: Double(-y), deadZone: 0.5)
         }, ticks: totalTicks)
     }

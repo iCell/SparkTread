@@ -11,17 +11,17 @@
     "sfx_base_hit.wav": {
       "attribution": "provisional",
       "milliseconds": 440,
-      "sha256": "5993a88b6126557798ac6a3528438d0b154b5e44d6d652a55d48a9807f350cec"
+      "sha256": "55041dcb78eb10b8b2c239a73b7a20e6eafcb938ebfb185499edfde53264631a"
     },
     "sfx_base_own_hit.wav": {
       "attribution": "provisional",
       "milliseconds": 200,
-      "sha256": "6376e7da9e387f8b6d35d74acdba96dd1aa21146fd3f3743274e043e3e6502d7"
+      "sha256": "2b044f9d4ba413032f58ac8905973f88b43a8c261322ce189cb0fbdebe81f253"
     },
     "sfx_base_shield_on.wav": {
       "attribution": "provisional",
       "milliseconds": 320,
-      "sha256": "8aacbfaf2774d777906356092250935f6e53d430e8969976848aff190b32257b"
+      "sha256": "1f5db0235fc19561a356d66aacd33b7a509221ce89639ebea5909cad6dbd4bbd"
     },
     "sfx_deflect.wav": {
       "attribution": "derived",
@@ -31,27 +31,27 @@
     "sfx_dry_fire.wav": {
       "attribution": "provisional",
       "milliseconds": 35,
-      "sha256": "4a9ff00430167072fa07f60a94d2ef511ce6e7166f8342a099f335ae482890e6"
+      "sha256": "ae40414285d68b2bf023036bb59c49fd9cf3ae12e96dcb53367abc6ffa87e487"
     },
     "sfx_explosion_blast.wav": {
       "attribution": "provisional",
       "milliseconds": 380,
-      "sha256": "6cd91f6d81ee3eec0822fb9967e7ca1e326ef7ee178313387634ab3492aa1346"
+      "sha256": "5d75d9e0089f5904e349f6fdce9fd034f266f739e29ae510c30b479c1de5072b"
     },
     "sfx_fire_ap.wav": {
       "attribution": "provisional",
       "milliseconds": 380,
-      "sha256": "70e5e03d408ce2a2e651a2184a140a4ce22e58520e66bacb28a18c4047f87993"
+      "sha256": "86184c45650586d4cae37385a594ce4cba98d137efc5197d7458446cb24aeca6"
     },
     "sfx_fire_explosion.wav": {
       "attribution": "provisional",
       "milliseconds": 210,
-      "sha256": "77705b0e8e0ea6356508e43287145b176b2f5eec65df07830359972627a4bd56"
+      "sha256": "1150c9cfe73b23242e236d3a5bde3d97fd53882418c86f09887a5d89d8662ee0"
     },
     "sfx_fire_flame.wav": {
       "attribution": "provisional",
       "milliseconds": 380,
-      "sha256": "812fbffa57f8bdd24a7dbe26c0b4bb4aa9cb780980fb45840075394b5bf5a815"
+      "sha256": "59b8e472df1905c70de813ba6db0941dd808156643b7ac95b75be6950dba29d6"
     },
     "sfx_fire_normal.wav": {
       "attribution": "excerpt",
@@ -95,7 +95,7 @@
     "sfx_flame_loop.wav": {
       "attribution": "provisional",
       "milliseconds": 1200,
-      "sha256": "85d9f630ac68c5e657a91c4dabce10f0e80dd618ff50005752894903d8d9a2dd"
+      "sha256": "a613dca6a94bc068ef25b1e4e59ccdb3c156802ca79c55560c53a24b243cb96f"
     },
     "sfx_hit_brick.wav": {
       "attribution": "derived",
@@ -118,12 +118,7 @@
     "sfx_hit_tank.wav": {
       "attribution": "provisional",
       "milliseconds": 130,
-      "sha256": "d912e51575fbbd59dde027ce5b1afefe229c5fa26b205a788551d2d55aacab6d"
-    },
-    "sfx_mine_place.wav": {
-      "attribution": "provisional",
-      "milliseconds": 140,
-      "sha256": "88ac31798c0bb05f9824243c888c3f9f2e3f322bb934d80b42e0e8c63610a28a"
+      "sha256": "8cbbc3e756254eb007545bd53b59eda20e0fda8730a4a618397c1eed646f9080"
     },
     "sfx_pickup_collect.wav": {
       "attribution": "excerpt",
@@ -159,18 +154,13 @@
     "sfx_spawn_warp.wav": {
       "attribution": "provisional",
       "milliseconds": 160,
-      "sha256": "d7f84bd04591aa57ec81a51b60aa46171e5921e4957cda20b9b2d40726c2a489"
+      "sha256": "cb8431d933c801c0e3b04a811946974b8309b616055de616015896cecf32b562"
     },
     "sfx_stage_card.wav": {
-      "attribution": "inspired",
-      "inspiration": {
-        "modelled_on": "NES Battle City (Namco, 1985) stage-start jingle",
-        "reference": "https://www.youtube.com/watch?v=_vgaq3LmVak at 2.63-7.2 s (Tools/reference_measure/README.md, second reference)",
-        "relationship": "original composition following the reference's direction: same key/mode (C minor), tempo (~103 bpm), rhythmic skeleton, register, instrumentation and length; its own note sequences and contours; no note run of the reference reproduced; no audio of the reference used (owner's choice 2026-09-10 after declining a near-copy)",
-        "rights_note": "independence of every musical element is for the pending rights review, not asserted here"
-      },
-      "milliseconds": 4659,
-      "sha256": "8d52287b99162f78d9cc39a687be1f648c64918287f4014792bd040308ef59aa"
+      "attribution": "derived",
+      "milliseconds": 3320,
+      "note": "an original two-bar pattern re-sequenced from the results-passage excerpt's own drum strokes: grid-sliced at the measured \u22480.118 s sixteenth, kick/snare/tom/tick/wash slices chosen by deterministic band-energy analysis, two bars of twelve sixteenths (four-on-the-floor kick, backbeat snares, off-beat ticks, tom fills) and a closing accent that rings out on the excerpt's own wash, all laid over a room bed grain-built from the excerpt's own band above 2 kHz so no step is silent, and levelled to the excerpt's own RMS; same tempo, room, level and one-step-rest idiom as the stage end, denser and driving, with the accent landing where the intro hands over to play (owner 2026-09-16: not the same audio as the stage end \u2014 style-consistent and \u52a8\u611f; owner 2026-09-25: aligned to the stage end's room, level and flat drive)",
+      "sha256": "9b8a70760b9616e919eaf0651d2d83661a88f8ddfc37e8f482cd6df850c54e75"
     },
     "sfx_stage_win.wav": {
       "attribution": "excerpt",
@@ -188,7 +178,7 @@
     "sfx_tally_tick.wav": {
       "attribution": "derived",
       "milliseconds": 90,
-      "sha256": "e29e2f514b8ed5ebbd35d93a9682e9d7352d52951d025d8e03ba5e1c7ee525c8"
+      "sha256": "225c3a025c5cb38ecbc3e0954d5322cd63f13dce0bfee7a814582f74e9d77835"
     },
     "sfx_tank_explode.wav": {
       "attribution": "excerpt",
@@ -205,7 +195,7 @@
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "86110222a4eccba042e2d5957b5a40a872c9d988a1f4cf46f1162ae205c52564",
+  "generator_sha256": "504809b83d95ceaf5265da65b82cce25e29af0f863a5973ebc61e4ab9214580b",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
   "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",

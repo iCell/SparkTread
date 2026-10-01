@@ -29,8 +29,8 @@ import GameCore
 
     @Test func categoriesShowTheirFamilyAndTier() {
         let looks = PixelTankIcons.archetypes.map { PixelTankNode.appearance(archetypeID: $0, isPlayer: false) }
-        #expect(looks.map(\.weapon) == ["normal", "normal", "rapid", "mine", "explosion", "fire", "ap", "ap"])
-        #expect(looks.map(\.kind) == ["scout", "armored", "scout", "scout", "scout", "scout", "scout", "armored"])
+        #expect(looks.map(\.weapon) == ["normal", "normal", "rapid", "rapid", "explosion", "fire", "ap", "ap"])
+        #expect(looks.map(\.kind) == ["scout", "armored", "scout", "armored", "scout", "scout", "scout", "armored"])
         // The scene's mapping, unchanged: tier letter → chassis, family → turret.
         #expect(PixelTankNode.appearance(archetypeID: "normal_b", isPlayer: false) == ("standard", "normal"))
         #expect(PixelTankNode.appearance(archetypeID: "fire_d", isPlayer: false) == ("heavy", "fire"))

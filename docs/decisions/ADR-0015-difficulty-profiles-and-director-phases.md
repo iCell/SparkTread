@@ -1,5 +1,7 @@
 # ADR-0015: Difficulty Profiles and Authored Director Phases
 
+> **Superseded in part by ADR-0018 (2026-09-15).** Where this record conflicts with `GAME_RULES.md` R5, R5 wins; see ADR-0018 item 3 for the exact clauses.
+
 Status: Proposed (drafted 2026-09-10 late evening, M4 item 4)
 
 Date: 2026-09-10
@@ -37,8 +39,9 @@ mine roll were constants, the director a flat queue, and only
    pickups kept paired), optional `maxAliveEnemies`, `repairsBase`
    (durability to full; a destroyed base stays destroyed). Phases fire
    once each, in order, at the director pass after the trigger count is
-   reached; `directorPhaseStarted` and `baseRepaired` events drive a HUD
-   notice ("精英布雷车来袭 ×3") and cues. VS-03 authors one phase: after 16
+   reached; `directorPhaseStarted` and `baseRepaired` events drive sound
+   cues only (the HUD notice "精英…来袭 ×N" was removed at the owner's
+   request, 2026-09-15). VS-03 authors one phase: after 16
    enemies, `mine_c` escorted by two `ap_c`, cap 6, base repaired — the
    base-shield carrier precedes it.
 3. **`DifficultyDefinition`** (content, `Content/difficulties/*.json`,

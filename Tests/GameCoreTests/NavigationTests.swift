@@ -1,7 +1,7 @@
 import Testing
 @testable import GameCore
 
-/// §10.4 cost-field navigation and the owner's random drop placement.
+/// GAME_RULES §9.2 cost-field navigation and §10.2 drop placement.
 private func openWorld(_ build: (inout WorldState) -> Void = { _ in }) -> WorldState {
     var terrain = TerrainGrid(arena: .universal)
     let w = terrain.arena.cellsWide, h = terrain.arena.cellsHigh
@@ -79,7 +79,7 @@ private func cellsToBase(_ world: WorldState, _ tank: TankState) -> Int {
                                         positionSubunits: Vec2i(x: 2 * 1024, y: 1 * 1024), facing: .down)
             world.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.specialWeaponID = "normal" }
             var closest = Int.max
-            for _ in 0..<(withBand ? 7200 : 3600) {
+            for _ in 0..<(withBand ? 18_000 : 9_000) { // GAME_RULES R5.2 enemy speeds
                 run(&world, 1)
                 if let tank = world.tank(entityID: enemy) { closest = min(closest, cellsToBase(world, tank)) }
                 if closest <= 1 { break }
@@ -116,7 +116,8 @@ private func cellsToBase(_ world: WorldState, _ tank: TankState) -> Int {
     @Test func fireFamilyRoutesAroundBrickInsteadOfDigging() {
         let sealed = openWorld { w in for x in 1...54 { w.terrain[x, 18] = TerrainCell(kind: .brick) } }
         let width = sealed.arena.cellsWide
-        let cannotDig = Navigation.distanceField(sealed, goals: Navigation.baseApproachGoals(sealed, canDig: false), canDig: false)
+        let flame = Navigation.Context(dig: Navigation.DigAbility(brick: false, steel: false))
+        let cannotDig = Navigation.distanceField(sealed, goals: Navigation.baseApproachGoals(sealed, context: flame), context: flame)
         #expect(cannotDig[10 * width + 40] == Navigation.unreachable)
         let canDig = Navigation.distanceField(sealed, goals: Navigation.baseApproachGoals(sealed))
         #expect(canDig[10 * width + 40] < Navigation.unreachable)
@@ -129,7 +130,7 @@ private func cellsToBase(_ world: WorldState, _ tank: TankState) -> Int {
                                       positionSubunits: Vec2i(x: 2 * 1024, y: 1 * 1024), facing: .down)
         partial.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.specialWeaponID = "fire" }
         var closest = Int.max
-        for _ in 0..<7200 {
+        for _ in 0..<18_000 {
             run(&partial, 1)
             if let tank = partial.tank(entityID: enemy) { closest = min(closest, cellsToBase(partial, tank)) }
             if closest <= 1 { break }
@@ -146,7 +147,7 @@ private func cellsToBase(_ world: WorldState, _ tank: TankState) -> Int {
                                     positionSubunits: Vec2i(x: 2 * 1024, y: 1 * 1024), facing: .down)
         world.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.specialWeaponID = "normal" }
         var damaged = false
-        for _ in 0..<5400 {
+        for _ in 0..<14_000 {
             let events = Simulation.step(&world, commands: [PlayerCommand(playerID: .one, targetTick: world.tick)])
             if events.contains(where: { if case .baseDamaged(_, _, false) = $0 { true } else { false } }) {
                 damaged = true; break
@@ -157,71 +158,62 @@ private func cellsToBase(_ world: WorldState, _ tank: TankState) -> Int {
 }
 
 @Suite struct DropPlacementTests {
-    /// R8-02: the random policy never weakens its constraints on the
-    /// fallback path — with the only free cells under a tank, no pickup is
-    /// created inside the footprint.
-    @Test func randomPolicyFallbackStillAvoidsTanks() {
-        var world = openWorld { w in
-            for y in 1...25 { for x in 1...54 { w.terrain[x, y] = TerrainCell(kind: .steel) } }
-            for y in 10...11 { for x in 10...11 { w.terrain[x, y] = TerrainCell(kind: .ground) } }
-        }
-        let blocker = world.spawnTank(teamID: 1, ownerPlayerID: nil, archetypeID: "normal_a",
-                                      positionSubunits: Vec2i(x: 10 * 1024, y: 10 * 1024), facing: .down)
-        _ = blocker
-        var events: [DomainEvent] = []
-        Stage.spawnDrop(&world, pickupID: "bomb", deathCell: Vec2i(x: 10, y: 10),
-                        rules: .provisional, events: &events)
-        #expect(world.pickups.isEmpty) // documented: lost rather than placed under a tank
-        var plan = PickupRuleset.provisional
-        plan.dropsSpawnAtRandomCells = false
-        Stage.spawnDrop(&world, pickupID: "bomb", deathCell: Vec2i(x: 10, y: 10), rules: plan, events: &events)
-        #expect(world.pickups.count == 1) // the plan text keeps its own policy (grace period covers the tank)
+    private func withPlayer(_ build: (inout WorldState) -> Void = { _ in }) -> WorldState {
+        var world = openWorld(build)
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 3 * 1024, y: 20 * 1024), facing: .up)
+        world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
+        return world
     }
 
-    @Test func dropsAppearOnALegalCellAwayFromTheBaseAndTanks() {
-        var world = openWorld { w in w.stage?.dropTable = ["speed_up"]; w.stage?.dropChancePercent = 100 }
-        var events: [DomainEvent] = []
-        for i in 0..<6 {
-            let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
-                                        positionSubunits: Vec2i(x: (10 + i * 3) * 1024, y: 10 * 1024), facing: .down)
-            world.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.armor = 0 }
-        }
-        events += Simulation.step(&world, commands: [])
-        #expect(world.pickups.count == 6)
-        let cell = SpatialUnits.subunitsPerCell
-        for pickup in world.pickups {
-            let cx = pickup.positionSubunits.x / cell, cy = pickup.positionSubunits.y / cell
-            #expect(world.terrain[cx, cy].kind.canHoldPickup)
-            #expect(!(cx >= 40 && cx <= 41 && cy >= 22 && cy <= 23)) // never under the base
-            // Not where the enemies died (row 10, columns 10…25) — the rule
-            // is "elsewhere"; six independent draws all landing on the death
-            // row would be a one-in-thousands accident.
-        }
-        #expect(Set(world.pickups.map { $0.positionSubunits.y / cell }).count > 1 || world.pickups.first!.positionSubunits.y / cell != 10)
-    }
-
-    @Test func planPlacementRemainsAvailableAsRulesetData() {
-        var plan = PickupRuleset.provisional
-        plan.dropsSpawnAtRandomCells = false
-        var world = openWorld { w in w.stage?.carriedPickupQueue = [] }
+    private func kill(_ world: inout WorldState, at cell: Vec2i, carrying: String? = nil) {
         let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
-                                    positionSubunits: Vec2i(x: 20 * 1024, y: 10 * 1024), facing: .down)
-        world.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.armor = 0; $0.carriedPickupID = "bomb" }
-        Simulation.step(&world, commands: [], pickups: plan)
-        #expect(world.pickups.count == 1)
-        let cell = SpatialUnits.subunitsPerCell
-        #expect(world.pickups.first?.positionSubunits.x == 21 * cell + cell / 2) // the death cell (footprint center)
-        #expect(world.pickups.first?.positionSubunits.y == 11 * cell + cell / 2)
+                                    positionSubunits: Vec2i(x: cell.x * 1024, y: cell.y * 1024), facing: .down)
+        world.withTank(entityID: enemy) {
+            $0.spawnProtectionTicks = 0; $0.armor = 0
+            $0.carriedPickup = carrying.map { CarriedPickup(pickupID: $0) }
+        }
+    }
+
+    /// §10.2: drops land on legal 2×2 interior areas away from the base and
+    /// tanks, in the region the player can reach.
+    @Test func dropsAppearOnLegalReachableAreas() {
+        var world = withPlayer { w in
+            w.stage?.dropTable = ["speed_up"]; w.stage?.dropChancePercent = 100
+            // A white-steel wall seals the right half: unreachable for the player.
+            for y in 1...25 { w.terrain[28, y] = TerrainCell(kind: .whiteSteel) }
+        }
+        for i in 0..<6 { kill(&world, at: Vec2i(x: 5 + i * 3, y: 8)) }
+        Simulation.step(&world, commands: [])
+        #expect(world.pickups.count == 6)
+        for pickup in world.pickups {
+            #expect(pickup.cell.x >= 1 && pickup.cell.y >= 1 && pickup.cell.x + 1 < 27 && pickup.cell.y + 1 <= 25)
+            for dy in 0..<2 { for dx in 0..<2 { #expect(world.terrain[pickup.cell.x + dx, pickup.cell.y + dy].canHoldPickup) } }
+        }
+        for (i, a) in world.pickups.enumerated() {
+            for b in world.pickups.dropFirst(i + 1) {
+                #expect(abs(a.cell.x - b.cell.x) >= 2 || abs(a.cell.y - b.cell.y) >= 2) // never overlapping
+            }
+        }
+    }
+
+    /// §10.2: without a living player tank a guaranteed drop waits in the
+    /// queue instead of being lost.
+    @Test func guaranteedDropWaitsForThePlayer() {
+        var world = openWorld { $0.stage?.spawnQueue = ["normal_a"] } // keeps the stage undecided
+        kill(&world, at: Vec2i(x: 20, y: 10), carrying: "bomb")
+        Simulation.step(&world, commands: [])
+        #expect(world.pickups.isEmpty && world.stage?.pendingPickups.count == 1)
+        world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
+                        positionSubunits: Vec2i(x: 3 * 1024, y: 20 * 1024), facing: .up)
+        Simulation.step(&world, commands: [])
+        #expect(world.pickups.count == 1 && world.stage?.pendingPickups.isEmpty == true)
     }
 
     @Test func randomPlacementIsDeterministic() {
         func run() -> WorldState {
-            var world = openWorld { w in w.stage?.dropTable = ["armor_up"]; w.stage?.dropChancePercent = 100 }
-            for i in 0..<3 {
-                let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
-                                            positionSubunits: Vec2i(x: (10 + i * 4) * 1024, y: 8 * 1024), facing: .down)
-                world.withTank(entityID: enemy) { $0.spawnProtectionTicks = 0; $0.armor = 0 }
-            }
+            var world = withPlayer { w in w.stage?.dropTable = ["armor_up"]; w.stage?.dropChancePercent = 100 }
+            for i in 0..<3 { kill(&world, at: Vec2i(x: 10 + i * 4, y: 8)) }
             Simulation.step(&world, commands: [])
             return world
         }

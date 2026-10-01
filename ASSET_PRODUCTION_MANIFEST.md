@@ -1,5 +1,7 @@
 # Project Golden Eagle
 
+> 2026-09-15 (ADR-0018): `GAME_RULES.md` R5 is authoritative. V1 has five weapon families, two equipment items, 20 enemy types and 22 pickups; Mine, mine-family enemies, Moon Shield and Memory of Sea entries were removed from this manifest. Runtime art comes from `Vendor/SparkTreadPixel` (ADR-0008).
+
 ## Visual and Audio Asset Production Manifest
 
 Document version: 0.3  
@@ -69,7 +71,6 @@ Provisional master palette:
 | Fire enemy | cream/coral | warm charcoal | orange-yellow |
 | AP enemy | muted violet | soft gray | magenta-white |
 | Explosion enemy | muted coral | warm charcoal | amber-white |
-| Mine enemy | tan/bronze | warm charcoal | amber/cyan rings |
 | Friendly/base | ivory | blue | cyan-gold |
 | Danger | muted red/coral | warm charcoal | orange-white |
 
@@ -78,7 +79,7 @@ Exact accessible color values will be locked only after grayscale and color-visi
 ### 2.5 Lighting
 
 - Non-rotating elements (terrain, base, structures, UI, key art) use a consistent soft key light from the upper-left.
-- Rotating gameplay sprites (tank chassis, turrets, attachments, projectiles, mines) use near-neutral, top-centered lighting with only radial/ambient shading, so 90-degree runtime rotation never changes the apparent light direction; emissive strips and the separate shadow layer carry directional readability.
+- Rotating gameplay sprites (tank chassis, turrets, attachments, projectiles) use near-neutral, top-centered lighting with only radial/ambient shading, so 90-degree runtime rotation never changes the apparent light direction; emissive strips and the separate shadow layer carry directional readability.
 - Short, soft contact shadow directly below each object.
 - No long shadow may hide grid position or overlap another tank.
 - Emissive weapon effects may temporarily override local color but not silhouette.
@@ -89,7 +90,7 @@ Exact accessible color values will be locked only after grayscale and color-visi
 
 ### 3.1 World-to-art scale
 
-- Universal arena baseline: 48×27 base cells, provisional until the M1 legibility gate.
+- Universal arena baseline: 56×27 base cells (ADR-0009).
 - Standard tank footprint: 2×2 base cells.
 - Authoring master for one base terrain cell: 128×128 px.
 - One base cell equals `1024` simulation subunits (ADR-0001); source pixels never enter authoritative data.
@@ -142,7 +143,6 @@ Quantities below are source-art units, not final atlas-frame counts. Variants co
 | TANK-PLAYER-TURRET-FIRE | Fire projector turret | 1 | Generated source + artist finish |
 | TANK-PLAYER-TURRET-AP | Armor-piercing turret | 1 | Generated source + artist finish |
 | TANK-PLAYER-TURRET-EXPLOSION | Explosion cannon turret | 1 | Generated source + artist finish |
-| TANK-PLAYER-TURRET-MINE | Mine-layer mechanism | 1 | Generated source + artist finish |
 | TANK-PLAYER-ARMOR | Armor tier overlays | 4 | Artist finish |
 | TANK-PLAYER-POWER | Power tier barrel/emissive overlays | 4 | Artist finish |
 | TANK-PLAYER-DAMAGE | Light/heavy/critical damage overlays | 3 | Artist finish |
@@ -152,20 +152,20 @@ Quantities below are source-art units, not final atlas-frame counts. Variants co
 
 ### C. Enemy tank system
 
-The 24 enemy archetype slots are assembled from reusable modules instead of 24 unrelated paintings.
+The 20 enemy type slots are assembled from reusable modules instead of 20 unrelated paintings.
 
 | ID family | Asset | Source units | Method |
 |---|---|---:|---|
 | TANK-ENEMY-CHASSIS | Scout, standard, armored, heavy chassis | 4 | Generated source + artist finish |
-| TANK-ENEMY-TURRET | Normal, Rapid, Fire, AP, Explosion, Mine turrets | 6 | Generated source + artist finish |
+| TANK-ENEMY-TURRET | Normal, Rapid, Fire, AP, Explosion turrets | 5 | Generated source + artist finish |
 | TANK-ENEMY-ARMOR | Armor reinforcement overlays | 4 | Artist finish |
 | TANK-ENEMY-POWER | Weapon-power indicators | 4 | Artist finish |
-| TANK-ENEMY-EQUIPMENT | Amphi, AntiSkid, Moon Shield, Memory of Sea attachments | 4 | Generated source + artist finish |
+| TANK-ENEMY-EQUIPMENT | Amphi, AntiSkid attachments | 2 | Generated source + artist finish |
 | TANK-ENEMY-DANGER | Elite/danger silhouette attachments | 3 | Artist finish |
 | TANK-ENEMY-DAMAGE | Light/heavy/critical damage overlays | 3 | Artist finish |
 | TANK-ENEMY-SPAWN | Enemy spawn telegraph primitives | 3 | Generated source + code animation |
 | TANK-ENEMY-SHADOW | Common contact shadows by chassis size | 4 | Artist finish |
-| TANK-ENEMY-COLOR | Accessible palette masks for six weapon families | 6 | Artist finish + shader/runtime tint |
+| TANK-ENEMY-COLOR | Accessible palette masks for five weapon families | 5 | Artist finish + shader/runtime tint |
 
 Required archetype coverage:
 
@@ -175,7 +175,6 @@ rapid_a rapid_b rapid_c rapid_d
 fire_a fire_b fire_c fire_d
 ap_a ap_b ap_c ap_d
 explosion_a explosion_b explosion_c explosion_d
-mine_a mine_b mine_c mine_d
 ```
 
 ### D. Projectiles, weapons, and combat VFX
@@ -186,21 +185,19 @@ mine_a mine_b mine_c mine_d
 | WPN-RAPID | Projectile, muzzle flash, streak, ricochet/impact | Generated primitives + particles |
 | WPN-FIRE | Fire bolt, flame core, burning patch, smoke, extinguish | Generated primitives + particles/shader |
 | WPN-AP | AP projectile, piercing line, entry spark, exit spark | Generated primitives + particles |
-| WPN-EXPLOSION | Shell, warning pulse, blast core, blast ring, debris | Generated primitives + particles |
-| WPN-MINE | Mine body levels 0–3, ownership mark, arming ring, trigger ring, blast | Generated source + artist finish + particles |
+| WPN-EXPLOSION | Shell, blast core, blast ring, debris | Generated primitives + particles |
 | COMBAT-HIT | Armor flash, shield hit, invulnerable deflect, dry fire | Particles + small textures |
 | COMBAT-DEATH | Tank explosion, smoke, fragments, scorch decal | Particles + reusable fragments |
-| COMBAT-STATUS | Freeze, slow, airborne/launch, invincibility, stun | Generated primitives + shader/particles |
+| COMBAT-STATUS | Freeze, invincibility, spawn protection | Generated primitives + shader/particles |
 
 Minimum independent bitmap primitives:
 
-- 6 projectile cores;
-- 6 muzzle-flash shapes;
-- 6 impact shapes;
-- 4 mine bodies;
+- 5 projectile cores;
+- 5 muzzle-flash shapes;
+- 5 impact shapes;
 - 3 smoke puffs;
 - 6 debris fragments;
-- 5 status-effect masks/rings;
+- 3 status-effect masks/rings;
 - 4 scorch/crack decals.
 
 ### E. Auxiliary equipment
@@ -209,8 +206,6 @@ Minimum independent bitmap primitives:
 |---|---|---:|---|
 | EQ-AMPHI | AmphiTank flotation/propulsion attachment | idle + water wake | Generated source + artist finish |
 | EQ-ANTISKID | AntiSkid track cleats | idle + active glint | Generated source + artist finish |
-| EQ-MOON-SHIELD | Crescent shield projector | idle + active field | Generated source + particles |
-| EQ-MEMORY-SEA | Chromatic ring/sea-memory module | idle + active aura | Generated source + shader |
 
 Each equipment requires:
 
@@ -233,8 +228,6 @@ All icons require normal, newly-spawned glow, available-to-collect, and collecte
 | 04 | max_speed_power | dual maximum gauge |
 | 05 | amphi_tank | flotation module |
 | 06 | anti_skid | track cleat module |
-| 07 | shield_of_moon | crescent shield |
-| 08 | memory_of_sea | chromatic sea-memory ring |
 | 09 | score_200 | small score token |
 | 10 | score_500 | medium score token |
 | 11 | score_1000 | large score token |
@@ -250,9 +243,8 @@ All icons require normal, newly-spawned glow, available-to-collect, and collecte
 | 21 | fire_weapon | fire turret chip |
 | 22 | ap_weapon | piercing turret chip |
 | 23 | explosion_weapon | explosion turret chip |
-| 24 | mine_weapon | mine-layer turret chip |
 
-Required source art: 25 square icons plus one shared pickup container/frame, rarity border, spawn beam, collection burst, and shadow.
+Required source art: 22 square icons plus one shared pickup container/frame, rarity border, spawn beam, collection burst, and shadow.
 
 ### G. Universal arena terrain
 
@@ -271,6 +263,8 @@ Core terrain families:
 | TERRAIN-BOUNDARY | universal arena edge and corner | static |
 | TERRAIN-SPAWN | player/enemy spawn pads | telegraph animation |
 | TERRAIN-DECAL | tracks, scorch, debris, wet marks, frost | pooled decals |
+
+Note: the white brick and white steel tiers (GAME_RULES §3.1, R5.6 palette: pale grey stone brick / polished silver steel) ship as the dedicated `PixelWallsWhite.atlas` (Astra delivery, 2026-09-16: 256 joint tiles each for white brick, cracked white brick and white steel); the runtime prefers them and falls back to a luminance recolour of the base atlases when an id is missing.
 
 Four campaign material themes:
 
@@ -310,9 +304,9 @@ Gameplay-specific icons are original. SF Symbols may be used only for convention
 | Family | Required assets |
 |---|---|
 | HUD-STATUS | lives, armor, speed, power, ammunition, equipment, score |
-| HUD-WEAPON | normal plus five special weapon icons |
+| HUD-WEAPON | normal plus four special weapon icons |
 | HUD-BASE | durability and shield meter |
-| HUD-ENEMY | remaining count, wave pressure, elite warning |
+| HUD-ENEMY | remaining count, wave pressure |
 | HUD-ALERT | base threatened, low armor, no ammo, pickup explanation |
 | INPUT-MOVE | floating stick base, knob, four direction feedback states |
 | INPUT-FIRE | normal fire button: idle, pressed, cooldown, disabled |
@@ -344,9 +338,9 @@ Stage thumbnails must be rendered from actual stage data after presentation is i
 - 4 theme key art backgrounds, one per material theme;
 - 12 engine-rendered stage thumbnails;
 - 3 difficulty emblems;
-- 6 enemy weapon-family portraits/icons;
-- 4 equipment feature cards;
-- 5 special-weapon feature cards;
+- 5 enemy weapon-family portraits/icons;
+- 2 equipment feature cards;
+- 4 special-weapon feature cards;
 - 3 onboarding illustrations;
 - victory, defeat, campaign-complete, and new-unlock presentation plates;
 - optional loading tips using gameplay sprites rather than unique illustrations.
@@ -379,12 +373,10 @@ Music target:
 
 Sound-effect families:
 
-- player/enemy engine loops by weight;
-- tread on ground, metal, ice, shallow water;
-- normal plus five special weapon fire sounds;
+- (engine and tread loops removed — standing owner rule 2026-09-10: no engine/tread sound);
+- normal plus four special weapon fire sounds;
 - projectile flights/loops where needed;
 - armor, shield, brick, steel, water, ice, and foliage impacts;
-- four mine levels: place, arm, trigger, explode;
 - pickup spawn, hover, collect, replace, reject/cap;
 - armor/speed/power/equipment upgrade confirmations;
 - tank damage, critical warning, destruction, respawn;
@@ -427,9 +419,9 @@ No sound extracted from the reference game or another commercial game is permitt
 Generate and finish:
 
 - player tank modules;
-- six enemy archetype representatives;
-- all six weapon families;
-- all four equipment families;
+- five enemy family representatives;
+- all five weapon families;
+- both equipment items;
 - base states;
 - one complete terrain theme;
 - at least 12 pickup icons;
@@ -438,8 +430,8 @@ Generate and finish:
 
 ### Phase 2: campaign production
 
-- complete all 24 enemy combinations;
-- complete all 25 pickup icons;
+- complete all 20 enemy types;
+- complete all 22 pickup icons;
 - complete remaining three material themes;
 - complete all stage presentation and campaign UI;
 - finalize audio and music;

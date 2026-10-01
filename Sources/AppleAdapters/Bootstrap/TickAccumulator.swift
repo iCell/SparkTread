@@ -4,22 +4,22 @@ import GameCore
 /// (ADR-0007): converts host timestamps into whole 1/60 s ticks. Pure and
 /// value-typed so the stall policy is unit-tested without a display link.
 ///
-/// Policy (ADR-0007 §2–3):
+/// Policy (GAME_RULES §15.3, amending ADR-0007 §2–3):
 /// - Elapsed wall time accumulates in tick units; whole ticks are stepped,
 ///   the fractional remainder carries to the next callback (a 120 Hz
 ///   schedule alternates 0/1 ticks, a 60 Hz one steps 1 each frame).
-/// - At most `maxTicksPerCallback` ticks are stepped per callback.
-/// - A RAW elapsed gap longer than `stallThresholdSeconds` (the time six
-///   ticks take, with a floating-point tolerance so a six-tick frame at any
-///   uptime magnitude is not misread as a stall) is a stall — debugger
-///   pause, suspension, a hitch: the gap is dropped entirely and the
-///   remainder reset, i.e. an implicit pause rather than a burst.
+/// - A gap up to `stallThresholdSeconds` (250 ms) is caught up in full, at
+///   most `maxTicksPerCallback` (15) ticks — a dropped frame never slows
+///   the game.
+/// - A longer gap is a stall: it is dropped entirely, the remainder reset,
+///   and the caller pauses the game (`advance` reports it through
+///   `droppedStalls`; the driver's stall callback turns it into a pause).
 /// - Non-finite, duplicate, or backward timestamps step nothing, keep the
 ///   remainder, and do NOT move the accepted baseline — a later callback is
 ///   measured against the last ACCEPTED timestamp, so a rejected sample can
 ///   never manufacture elapsed time.
 public struct TickAccumulator: Equatable, Sendable {
-    public static let maxTicksPerCallback = 6
+    public static let maxTicksPerCallback = 15
     public static let stallThresholdSeconds: Double =
         Double(maxTicksPerCallback) / Double(MovementRuleset.ticksPerSecond)
     /// Tolerances for binary floating point at realistic uptimes (hours):

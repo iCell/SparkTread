@@ -1,5 +1,7 @@
 # Handoff: joint review 2026-09-09/10 — combat contract, lifecycle, presentation, reference audio, stage transitions
 
+> 2026-09-15 起本文件为历史记录：GAME_RULES.md（R5，ADR-0018）取代此处全部规则性结论。已失效的条目包括：无敌 10 秒（现 1200 tick，ADR-0021）、地雷/mine launch（已删除）、回放格式 3（现为 11）、fort ring（改为关卡护旗模板）、ADR-0012 的“无 MaxHits/MaxCombos”（已恢复，R5 §13）。
+
 Date: 2026-09-10 (started 2026-09-09)  
 From → To: Claude (Fable 5.1) with PI (gpt-6-astra) as reviewer → next session  
 Scope: M3 hardening across GameCore combat/stage/navigation rules,

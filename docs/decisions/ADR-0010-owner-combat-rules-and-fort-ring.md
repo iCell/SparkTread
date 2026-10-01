@@ -1,5 +1,7 @@
 # ADR-0010: Owner Combat Rules — Special-Channel Fallback, Fort-Ring Hardening, Hidden-Treasure Reveal, Mine Visibility
 
+> **Superseded in part by ADR-0018 (2026-09-15).** Where this record conflicts with `GAME_RULES.md` R5, R5 wins; see ADR-0018 item 3 for the exact clauses.
+
 Status: Accepted by the owner on 2026-09-10 (drafted 2026-09-09 during the Claude/PI joint review); restoration mapping decided as B — recorded materials  
 Date: 2026-09-09  
 Related: plan §6.6, §8.1, §9.3, §11.2, §12.3; ADR-0005

@@ -11,9 +11,13 @@ public final class DisplayLinkSimulationDriver {
     private var link: CADisplayLink?
     private var accumulator = TickAccumulator()
     private let stepTick: () -> Void
+    /// Called when a frame gap exceeded the stall threshold (GAME_RULES
+    /// §15.3): the game pauses instead of silently losing time.
+    private let onStall: () -> Void
 
-    public init(stepTick: @escaping () -> Void) {
+    public init(stepTick: @escaping () -> Void, onStall: @escaping () -> Void = {}) {
         self.stepTick = stepTick
+        self.onStall = onStall
     }
 
     public var isRunning: Bool { link != nil }
@@ -44,7 +48,12 @@ public final class DisplayLinkSimulationDriver {
     }
 
     @objc private func fire(_ link: CADisplayLink) {
+        let stalls = accumulator.droppedStalls
         let whole = accumulator.advance(to: link.timestamp)
+        if accumulator.droppedStalls != stalls {
+            onStall()
+            return
+        }
         for _ in 0..<whole { stepTick() }
     }
 }

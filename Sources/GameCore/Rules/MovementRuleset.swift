@@ -1,112 +1,79 @@
-/// Movement tuning (§6.3, §7.1–§7.2). These are ruleset DATA, not hardcoded
-/// constants; values below are the PROVISIONAL Movement Lab baseline and are
-/// selected/tuned during M1.
+/// Movement tuning (GAME_RULES §4). Ruleset DATA: speeds are exact R5
+/// integers in milli-subunits per second with permille level multipliers.
 public struct MovementRuleset: Codable, Equatable, Sendable {
-    /// Simulation rate is fixed at 60 ticks per second (D-018).
+    /// Simulation rate is fixed at 60 ticks per second.
     public static let ticksPerSecond = 60
 
-    /// Base tank speed in subunits per second at speed level 0.
-    /// Reference-derived: ~45 reference pixels/s × 64 subunits (ADR-0001).
-    public var baseSpeedSubunitsPerSecond: Int
+    /// Player base speed at speed level 0: 1.92 cells/s = 1 966 080 mSU/s
+    /// (GAME_RULES §4.1 R5.2: the owner's playtests of 2026-09-15 took R5's
+    /// 4.8 cells/s down to 40 %).
+    public var baseSpeedMilliSubunitsPerSecond: Int
 
-    /// Player speed multipliers per level, in permille (§7.2).
+    /// Player speed multipliers per level 0…3, in permille.
     public var speedMultipliersPermille: [Int]
 
-    /// Enemy speed multipliers for levels -4…4, in permille (reference table,
-    /// GAME_RULES §8.3; level 0 is 0.6× the player base, NOT 1.0×).
+    /// Enemy speed multipliers for levels −4…4, in permille (level 0 is
+    /// 0.6× the player base).
     public var enemySpeedMultipliersPermille: [Int]
 
-    /// How long a pre-pressed turn stays buffered (§6.3).
+    /// How long a pre-pressed perpendicular turn stays buffered.
     public var turnBufferTicks: Int
 
-    /// Maximum travel-axis distance the tank may be nudged onto a movement
-    /// lane (multiples of 512/1024 subunits) when turning perpendicular
-    /// (§6.3). 512 covers every FULL-cell lane phase — 2-cell corridors
-    /// only admit 1024-multiple lanes, and a 256 window left tanks 256–512
-    /// off-lane unable to turn in (owner report). 512 subunits is the
-    /// reference's half-tile snap; assistance never teleports through
-    /// collision and never changes tactical speed.
+    /// Maximum travel-axis nudge onto a half- or full-cell lane when turning
+    /// perpendicular; the nudge is swept and never passes through collision.
     public var alignmentAssistWindowSubunits: Int
 
-    /// Collision inset per side of the nominal 2048×2048 footprint (§6.1).
+    /// Collision inset per side of the nominal 2048×2048 footprint.
     public var collisionInsetSubunits: Int
-    /// Ice inertia (§7.3, ADR-0016): the distance a tank keeps sliding in
-    /// its last travel direction when it releases or changes direction
-    /// with its centre on ice (0 disables sliding); AntiSkid never slides.
+    /// Ice slide budget set once when a tank on ice releases or changes
+    /// direction (0 disables sliding); AntiSkid never slides.
     public var iceSlideDistanceSubunits: Int
-    /// Mine launch slow (§8.6): movement speed percent while "slowed".
-    public var slowedSpeedPercent: Int
 
-    public init(baseSpeedSubunitsPerSecond: Int = 2880,
+    public init(baseSpeedMilliSubunitsPerSecond: Int = 1_966_080,
                 speedMultipliersPermille: [Int] = [1000, 1260, 1588, 2000],
                 enemySpeedMultipliersPermille: [Int] = [150, 216, 300, 432, 600, 864, 1200, 1728, 2400],
                 turnBufferTicks: Int = 10,
                 alignmentAssistWindowSubunits: Int = 512,
                 collisionInsetSubunits: Int = 64,
-                iceSlideDistanceSubunits: Int = 1536,
-                slowedSpeedPercent: Int = 50) {
-        self.baseSpeedSubunitsPerSecond = baseSpeedSubunitsPerSecond
+                iceSlideDistanceSubunits: Int = 1536) {
+        self.baseSpeedMilliSubunitsPerSecond = baseSpeedMilliSubunitsPerSecond
         self.speedMultipliersPermille = speedMultipliersPermille
         self.enemySpeedMultipliersPermille = enemySpeedMultipliersPermille
         self.turnBufferTicks = turnBufferTicks
         self.alignmentAssistWindowSubunits = alignmentAssistWindowSubunits
         self.collisionInsetSubunits = collisionInsetSubunits
         self.iceSlideDistanceSubunits = iceSlideDistanceSubunits
-        self.slowedSpeedPercent = slowedSpeedPercent
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case baseSpeedSubunitsPerSecond, speedMultipliersPermille, enemySpeedMultipliersPermille
-        case turnBufferTicks, alignmentAssistWindowSubunits, collisionInsetSubunits
-        case iceSlideDistanceSubunits, slowedSpeedPercent
-    }
-
-    /// Rules recorded before the ice/slow fields existed decode with the
-    /// defaults (the replay format bump already separates them).
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        baseSpeedSubunitsPerSecond = try c.decode(Int.self, forKey: .baseSpeedSubunitsPerSecond)
-        speedMultipliersPermille = try c.decode([Int].self, forKey: .speedMultipliersPermille)
-        enemySpeedMultipliersPermille = try c.decode([Int].self, forKey: .enemySpeedMultipliersPermille)
-        turnBufferTicks = try c.decode(Int.self, forKey: .turnBufferTicks)
-        alignmentAssistWindowSubunits = try c.decode(Int.self, forKey: .alignmentAssistWindowSubunits)
-        collisionInsetSubunits = try c.decode(Int.self, forKey: .collisionInsetSubunits)
-        iceSlideDistanceSubunits = try c.decodeIfPresent(Int.self, forKey: .iceSlideDistanceSubunits) ?? 1536
-        slowedSpeedPercent = try c.decodeIfPresent(Int.self, forKey: .slowedSpeedPercent) ?? 50
     }
 
     public static let provisional = MovementRuleset()
 
-    /// Per-tick accumulator increment for a speed level, in 1/60000 subunit.
-    /// Whole subunits are `accumulator / (1000 × ticksPerSecond)`; the
-    /// remainder carries (integer accumulator, §7.1 — no drift, no floats).
+    /// Per-tick accumulator increment for a player speed level; whole
+    /// subunits are `accumulator / accumulatorUnitsPerSubunit` and the
+    /// remainder carries (§4.1).
     public func accumulatorIncrement(speedLevel: Int) -> Int {
         let clamped = max(0, min(speedMultipliersPermille.count - 1, speedLevel))
-        return baseSpeedSubunitsPerSecond * speedMultipliersPermille[clamped]
+        return baseSpeedMilliSubunitsPerSecond * speedMultipliersPermille[clamped]
     }
 
-    /// AI tanks use the reference enemy speed curve (levels -4…4).
+    /// AI tanks use the enemy speed curve (levels −4…4).
     public func enemyAccumulatorIncrement(speedLevel: Int) -> Int {
         let index = max(0, min(enemySpeedMultipliersPermille.count - 1, speedLevel + 4))
-        return baseSpeedSubunitsPerSecond * enemySpeedMultipliersPermille[index]
+        return baseSpeedMilliSubunitsPerSecond * enemySpeedMultipliersPermille[index]
     }
 
-    public static let accumulatorUnitsPerSubunit = 1000 * ticksPerSecond
+    /// 1000 mSU × 1000 permille × 60 ticks.
+    public static let accumulatorUnitsPerSubunit = 1000 * 1000 * ticksPerSecond
 
-    /// Documented domains (§15.3): every field is range-checked BEFORE any
-    /// arithmetic, so validation is total over decoded integers.
-    public static let maxBaseSpeedSubunitsPerSecond = 1_000_000
+    public static let maxBaseSpeedMilliSubunitsPerSecond = 1_000_000_000
     public static let maxMultiplierPermille = 100_000
     public static let maxTicks = 216_000
 
-    /// §15.3: array shapes (4 player levels, 9 enemy levels), speeds and
-    /// multipliers inside their domains, a collision inset that leaves a
-    /// box, and per-tick movement under the §7.4 displacement cap at the
-    /// fastest level. Never traps: comparisons precede multiplication.
+    /// Array shapes, domains, and per-tick movement under the displacement
+    /// cap at the fastest level. Comparisons precede multiplication.
     public func validationIssues() -> [String] {
         var issues: [String] = []
-        if baseSpeedSubunitsPerSecond < 1 || baseSpeedSubunitsPerSecond > Self.maxBaseSpeedSubunitsPerSecond {
-            issues.append("base_speed_subunits_per_second must be 1…\(Self.maxBaseSpeedSubunitsPerSecond)")
+        if baseSpeedMilliSubunitsPerSecond < 1 || baseSpeedMilliSubunitsPerSecond > Self.maxBaseSpeedMilliSubunitsPerSecond {
+            issues.append("base_speed_milli_subunits_per_second must be 1…\(Self.maxBaseSpeedMilliSubunitsPerSecond)")
         }
         if speedMultipliersPermille.count != 4 { issues.append("speed_multipliers_permille must have 4 entries") }
         if enemySpeedMultipliersPermille.count != 9 { issues.append("enemy_speed_multipliers_permille must have 9 entries") }
@@ -118,17 +85,14 @@ public struct MovementRuleset: Codable, Equatable, Sendable {
         if alignmentAssistWindowSubunits < 0 || alignmentAssistWindowSubunits > SpatialUnits.subunitsPerCell {
             issues.append("alignment_assist_window_subunits must be 0…\(SpatialUnits.subunitsPerCell)")
         }
-        // Half the footprint minus one leaves at least a 2-subunit box.
         if collisionInsetSubunits < 0 || collisionInsetSubunits >= SpatialUnits.standardTankFootprintSubunits / 2 {
             issues.append("collision_inset_subunits must leave a collision box")
         }
         if iceSlideDistanceSubunits < 0 || iceSlideDistanceSubunits > 8 * SpatialUnits.subunitsPerCell {
             issues.append("ice_slide_distance_subunits must be 0…\(8 * SpatialUnits.subunitsPerCell)")
         }
-        if slowedSpeedPercent < 0 || slowedSpeedPercent > 100 { issues.append("slowed_speed_percent must be 0…100") }
         if issues.isEmpty, let fastest = multipliers.max() {
-            // Both factors are bounded above, so the product cannot overflow.
-            let perTick = baseSpeedSubunitsPerSecond * fastest / (1000 * Self.ticksPerSecond)
+            let perTick = baseSpeedMilliSubunitsPerSecond * fastest / Self.accumulatorUnitsPerSubunit
             if perTick > SpatialUnits.maxPerTickDisplacementSubunits {
                 issues.append("fastest tank exceeds the per-tick displacement cap")
             }

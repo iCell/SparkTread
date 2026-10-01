@@ -1,79 +1,86 @@
-/// Weapon data contract (§8.4). Values below are PROVISIONAL M2 Combat Lab
-/// tuning seeded from reference-derived bases (§8.3); canonical content
-/// migrates to Content/weapons/ JSON once the content pipeline carries
-/// weapon schemas. The simulation never branches on display names.
+/// Weapon data contract (GAME_RULES §5). Motion values are the R5 integer
+/// rule values in milli-subunits; per-power-level arrays hold exactly four
+/// entries (LV0…LV3). The simulation never branches on display names.
 public struct WeaponDefinition: Codable, Equatable, Sendable {
     public let id: String
     public let family: WeaponFamily
     public let fireChannel: FireChannel
-    public let ammoCost: Int
+    /// Special weapons: rounds a weapon pickup / Caisson adds, and the cap.
     public let refillAmount: Int
     public let maxAmmo: Int
-    // Per-power-level arrays: exactly four entries (§8.4).
     public let cooldownTicks: [Int]
+    /// Own in-flight projectiles of this weapon per shooter (§5.3).
     public let maxActive: [Int]
-    public let initialSpeedSubunitsPerTick: [Int]
-    public let accelerationSubunitsPerTick2: [Int]
-    public let maxSpeedSubunitsPerTick: [Int]
-    public let lifetimeTicks: [Int]
+    /// §5.2 motion: initial speed, signed acceleration and speed cap, all
+    /// independent of power level.
+    public let initialSpeedMilliSubunitsPerSecond: Int
+    public let accelerationMilliSubunitsPerSecond2: Int
+    public let maxSpeedMilliSubunitsPerSecond: Int
+    public let lifetimeTicks: Int
+    /// Armor damage of a direct hit (explosion family: of the blast).
     public let tankDamage: [Int]
-    public let brickDamage: [Int]
-    public let steelDamage: [Int]
-    public let projectileDurability: [Int]
-    public let penetrationCount: [Int]
+    /// Depth of the §3.2 damage strip in quadrant rows (0 = no wall damage).
+    public let stripDepthQuadrants: [Int]
+    /// Strip depth for columns whose first material is red or white brick;
+    /// nil = the same as `stripDepthQuadrants` (GAME_RULES R5.5: AP cuts
+    /// brick two cells deep, steel one).
+    public let brickStripDepthQuadrants: [Int]?
+    /// Whether the strip damages grey steel (only AP, §3.1).
+    public let breaksSteel: Bool
+    /// Blast radius (0 = no blast).
     public let explosionRadiusSubunits: [Int]
-    public let mineTriggerRadiusSubunits: [Int]
-    public let statusEffectID: String?
-    public let friendlyFirePolicy: String
     public let presentationID: String
-    /// Owner rule (2026-09-11, GAME_RULES §17.1): the AP shell cuts a whole
-    /// corridor — brick it actually breaks through never consumes
-    /// `penetrationCount`, so one round opens the full run instead of
-    /// stopping after a cell. Optional so documents written before the rule
-    /// still decode; `cutsThroughBrick` is the accessor simulation uses.
-    public let cutsBrickCorridor: Bool?
-
-    public var cutsThroughBrick: Bool { cutsBrickCorridor ?? false }
 
     public init(id: String, family: WeaponFamily, fireChannel: FireChannel,
-                ammoCost: Int, refillAmount: Int, maxAmmo: Int,
-                cooldownTicks: [Int], maxActive: [Int],
-                initialSpeedSubunitsPerTick: [Int], accelerationSubunitsPerTick2: [Int],
-                maxSpeedSubunitsPerTick: [Int], lifetimeTicks: [Int],
-                tankDamage: [Int], brickDamage: [Int], steelDamage: [Int],
-                projectileDurability: [Int], penetrationCount: [Int],
-                explosionRadiusSubunits: [Int], mineTriggerRadiusSubunits: [Int],
-                statusEffectID: String?, friendlyFirePolicy: String, presentationID: String,
-                cutsBrickCorridor: Bool? = nil) {
+                refillAmount: Int, maxAmmo: Int, cooldownTicks: [Int], maxActive: [Int],
+                initialSpeedMilliSubunitsPerSecond: Int, accelerationMilliSubunitsPerSecond2: Int,
+                maxSpeedMilliSubunitsPerSecond: Int, lifetimeTicks: Int,
+                tankDamage: [Int], stripDepthQuadrants: [Int], brickStripDepthQuadrants: [Int]? = nil,
+                breaksSteel: Bool, explosionRadiusSubunits: [Int], presentationID: String) {
         self.id = id; self.family = family; self.fireChannel = fireChannel
-        self.ammoCost = ammoCost; self.refillAmount = refillAmount; self.maxAmmo = maxAmmo
+        self.refillAmount = refillAmount; self.maxAmmo = maxAmmo
         self.cooldownTicks = cooldownTicks; self.maxActive = maxActive
-        self.initialSpeedSubunitsPerTick = initialSpeedSubunitsPerTick
-        self.accelerationSubunitsPerTick2 = accelerationSubunitsPerTick2
-        self.maxSpeedSubunitsPerTick = maxSpeedSubunitsPerTick
+        self.initialSpeedMilliSubunitsPerSecond = initialSpeedMilliSubunitsPerSecond
+        self.accelerationMilliSubunitsPerSecond2 = accelerationMilliSubunitsPerSecond2
+        self.maxSpeedMilliSubunitsPerSecond = maxSpeedMilliSubunitsPerSecond
         self.lifetimeTicks = lifetimeTicks
-        self.tankDamage = tankDamage; self.brickDamage = brickDamage; self.steelDamage = steelDamage
-        self.projectileDurability = projectileDurability; self.penetrationCount = penetrationCount
+        self.tankDamage = tankDamage; self.stripDepthQuadrants = stripDepthQuadrants
+        self.brickStripDepthQuadrants = brickStripDepthQuadrants
+        self.breaksSteel = breaksSteel
         self.explosionRadiusSubunits = explosionRadiusSubunits
-        self.mineTriggerRadiusSubunits = mineTriggerRadiusSubunits
-        self.statusEffectID = statusEffectID; self.friendlyFirePolicy = friendlyFirePolicy
-        self.presentationID = presentationID; self.cutsBrickCorridor = cutsBrickCorridor
+        self.presentationID = presentationID
     }
 
     public func level(_ array: [Int], _ power: Int) -> Int {
         array[max(0, min(3, power))]
     }
 
-    /// Documented domains (§15.3) so validation is total over decoded
-    /// integers and the simulation's arithmetic stays far from overflow.
+    /// The strip depth (quadrant rows) for a column whose first material is `kind`.
+    public func stripDepth(for kind: TerrainKind, power: Int) -> Int {
+        kind.isBrickFamily ? level(brickStripDepthQuadrants ?? stripDepthQuadrants, power)
+            : level(stripDepthQuadrants, power)
+    }
+
+    /// Whether this weapon's strip damages a wall material (§3.1).
+    public func damages(_ kind: TerrainKind) -> Bool {
+        if kind.isBrickFamily { return stripDepthQuadrants.contains { $0 > 0 } }
+        if kind == .steel { return breaksSteel }
+        return false
+    }
+
+    /// Accumulator units per subunit of projectile travel: the §5.2 integer
+    /// integration advances `60 × speed` per tick over 3 600 000.
+    public static let travelUnitsPerSubunit = 3_600_000
+
     public static let maxTicks = 216_000
     public static let maxCount = 1_000_000
     public static let maxDamage = 99
     public static let maxRadiusSubunits = 65_536
+    /// Fastest legal projectile: one per-tick displacement cap.
+    public static var maxSpeedMilliSubunits: Int {
+        SpatialUnits.maxPerTickDisplacementSubunits * SpatialUnits.milliSubunitsPerSubunit * 60
+    }
 
-    /// §8.4: every per-level array has exactly four entries; every value
-    /// sits inside its domain; per-tick displacement never exceeds the §7.4
-    /// cap.
     public func validationIssues() -> [String] {
         var issues: [String] = []
         func check(_ name: String, _ values: [Int], max upper: Int) {
@@ -82,18 +89,22 @@ public struct WeaponDefinition: Codable, Equatable, Sendable {
         }
         check("cooldown_ticks", cooldownTicks, max: Self.maxTicks)
         check("max_active", maxActive, max: Self.maxCount)
-        check("initial_speed_subunits_per_tick", initialSpeedSubunitsPerTick, max: SpatialUnits.maxPerTickDisplacementSubunits)
-        check("acceleration_subunits_per_tick2", accelerationSubunitsPerTick2, max: SpatialUnits.maxPerTickDisplacementSubunits)
-        check("max_speed_subunits_per_tick", maxSpeedSubunitsPerTick, max: SpatialUnits.maxPerTickDisplacementSubunits)
-        check("lifetime_ticks", lifetimeTicks, max: Self.maxTicks)
         check("tank_damage", tankDamage, max: Self.maxDamage)
-        check("brick_damage", brickDamage, max: Self.maxDamage)
-        check("steel_damage", steelDamage, max: Self.maxDamage)
-        check("projectile_durability", projectileDurability, max: Self.maxCount)
-        check("penetration_count", penetrationCount, max: Self.maxCount)
+        check("strip_depth_quadrants", stripDepthQuadrants, max: 8)
+        if let brickStripDepthQuadrants { check("brick_strip_depth_quadrants", brickStripDepthQuadrants, max: 8) }
         check("explosion_radius_subunits", explosionRadiusSubunits, max: Self.maxRadiusSubunits)
-        check("mine_trigger_radius_subunits", mineTriggerRadiusSubunits, max: Self.maxRadiusSubunits)
-        for (name, value) in [("ammo_cost", ammoCost), ("refill_amount", refillAmount), ("max_ammo", maxAmmo)]
+        let speedCap = Self.maxSpeedMilliSubunits
+        if initialSpeedMilliSubunitsPerSecond < 0 || initialSpeedMilliSubunitsPerSecond > speedCap {
+            issues.append("\(id).initial_speed must be 0…\(speedCap)")
+        }
+        if maxSpeedMilliSubunitsPerSecond < 0 || maxSpeedMilliSubunitsPerSecond > speedCap {
+            issues.append("\(id).max_speed must be 0…\(speedCap)")
+        }
+        if accelerationMilliSubunitsPerSecond2 < -speedCap || accelerationMilliSubunitsPerSecond2 > speedCap {
+            issues.append("\(id).acceleration out of domain")
+        }
+        if lifetimeTicks < 1 || lifetimeTicks > Self.maxTicks { issues.append("\(id).lifetime_ticks must be 1…\(Self.maxTicks)") }
+        for (name, value) in [("refill_amount", refillAmount), ("max_ammo", maxAmmo)]
         where value < 0 || value > Self.maxCount {
             issues.append("\(id).\(name) must be 0…\(Self.maxCount)")
         }
@@ -102,98 +113,61 @@ public struct WeaponDefinition: Codable, Equatable, Sendable {
 }
 
 public enum WeaponFamily: String, Codable, Sendable {
-    case normal, rapid, fire, ap, explosion, mine
+    case normal, rapid, fire, ap, explosion
 }
 
-/// Fire-hazard team filtering (§8.7).
-public enum FireTeamFilter: String, Codable, Sendable {
-    case both, alliedOnly, enemyOnly
+/// Ground-fire colour (GAME_RULES §7.3): who a flame hurts. Player fire is
+/// yellow (enemy tanks), enemy fire orange (player tanks), stage fire red
+/// (every tank).
+public enum FireColor: String, Codable, Sendable {
+    case yellow, orange, red
+
+    public func hurts(teamID: Int) -> Bool {
+        switch self {
+        case .yellow: teamID != 1
+        case .orange: teamID == 1
+        case .red: true
+        }
+    }
+
+    public static func of(sourceTeam teamID: Int) -> FireColor { teamID == 1 ? .yellow : .orange }
 }
 
-/// The M2 weapon ruleset: the six required families plus combat-wide tuning.
+/// The weapon ruleset: the five families plus combat-wide tuning.
 public struct WeaponRuleset: Codable, Equatable, Sendable {
     public var weapons: [WeaponDefinition]
     /// Half-extent of a projectile's collision box, in subunits.
     public var projectileHalfExtentSubunits: Int
-    /// Mine hardware collision half-extent, and arming delay after placement.
-    public var mineHalfExtentSubunits: Int
-    public var mineArmingTicks: Int
-    /// Fire hazards damage at most once per this many ticks per tank.
+    /// Ground fire: lifetime of a patch, and the per-victim damage cadence.
+    public var firePatchLifetimeTicks: Int
     public var fireDamageIntervalTicks: Int
-    /// Chain-detonation wave cap (§8.5, default 8).
-    public var chainDetonationWaveCap: Int
+    /// Foliage: ticks from a cell's ignition to its one spread (§7.4).
+    public var foliageSpreadDelayTicks: Int
     /// Difficulty-scoped allied base damage (ADR-0005); Standard default.
     public var alliedBaseDamage: Bool
-    /// Mine launch/flight (§8.6, ADR-0016), per mine level 0…3: how far
-    /// the triggering tank is thrown along its travel direction, how long
-    /// it stays airborne (uncontrollable, untargetable, suspended from all
-    /// interactions), and how long it is slowed after landing. Level 0
-    /// launches nothing. `mineLaunchEnabled` disables the whole effect.
-    public var mineLaunchDistanceSubunits: [Int]
-    public var mineAirborneTicks: [Int]
-    public var mineSlowTicks: [Int]
-    public var mineLaunchEnabled: Bool
-    /// Foliage fire (ADR-0017, owner rule): a flame on a foliage cell
-    /// spreads to the neighbouring foliage cells after this many ticks
-    /// (0 disables spreading), and foliage a flame burns out on becomes
-    /// plain ground when `foliageBurnsAway`.
-    public var foliageSpreadDelayTicks: Int
-    public var foliageBurnsAway: Bool
+    /// §5.1: how long a normal-fire press stays buffered.
+    public var normalFireBufferTicks: Int
+    /// §5.1: minimum spacing of dry-fire feedback while a special is held.
+    public var dryFireFeedbackIntervalTicks: Int
 
-    public init(weapons: [WeaponDefinition], projectileHalfExtentSubunits: Int, mineHalfExtentSubunits: Int,
-                mineArmingTicks: Int, fireDamageIntervalTicks: Int, chainDetonationWaveCap: Int,
-                alliedBaseDamage: Bool,
-                mineLaunchDistanceSubunits: [Int] = [0, 1024, 1536, 2048],
-                mineAirborneTicks: [Int] = [0, 18, 24, 30],
-                mineSlowTicks: [Int] = [0, 60, 90, 120],
-                mineLaunchEnabled: Bool = true,
-                foliageSpreadDelayTicks: Int = 20,
-                foliageBurnsAway: Bool = true) {
+    public init(weapons: [WeaponDefinition], projectileHalfExtentSubunits: Int = 96,
+                firePatchLifetimeTicks: Int = 340, fireDamageIntervalTicks: Int = 30,
+                foliageSpreadDelayTicks: Int = 20, alliedBaseDamage: Bool = true,
+                normalFireBufferTicks: Int = 10, dryFireFeedbackIntervalTicks: Int = 30) {
         self.weapons = weapons
         self.projectileHalfExtentSubunits = projectileHalfExtentSubunits
-        self.mineHalfExtentSubunits = mineHalfExtentSubunits
-        self.mineArmingTicks = mineArmingTicks
+        self.firePatchLifetimeTicks = firePatchLifetimeTicks
         self.fireDamageIntervalTicks = fireDamageIntervalTicks
-        self.chainDetonationWaveCap = chainDetonationWaveCap
-        self.alliedBaseDamage = alliedBaseDamage
-        self.mineLaunchDistanceSubunits = mineLaunchDistanceSubunits
-        self.mineAirborneTicks = mineAirborneTicks
-        self.mineSlowTicks = mineSlowTicks
-        self.mineLaunchEnabled = mineLaunchEnabled
         self.foliageSpreadDelayTicks = foliageSpreadDelayTicks
-        self.foliageBurnsAway = foliageBurnsAway
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case weapons, projectileHalfExtentSubunits, mineHalfExtentSubunits, mineArmingTicks
-        case fireDamageIntervalTicks, chainDetonationWaveCap, alliedBaseDamage
-        case mineLaunchDistanceSubunits, mineAirborneTicks, mineSlowTicks, mineLaunchEnabled
-        case foliageSpreadDelayTicks, foliageBurnsAway
-    }
-
-    public init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        weapons = try c.decode([WeaponDefinition].self, forKey: .weapons)
-        projectileHalfExtentSubunits = try c.decode(Int.self, forKey: .projectileHalfExtentSubunits)
-        mineHalfExtentSubunits = try c.decode(Int.self, forKey: .mineHalfExtentSubunits)
-        mineArmingTicks = try c.decode(Int.self, forKey: .mineArmingTicks)
-        fireDamageIntervalTicks = try c.decode(Int.self, forKey: .fireDamageIntervalTicks)
-        chainDetonationWaveCap = try c.decode(Int.self, forKey: .chainDetonationWaveCap)
-        alliedBaseDamage = try c.decode(Bool.self, forKey: .alliedBaseDamage)
-        mineLaunchDistanceSubunits = try c.decodeIfPresent([Int].self, forKey: .mineLaunchDistanceSubunits) ?? [0, 1024, 1536, 2048]
-        mineAirborneTicks = try c.decodeIfPresent([Int].self, forKey: .mineAirborneTicks) ?? [0, 18, 24, 30]
-        mineSlowTicks = try c.decodeIfPresent([Int].self, forKey: .mineSlowTicks) ?? [0, 60, 90, 120]
-        mineLaunchEnabled = try c.decodeIfPresent(Bool.self, forKey: .mineLaunchEnabled) ?? true
-        foliageSpreadDelayTicks = try c.decodeIfPresent(Int.self, forKey: .foliageSpreadDelayTicks) ?? 20
-        foliageBurnsAway = try c.decodeIfPresent(Bool.self, forKey: .foliageBurnsAway) ?? true
+        self.alliedBaseDamage = alliedBaseDamage
+        self.normalFireBufferTicks = normalFireBufferTicks
+        self.dryFireFeedbackIntervalTicks = dryFireFeedbackIntervalTicks
     }
 
     public func weapon(_ id: String) -> WeaponDefinition? {
         weapons.first { $0.id == id }
     }
 
-    /// Ruleset-wide validation (§15.3): unique IDs, the `normal` weapon
-    /// present, geometry inside a cell, cadence values inside their domains.
     public func validationIssues() -> [String] {
         var issues = weapons.flatMap { $0.validationIssues() }
         if Set(weapons.map(\.id)).count != weapons.count { issues.append("weapon ids must be unique") }
@@ -202,120 +176,57 @@ public struct WeaponRuleset: Codable, Equatable, Sendable {
         if projectileHalfExtentSubunits < 1 || projectileHalfExtentSubunits > cell {
             issues.append("projectile_half_extent_subunits must be 1…\(cell)")
         }
-        if mineHalfExtentSubunits < 1 || mineHalfExtentSubunits > cell {
-            issues.append("mine_half_extent_subunits must be 1…\(cell)")
-        }
-        if mineArmingTicks < 0 || mineArmingTicks > WeaponDefinition.maxTicks { issues.append("mine_arming_ticks must be 0…\(WeaponDefinition.maxTicks)") }
-        if fireDamageIntervalTicks < 1 || fireDamageIntervalTicks > WeaponDefinition.maxTicks {
-            issues.append("fire_damage_interval_ticks must be 1…\(WeaponDefinition.maxTicks)")
-        }
-        if chainDetonationWaveCap < 1 || chainDetonationWaveCap > 64 { issues.append("chain_detonation_wave_cap must be 1…64") }
-        for (name, values) in [("mine_launch_distance_subunits", mineLaunchDistanceSubunits),
-                               ("mine_airborne_ticks", mineAirborneTicks), ("mine_slow_ticks", mineSlowTicks)] {
-            if values.count != 4 { issues.append("\(name) must have 4 entries") }
-        }
-        if mineLaunchDistanceSubunits.contains(where: { $0 < 0 || $0 > 8 * SpatialUnits.subunitsPerCell }) {
-            issues.append("mine_launch_distance_subunits must be 0…\(8 * SpatialUnits.subunitsPerCell)")
-        }
-        if (mineAirborneTicks + mineSlowTicks).contains(where: { $0 < 0 || $0 > WeaponDefinition.maxTicks }) {
-            issues.append("mine airborne/slow ticks must be 0…\(WeaponDefinition.maxTicks)")
-        }
-        if mineLaunchEnabled, zip(mineLaunchDistanceSubunits, mineAirborneTicks).contains(where: { $0 > 0 && $1 == 0 }) {
-            issues.append("a launch distance needs airborne ticks")
-        }
-        if foliageSpreadDelayTicks < 0 || foliageSpreadDelayTicks > WeaponDefinition.maxTicks {
-            issues.append("foliage_spread_delay_ticks must be 0…\(WeaponDefinition.maxTicks)")
+        let maxTicks = WeaponDefinition.maxTicks
+        for (name, value, minimum) in [("fire_patch_lifetime_ticks", firePatchLifetimeTicks, 1),
+                                       ("fire_damage_interval_ticks", fireDamageIntervalTicks, 1),
+                                       ("foliage_spread_delay_ticks", foliageSpreadDelayTicks, 1),
+                                       ("normal_fire_buffer_ticks", normalFireBufferTicks, 1),
+                                       ("dry_fire_feedback_interval_ticks", dryFireFeedbackIntervalTicks, 1)]
+        where value < minimum || value > maxTicks {
+            issues.append("\(name) must be \(minimum)…\(maxTicks)")
         }
         return issues
     }
 
-    public static let provisional = WeaponRuleset(
-        weapons: [
-            WeaponDefinition(
-                id: "normal", family: .normal, fireChannel: .normal,
-                ammoCost: 0, refillAmount: 0, maxAmmo: 0,
-                cooldownTicks: [14, 12, 10, 8], maxActive: [6, 6, 8, 8],
-                initialSpeedSubunitsPerTick: [192, 192, 224, 224],
-                accelerationSubunitsPerTick2: [0, 0, 0, 0],
-                maxSpeedSubunitsPerTick: [192, 192, 224, 224],
-                lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [1, 1, 1, 2], brickDamage: [1, 1, 2, 2], steelDamage: [0, 0, 0, 0],
-                projectileDurability: [1, 1, 1, 1], penetrationCount: [0, 0, 0, 0],
-                explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
-                statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "projectile_normal"),
-            WeaponDefinition(
-                id: "rapid", family: .rapid, fireChannel: .special,
-                ammoCost: 1, refillAmount: 50, maxAmmo: 250,
-                cooldownTicks: [8, 7, 6, 5], maxActive: [3, 4, 5, 6],
-                initialSpeedSubunitsPerTick: [320, 320, 352, 384],
-                accelerationSubunitsPerTick2: [0, 0, 0, 0],
-                maxSpeedSubunitsPerTick: [320, 320, 352, 384],
-                lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [1, 1, 1, 1], brickDamage: [1, 1, 1, 2], steelDamage: [0, 0, 0, 0],
-                projectileDurability: [1, 1, 1, 1], penetrationCount: [0, 0, 0, 0],
-                explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
-                statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "projectile_rapid"),
-            WeaponDefinition(
-                id: "fire", family: .fire, fireChannel: .special,
-                ammoCost: 1, refillAmount: 30, maxAmmo: 150,
-                cooldownTicks: [45, 40, 35, 30], maxActive: [12, 16, 20, 24],
-                initialSpeedSubunitsPerTick: [0, 0, 0, 0],
-                accelerationSubunitsPerTick2: [0, 0, 0, 0],
-                maxSpeedSubunitsPerTick: [0, 0, 0, 0],
-                lifetimeTicks: [240, 270, 300, 360], // hazard lifetime
-                tankDamage: [1, 1, 1, 2], brickDamage: [0, 0, 0, 0], steelDamage: [0, 0, 0, 0],
-                projectileDurability: [0, 0, 0, 0], penetrationCount: [0, 0, 0, 0],
-                explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
-                statusEffectID: "burning", friendlyFirePolicy: "enemy_only",
-                presentationID: "fx_fire_patch"),
-            WeaponDefinition(
-                id: "ap", family: .ap, fireChannel: .special,
-                ammoCost: 1, refillAmount: 10, maxAmmo: 50,
-                cooldownTicks: [40, 36, 32, 28], maxActive: [1, 1, 2, 2],
-                initialSpeedSubunitsPerTick: [80, 80, 96, 112],
-                accelerationSubunitsPerTick2: [8, 10, 12, 16],
-                maxSpeedSubunitsPerTick: [448, 512, 576, 640],
-                lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [2, 2, 3, 3], brickDamage: [2, 2, 2, 2], steelDamage: [2, 2, 2, 2],
-                projectileDurability: [2, 2, 3, 3], penetrationCount: [1, 2, 3, 4],
-                explosionRadiusSubunits: [0, 0, 0, 0], mineTriggerRadiusSubunits: [0, 0, 0, 0],
-                statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "projectile_ap", cutsBrickCorridor: true),
-            WeaponDefinition(
-                id: "explosion", family: .explosion, fireChannel: .special,
-                ammoCost: 1, refillAmount: 20, maxAmmo: 100,
-                cooldownTicks: [50, 46, 42, 38], maxActive: [1, 1, 2, 2],
-                initialSpeedSubunitsPerTick: [72, 72, 80, 96],
-                accelerationSubunitsPerTick2: [4, 4, 6, 8],
-                maxSpeedSubunitsPerTick: [256, 288, 320, 384],
-                lifetimeTicks: [600, 600, 600, 600],
-                tankDamage: [2, 2, 2, 3], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 0, 0],
-                projectileDurability: [2, 2, 2, 2], penetrationCount: [0, 0, 0, 0],
-                explosionRadiusSubunits: [1024, 1280, 1536, 2048],
-                mineTriggerRadiusSubunits: [0, 0, 0, 0],
-                statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "projectile_explosion"),
-            WeaponDefinition(
-                id: "mine", family: .mine, fireChannel: .special,
-                ammoCost: 1, refillAmount: 15, maxAmmo: 75,
-                cooldownTicks: [30, 28, 26, 24], maxActive: [3, 4, 5, 6],
-                initialSpeedSubunitsPerTick: [0, 0, 0, 0],
-                accelerationSubunitsPerTick2: [0, 0, 0, 0],
-                maxSpeedSubunitsPerTick: [0, 0, 0, 0],
-                lifetimeTicks: [0, 0, 0, 0], // mines persist until triggered
-                tankDamage: [2, 2, 3, 4], brickDamage: [2, 2, 2, 2], steelDamage: [0, 0, 0, 0],
-                projectileDurability: [0, 0, 0, 0], penetrationCount: [0, 0, 0, 0],
-                explosionRadiusSubunits: [1024, 1152, 1280, 1536],
-                mineTriggerRadiusSubunits: [768, 832, 896, 1024],
-                statusEffectID: nil, friendlyFirePolicy: "no_allied_damage",
-                presentationID: "mine"),
-        ],
-        projectileHalfExtentSubunits: 96,
-        mineHalfExtentSubunits: 256,
-        mineArmingTicks: 45,
-        fireDamageIntervalTicks: 30,
-        chainDetonationWaveCap: 8,
-        alliedBaseDamage: true)
+    /// GAME_RULES §5.2–§5.3 (R5.2: shells at 40 % of R5 speed, same ranges;
+    /// R5.3/R5.6: the normal and rapid cooldowns follow the same time scale,
+    /// so their shot spacing on the field is R5's again).
+    public static let provisional = WeaponRuleset(weapons: [
+        WeaponDefinition(
+            id: "normal", family: .normal, fireChannel: .normal, refillAmount: 0, maxAmmo: 0,
+            cooldownTicks: [35, 30, 25, 20], maxActive: [8, 9, 11, 14],
+            initialSpeedMilliSubunitsPerSecond: 6_553_600, accelerationMilliSubunitsPerSecond2: -187_392,
+            maxSpeedMilliSubunitsPerSecond: 6_553_600, lifetimeTicks: 270,
+            tankDamage: [1, 1, 1, 2], stripDepthQuadrants: [1, 1, 2, 2], breaksSteel: false,
+            explosionRadiusSubunits: [0, 0, 0, 0], presentationID: "projectile_normal"),
+        WeaponDefinition(
+            id: "rapid", family: .rapid, fireChannel: .special, refillAmount: 50, maxAmmo: 250,
+            cooldownTicks: [20, 18, 15, 13], maxActive: [24, 28, 32, 36],
+            initialSpeedMilliSubunitsPerSecond: 9_362_432, accelerationMilliSubunitsPerSecond2: -280_576,
+            maxSpeedMilliSubunitsPerSecond: 9_362_432, lifetimeTicks: 412,
+            tankDamage: [1, 1, 1, 1], stripDepthQuadrants: [1, 1, 1, 2], breaksSteel: false,
+            explosionRadiusSubunits: [0, 0, 0, 0], presentationID: "projectile_rapid"),
+        WeaponDefinition(
+            id: "fire", family: .fire, fireChannel: .special, refillAmount: 30, maxAmmo: 150,
+            cooldownTicks: [45, 40, 35, 30], maxActive: [3, 3, 4, 4],
+            initialSpeedMilliSubunitsPerSecond: 6_553_600, accelerationMilliSubunitsPerSecond2: -562_176,
+            maxSpeedMilliSubunitsPerSecond: 6_553_600, lifetimeTicks: 180,
+            tankDamage: [0, 0, 0, 0], stripDepthQuadrants: [0, 0, 0, 0], breaksSteel: false,
+            explosionRadiusSubunits: [0, 0, 0, 0], presentationID: "projectile_fire"),
+        WeaponDefinition(
+            id: "ap", family: .ap, fireChannel: .special, refillAmount: 10, maxAmmo: 50,
+            cooldownTicks: [40, 36, 32, 28], maxActive: [1, 1, 2, 2],
+            initialSpeedMilliSubunitsPerSecond: 2_340_864, accelerationMilliSubunitsPerSecond2: 2_808_832,
+            maxSpeedMilliSubunitsPerSecond: 7_021_568, lifetimeTicks: 412,
+            tankDamage: [2, 2, 3, 3], stripDepthQuadrants: [2, 2, 2, 2], brickStripDepthQuadrants: [4, 4, 4, 4],
+            breaksSteel: true,
+            explosionRadiusSubunits: [0, 0, 0, 0], presentationID: "projectile_ap"),
+        WeaponDefinition(
+            id: "explosion", family: .explosion, fireChannel: .special, refillAmount: 20, maxAmmo: 100,
+            cooldownTicks: [50, 46, 42, 38], maxActive: [1, 1, 2, 2],
+            initialSpeedMilliSubunitsPerSecond: 3_744_768, accelerationMilliSubunitsPerSecond2: 2_996_224,
+            maxSpeedMilliSubunitsPerSecond: 7_489_536, lifetimeTicks: 412,
+            tankDamage: [2, 2, 2, 3], stripDepthQuadrants: [0, 0, 0, 0], breaksSteel: false,
+            explosionRadiusSubunits: [1024, 1280, 1536, 2048], presentationID: "projectile_explosion"),
+    ])
 }

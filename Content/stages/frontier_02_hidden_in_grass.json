@@ -356,11 +356,15 @@
   "enemyComposition": [
     {
       "archetype": "normal_a",
-      "count": 8
+      "count": 6
     },
     {
       "archetype": "normal_c",
       "count": 6
+    },
+    {
+      "archetype": "normal_d",
+      "count": 1
     },
     {
       "archetype": "rapid_a",
@@ -373,6 +377,10 @@
     {
       "archetype": "fire_a",
       "count": 2
+    },
+    {
+      "archetype": "fire_b",
+      "count": 1
     }
   ],
   "enemySpawns": [
@@ -401,6 +409,11 @@
       "pickup": "power_up"
     },
     {
+      "queueIndex": 5,
+      "pickup": "fire_weapon",
+      "critical": true
+    },
+    {
       "queueIndex": 11,
       "pickup": "base_shield"
     },
@@ -409,6 +422,7 @@
       "pickup": "freeze_enemy"
     }
   ],
+  "fortTemplate": [[26, 23], [27, 23], [28, 23], [29, 23], [26, 24], [29, 24], [26, 25], [29, 25]],
   "hiddenPickups": [
     {
       "id": "speed_up",

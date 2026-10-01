@@ -255,7 +255,7 @@
       1
     ]
   ],
-  "maxAliveEnemies": 5,
+  "maxAliveEnemies": 6,
   "initialEnemyDelayTicks": 240,
   "telegraphTicks": 45,
   "pickupSpawns": [],
@@ -267,8 +267,18 @@
       "pickup": "power_up"
     },
     {
+      "queueIndex": 5,
+      "pickup": "ap_weapon",
+      "critical": true
+    },
+    {
       "queueIndex": 9,
       "pickup": "bomb"
+    },
+    {
+      "queueIndex": 11,
+      "pickup": "explosion_weapon",
+      "critical": true
     },
     {
       "queueIndex": 15,
@@ -279,6 +289,7 @@
       "pickup": "invincibility"
     }
   ],
+  "fortTemplate": [[26, 23], [27, 23], [28, 23], [29, 23], [26, 24], [29, 24], [26, 25], [29, 25]],
   "hiddenPickups": [
     {
       "id": "armor_up",
@@ -297,10 +308,10 @@
   ],
   "directorPhases": [
     {
-      "id": "elite_minelayer",
+      "id": "elite_siege",
       "afterSpawned": 16,
       "reinforcements": [
-        "mine_c",
+        "explosion_c",
         "ap_c",
         "ap_c"
       ],

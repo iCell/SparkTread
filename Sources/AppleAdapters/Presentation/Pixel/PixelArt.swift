@@ -93,7 +93,7 @@ struct PixelManifest: Decodable {
         default: "scout"
         }
         let family = parts.first ?? ""
-        let weapon = ["normal", "rapid", "fire", "ap", "explosion", "mine"].contains(family) ? family : "normal"
+        let weapon = ["normal", "rapid", "fire", "ap", "explosion"].contains(family) ? family : "normal"
         return (kind, weapon)
     }
     let art: PixelArt, kind: String, pixelScale: CGFloat
@@ -173,9 +173,9 @@ struct PixelManifest: Decodable {
 /// sprites share one 64×64 canvas origin (hull/tread anchor 32,35; turret
 /// anchor 32,32 mounted 3 px up), so they stack without offsets.
 @MainActor enum PixelTankIcons {
-    /// A representative archetype per reward category 0…7 (the §8.2 column):
-    /// the Normal pairs, Rapid, Mine, Explosion, Fire, the AP pairs.
-    static let archetypes = ["normal_a", "normal_c", "rapid_a", "mine_a", "explosion_a", "fire_a", "ap_a", "ap_c"]
+    /// A representative archetype per results category 0…7 (GAME_RULES
+    /// §13): Normal A/B|C/D, Rapid A/B|C/D, Explosion|Fire, AP A/B|C/D.
+    static let archetypes = ["normal_a", "normal_c", "rapid_a", "rapid_c", "explosion_a", "fire_a", "ap_a", "ap_c"]
 
     static func image(category: Int, art: PixelArt) throws -> CGImage {
         guard archetypes.indices.contains(category) else { throw PixelArtError.missing("category \(category)") }

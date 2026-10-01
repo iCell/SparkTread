@@ -203,8 +203,21 @@ jingle occupies 2.63–7.2 s (the first 2.6 s are silent). Measured with
 `measure.py 0 8`, `fine.py 0 7.5` (pulse melody ≈ 517–1055 Hz with a
 triangle bass ≈ 194–345 Hz) and `hits.py 0 7.5` (noise drums on a ≈0.15 s
 sixteenth grid, ≈100 bpm). Namco's music: no excerpt is committed or
-shipped; the game's stage-start jingle is an original composition in the
-same idiom (`Tools/build_audio_assets.py`, attribution `inspired`).
+shipped. The game's stage-start jingle was an original composition in the
+same idiom until 2026-09-15 (next section).
+
+## Stage-start cue restyled (2026-09-15)
+
+The owner asked for an opening in the style of the stage-end music. The
+bundled `sfx_stage_win` excerpt was measured with `hits.py WAV 0 4.2`,
+`bands.py WAV all:0:4.2`, an onset-flux autocorrelation (peaks 0.229, 0.474,
+0.713, 0.943 s) and spectrograms: a ≈0.118 s sixteenth grid (≈127 bpm),
+groups of 4–7 hits with one empty step between them, kick ≈55–75 Hz, toms
+≈140–230 Hz with 250–400 ms rings, broadband snare strokes, a cymbal wash, a
+continuous room, faint harmonic stabs near C5/G5/B♭5, ≈−21 dBFS RMS. The
+new `sfx_stage_card` is an original drum-led composition in that idiom
+(`Tools/build_audio_assets.py`, attribution `inspired`); its band profile
+and loudness were compared against the excerpt with the same tools.
 
 ## Results screens and stage-clear bonuses (2026-09-10, ADR-0012)
 

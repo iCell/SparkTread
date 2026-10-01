@@ -1,6 +1,6 @@
 # ADR-0004: Arena Rendering Policy and Minimum-Device Floor
 
-Status: Accepted; the 28×28-point tank-footprint gate value is superseded in part by ADR-0006  
+Status: Accepted; the 28×28-point tank-footprint gate value is superseded in part by ADR-0006; the edge-to-edge arena clause is superseded by ADR-0018 (GAME_RULES R5 §15.1)  
 Date: 2026-09-01  
 Related findings: F-06, F-08 (context), F-19 (layout consequence)
 

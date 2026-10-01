@@ -26,6 +26,7 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
     var world = try StageLoader.loadWorld(at: stageURL(id), session: session)
     world.stage?.spawnQueue.removeAll()
     world.stage?.carriedPickupQueue.removeAll() // pairs with the spawn queue (invariant)
+    world.stage?.directorPhases.removeAll() // unfired reinforcements still count (GAME_RULES §11.4)
     return world
 }
 
@@ -33,7 +34,7 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
     @Test func campaignStartMatchesAFreshPlayer() {
         let start = SessionState.campaignStart
         #expect(start.lives == 3 && start.score == 0 && start.specialAmmoByWeapon == ["rapid": 50])
-        #expect(start.retainedSpeedLevel == 0 && start.retainedPowerLevel == 0
+        #expect(start.retainedSpeedLevel == 1 && start.retainedPowerLevel == 0 // GAME_RULES §11.3
                 && start.retainedEquipmentID == nil && start.retainedSpecialWeaponID == "rapid")
         #expect(start.validationIssues.isEmpty)
     }

@@ -4,6 +4,8 @@
 # - GameApplication may import GameCore and Foundation (content-loading use
 #   cases live here, §14 — JSON decoding needs Foundation), but never a
 #   presentation/platform framework (SpriteKit/SwiftUI/UIKit/GameController…).
+# It also bans one presentation call that is silently wrong with the
+# delivery's compiled atlases (see below).
 # Run from the repository root: sh Scripts/check-architecture.sh
 set -eu
 
@@ -30,6 +32,20 @@ adapter_bad=$(grep -rl 'import AppleAdapters' Sources/GameCore Sources/GameAppli
 if [ -n "$adapter_bad" ]; then
     echo "FORBIDDEN: inner layers import AppleAdapters:"
     echo "$adapter_bad"
+    fail=1
+fi
+
+# A sub-rect of an atlas-backed texture resolves against the PACKED PAGE,
+# not the sprite: in the app this drew a strip of the frozen/floodplain/
+# citadel ground sprites down the arena's right edge, while the tests — which
+# load the delivery's loose files, where each texture is its own image —
+# stayed green. Clip the CGImage instead (MovementLabScene.clippedGroundTexture).
+# (Comment lines are skipped so the explanation above may name the call.)
+subrect=$(grep -rn 'SKTexture(rect' Sources --include='*.swift' \
+    | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true)
+if [ -n "$subrect" ]; then
+    echo "FORBIDDEN: SKTexture(rect:in:) samples the packed atlas page — crop the CGImage instead:"
+    echo "$subrect"
     fail=1
 fi
 

@@ -23,15 +23,13 @@ public enum StageValidator {
             self.terrainKinds = terrainKinds
         }
         public static let reference = KnownIDs(
-            enemies: Set(["normal", "rapid", "fire", "ap", "explosion", "mine"].flatMap { fam in
-                ["a", "b", "c", "d"].map { "\(fam)_\($0)" }
-            }),
+            enemies: Set(EnemyArchetypes.allIDs),
             pickups: Set(["speed_up", "armor_up", "power_up", "level_up", "max_speed_power",
-                          "amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea",
+                          "amphi_tank", "anti_skid",
                           "score_200", "score_500", "score_1000", "score_2000",
                           "invincibility", "base_shield", "freeze_enemy", "bomb", "extra_life",
                           "max_armor_ammo", "ammo_crate",
-                          "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "mine_weapon"]),
+                          "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon"]),
             themes: Set(["frontier", "floodplain", "frozen_works", "iron_citadel"]),
             terrainKinds: Set(["ground", "brick", "steel", "white_brick", "white_steel",
                                "water", "ice", "foliage", "base"]))
@@ -136,12 +134,17 @@ public enum StageValidator {
         if totalEnemies == 0 { issues.append("enemy_composition is empty") }
         var phaseIDs = Set<String>()
         var lastTrigger = -1
+        // GAME_RULES §9.3: a phase triggers once N enemies were scheduled,
+        // N never above what was planned before it (its own reinforcements
+        // excluded), so every phase is reachable.
+        var plannedBefore = totalEnemies
         for phase in def.directorPhases ?? [] {
             if phase.id.isEmpty { issues.append("director phase without id") }
             if !phaseIDs.insert(phase.id).inserted { issues.append("director phase '\(phase.id)' repeats") }
-            if phase.afterSpawned < 0 || phase.afterSpawned > totalEnemies {
-                issues.append("director phase '\(phase.id)' after_spawned \(phase.afterSpawned) outside 0…\(totalEnemies)")
+            if phase.afterSpawned < 0 || phase.afterSpawned > plannedBefore {
+                issues.append("director phase '\(phase.id)' after_spawned \(phase.afterSpawned) outside 0…\(plannedBefore)")
             }
+            plannedBefore += min(phase.reinforcements.count, maxEnemiesPerStage)
             if phase.afterSpawned < lastTrigger { issues.append("director phase '\(phase.id)' out of trigger order") }
             lastTrigger = max(lastTrigger, phase.afterSpawned)
             for archetype in phase.reinforcements where !known.enemies.contains(archetype) {
@@ -160,9 +163,21 @@ public enum StageValidator {
         if def.telegraphTicks < telegraphFairnessFloor { issues.append("telegraph_ticks \(def.telegraphTicks) below the 45-tick fairness floor") }
         if def.telegraphTicks > WorldInvariants.maxTicks { issues.append("telegraph_ticks \(def.telegraphTicks) out of domain") }
 
+        func areaCells(_ c: [Int]) -> [[Int]] { [c, [c[0] + 1, c[1]], [c[0], c[1] + 1], [c[0] + 1, c[1] + 1]] }
+        func areaOverlapsBase(_ c: [Int]) -> Bool {
+            footprintInBounds(def.baseSpawn) && c[0] < def.baseSpawn[0] + 2 && c[0] + 2 > def.baseSpawn[0]
+                && c[1] < def.baseSpawn[1] + 2 && c[1] + 2 > def.baseSpawn[1]
+        }
         for pickup in def.pickupSpawns {
             if !known.pickups.contains(pickup.id) { issues.append("unknown pickup '\(pickup.id)'") }
-            if !inBounds(pickup.cell) { issues.append("pickup \(pickup.id) at \(pickup.cell) out of bounds") }
+            if !footprintInBounds(pickup.cell) {
+                issues.append("pickup \(pickup.id) at \(pickup.cell) out of bounds")
+            } else if areaOverlapsBase(pickup.cell) || areaCells(pickup.cell).contains(where: {
+                let cell = authoredCell(def, at: $0)
+                return cell.kind.isSolidStructure || cell.surface == .water
+            }) {
+                issues.append("pickup \(pickup.id) at \(pickup.cell) is not on open ground")
+            }
         }
 
         // Carrier drops index into the interleaved spawn queue (§11).
@@ -179,16 +194,42 @@ public enum StageValidator {
             }
         }
 
-        // Hidden treasures must sit under authored brick (§11): a hidden
-        // pickup on open ground would reveal itself on the first tick.
+        // Hidden pickups (GAME_RULES §10.2) sit under breakable walls: a
+        // 2×2 area with at least one brick or grey-steel cell, no white
+        // steel, no water, clear of the base.
         for hidden in def.hiddenPickups ?? [] {
             if !known.pickups.contains(hidden.id) {
                 issues.append("hidden pickup references unknown pickup '\(hidden.id)'")
             }
-            if !inBounds(hidden.cell) {
+            guard footprintInBounds(hidden.cell) else {
                 issues.append("hidden pickup \(hidden.id) at \(hidden.cell) out of bounds")
-            } else if authoredKind(def, at: hidden.cell) != "brick" {
-                issues.append("hidden pickup \(hidden.id) at \(hidden.cell) is not covered by brick")
+                continue
+            }
+            let cells = areaCells(hidden.cell).map { authoredCell(def, at: $0) }
+            if areaOverlapsBase(hidden.cell) || cells.contains(where: { $0.kind == .whiteSteel || $0.kind == .base || $0.surface == .water }) {
+                issues.append("hidden pickup \(hidden.id) at \(hidden.cell) overlaps the base, white steel or water")
+            } else if !cells.contains(where: { $0.kind.isBrickFamily || $0.kind == .steel }) {
+                issues.append("hidden pickup \(hidden.id) at \(hidden.cell) is not covered by a wall")
+            }
+        }
+        for cell in def.fortTemplate ?? [] where !inBounds(cell) {
+            issues.append("fort template cell \(cell) malformed or out of bounds")
+        }
+        for fire in def.environmentFires ?? [] {
+            if !inBounds(fire.cell) { issues.append("environment fire \(fire.cell) malformed or out of bounds") }
+            if fire.lifetimeTicks < 1 || fire.lifetimeTicks > WorldInvariants.maxTicks {
+                issues.append("environment fire lifetime \(fire.lifetimeTicks) out of domain")
+            }
+        }
+        // GAME_RULES §2.3: walls and foliage never stand on water.
+        for layer in def.terrain.layers where ["brick", "white_brick", "steel", "white_steel", "foliage", "base"].contains(layer.kind) {
+            var placed: [[Int]] = layer.cells ?? []
+            for rect in layer.rects ?? [] where rect.count == 4 && rect[0] <= rect[2] && rect[1] <= rect[3]
+                && inBounds([rect[0], rect[1]]) && inBounds([rect[2], rect[3]]) {
+                for y in rect[1]...rect[3] { for x in rect[0]...rect[2] { placed.append([x, y]) } }
+            }
+            if placed.contains(where: { inBounds($0) && authoredCell(def, at: $0).surface == .water }) {
+                issues.append("layer '\(layer.kind)' places a wall or foliage on water")
             }
         }
         for drop in def.dropTable where !known.pickups.contains(drop) {
@@ -217,38 +258,46 @@ public enum StageValidator {
         return issues
     }
 
-    /// The final authored terrain kind at a cell, replaying layers in order
-    /// (later layers overwrite, mirroring StageBuilder).
-    private static func authoredKind(_ def: StageDefinition, at c: [Int]) -> String {
+    /// The final authored cell (top kind and surface), replaying layers
+    /// the way StageBuilder stacks them.
+    static func authoredCell(_ def: StageDefinition, at c: [Int]) -> TerrainCell {
         let arena = ArenaSpecification.universal
-        var kind = c[0] == 0 || c[1] == 0 || c[0] == arena.cellsWide - 1
-            || c[1] == arena.cellsHigh - 1 ? def.terrain.border : "ground"
-        for layer in def.terrain.layers {
-            for rect in layer.rects ?? []
-            where rect.count == 4 && c[0] >= rect[0] && c[0] <= rect[2]
-                && c[1] >= rect[1] && c[1] <= rect[3] {
-                kind = layer.kind
-            }
-            for cell in layer.cells ?? [] where cell == c {
-                kind = layer.kind
+        func kind(_ name: String) -> TerrainKind {
+            switch name {
+            case "brick": .brick
+            case "steel": .steel
+            case "white_brick": .whiteBrick
+            case "white_steel": .whiteSteel
+            case "water": .water
+            case "ice": .ice
+            case "foliage": .foliage
+            case "base": .base
+            default: .ground
             }
         }
-        return kind
+        let border = c[0] == 0 || c[1] == 0 || c[0] == arena.cellsWide - 1 || c[1] == arena.cellsHigh - 1
+        var cell = TerrainCell(kind: border ? kind(def.terrain.border) : .ground)
+        for layer in def.terrain.layers {
+            let covers = (layer.rects ?? []).contains { rect in
+                rect.count == 4 && c[0] >= rect[0] && c[0] <= rect[2] && c[1] >= rect[1] && c[1] <= rect[3]
+            } || (layer.cells ?? []).contains { $0 == c }
+            guard covers else { continue }
+            let k = kind(layer.kind)
+            cell = k.isSurface ? TerrainCell(kind: k) : TerrainCell(kind: k, surface: cell.surface)
+        }
+        return cell
     }
 
     private static func solidCells(_ def: StageDefinition, brickIsSolid: Bool) -> Set<Int> {
         let arena = ArenaSpecification.universal
         var solid = Set<Int>()
-        let solidKinds = brickIsSolid
-            ? ["brick", "white_brick", "steel", "white_steel", "water", "base"]
-            : ["steel", "white_steel", "water", "base"]
         // Sample the bounded arena rather than iterating untrusted ranges.
-        // Later layers can clear walls, exactly as in StageBuilder.
         for y in 0..<arena.cellsHigh {
             for x in 0..<arena.cellsWide {
-                if solidKinds.contains(authoredKind(def, at: [x, y])) {
-                    solid.insert(x * 100 + y)
-                }
+                let cell = authoredCell(def, at: [x, y])
+                let solidCell = cell.surface == .water || cell.kind == .base || cell.kind.isSteelFamily
+                    || (brickIsSolid && cell.kind.isBrickFamily)
+                if solidCell { solid.insert(x * 100 + y) }
             }
         }
         return solid

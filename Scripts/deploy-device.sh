@@ -8,11 +8,13 @@ cd "$(dirname "$0")/.."
 DEVICE_ID="1C09422B-F9E4-5640-AF18-FE85688F6740"
 
 xcodegen generate
+# Release: device playtests measure real performance (Debug -Onone stutters and heats).
 xcodebuild build \
     -project SparkTread.xcodeproj -scheme SparkTread \
+    -configuration Release \
     -destination "platform=iOS,id=$DEVICE_ID" \
     -derivedDataPath .build/DerivedData \
     -allowProvisioningUpdates -quiet
 xcrun devicectl device install app --device "$DEVICE_ID" \
-    .build/DerivedData/Build/Products/Debug-iphoneos/SparkTread.app
+    .build/DerivedData/Build/Products/Release-iphoneos/SparkTread.app
 xcrun devicectl device process launch --terminate-existing --device "$DEVICE_ID" io.icell.sparktread

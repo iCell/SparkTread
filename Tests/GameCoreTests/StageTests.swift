@@ -47,12 +47,12 @@ private func tick(_ world: inout WorldState, _ n: Int,
 
         let apC = EnemyArchetypes.attributes(for: "ap_c")
         #expect(apC.armor == 6) // fortress
-        #expect(apC.speedLevel == -4) // slowest possible
+        #expect(apC.speedLevel == -2) // owner R5.8: faster than AP A's crawl
         #expect(apC.shieldHP == 2) // AP heavies carry the shield
 
         let rapidD = EnemyArchetypes.attributes(for: "rapid_d")
         #expect(rapidD.speedLevel == 2) // fastest tier
-        #expect(rapidD.equipmentID == "memory_of_sea")
+        #expect(rapidD.equipmentID == nil) // GAME_RULES §9.1: two equipment items only
         #expect(rapidD.baseFocusPercent == 50) // hunts the player half the time
 
         let apA = EnemyArchetypes.attributes(for: "ap_a")
@@ -87,7 +87,7 @@ private func tick(_ world: inout WorldState, _ n: Int,
             }
             return world.tank(entityID: id)!.positionSubunits.x - 5000
         }
-        let fortress = distance(archetype: "ap_c")   // speed -4
+        let fortress = distance(archetype: "ap_a")   // speed -4
         let sprinter = distance(archetype: "rapid_c") // speed 2
         #expect(sprinter > fortress * 4)
     }
@@ -174,14 +174,6 @@ private func tick(_ world: inout WorldState, _ n: Int,
         let events = run(&world, 120)
         #expect(fired(events, weaponID: "normal", by: 2))
     }
-
-    @Test func mineEnemyLaysMinesWhileDriving() {
-        var world = fireWorld(archetype: "mine_a")
-        world.withTank(entityID: 2) { $0.movementIntent = .down } // give it somewhere to go
-        run(&world, 600) // 1-in-5 roll every 24 ticks: cover plenty of chances
-        #expect(!world.mines.isEmpty)
-        #expect(world.mines.allSatisfy { $0.teamID == 2 })
-    }
 }
 
 @Suite struct EnemyDirectorTests {
@@ -249,10 +241,9 @@ private func tick(_ world: inout WorldState, _ n: Int,
         // Enemy shot into the base.
         let id = world.claimEntityID()
         world.projectiles.append(ProjectileState(
-            entityID: id, weaponID: "normal", ownerEntityID: -1, ownerPlayerID: nil,
+            entityID: id, weaponID: "normal", ownerEntityID: id, ownerPlayerID: nil,
             teamID: 2, powerLevel: 0, positionSubunits: Vec2i(x: 36 * 1024, y: 23 * 1024),
-            direction: .right, speedSubunitsPerTick: 192, lifetimeRemainingTicks: 600,
-            penetrationRemaining: 0, durability: 1))
+            direction: .right, velocity60: 60 * 16_384_000, lifetimeRemainingTicks: 108))
         tick(&world, 40, events: &events)
         #expect(world.base?.durability == 0)
         #expect(world.stage?.phase == .lost)
@@ -271,9 +262,9 @@ private func tick(_ world: inout WorldState, _ n: Int,
         #expect(world.stage?.phase == .lost)
     }
 
-    /// §6.7 simultaneity: last enemy dies the same tick the sole player is
-    /// eliminated and the base survives → WIN (ruleset default).
-    @Test func simultaneousLastEnemyAndPlayerDeathIsWin() {
+    /// GAME_RULES §11.4: the last enemy dying on the tick the sole player is
+    /// eliminated is a LOSS — failure takes priority.
+    @Test func simultaneousLastEnemyAndPlayerDeathIsLoss() {
         var world = makeStageWorld(enemies: [], startDelay: 1)
         // Queue is empty by design here: the LAST enemy is the manual one.
         let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
@@ -285,6 +276,23 @@ private func tick(_ world: inout WorldState, _ n: Int,
         }
         var events: [DomainEvent] = []
         tick(&world, 2, events: &events)
+        #expect(world.stage?.phase == .lost)
+    }
+
+    /// §11.4: a player whose death already booked a respawn still wins when
+    /// the last enemy falls.
+    @Test func lastEnemyDiesWhileRespawnIsPendingIsWin() {
+        var world = makeStageWorld(enemies: [], startDelay: 1)
+        let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
+                                    positionSubunits: Vec2i(x: 30 * 1024, y: 10 * 1024), facing: .down)
+        world.withPlayer(.one) { $0.lives = 1 }
+        world.withTank(entityID: enemy) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+        if let tankID = world.player(.one)?.tankEntityID {
+            world.withTank(entityID: tankID) { $0.armor = 0 }
+        }
+        var events: [DomainEvent] = []
+        tick(&world, 2, events: &events)
+        #expect(world.player(.one)?.lifeState == .awaitingRespawn)
         #expect(world.stage?.phase == .won)
     }
 }
@@ -340,69 +348,79 @@ private func tick(_ world: inout WorldState, _ n: Int,
 @Suite struct PickupTests {
     private func drop(_ id: String, into world: inout WorldState, at cell: Vec2i = Vec2i(x: 22, y: 20)) {
         var events: [DomainEvent] = []
-        world.spawnStagePickup(id, nearCell: cell, events: &events)
-        // Skip the avoidance grace for direct-effect tests.
-        for i in world.pickups.indices { world.pickups[i].graceTicksRemaining = 0 }
+        #expect(world.spawnStagePickup(id, atCell: cell, events: &events), "pickup \(id) at \(cell) rejected")
     }
 
     @Test func upgradePickupsApplyAndRetain() {
         var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
         drop("speed_up", into: &world)
-        drop("power_up", into: &world, at: Vec2i(x: 23, y: 20))
+        drop("power_up", into: &world, at: Vec2i(x: 24, y: 20))
         var events: [DomainEvent] = []
         tick(&world, 90, direction: .right, events: &events) // drive over both
         guard let tankID = world.player(.one)?.tankEntityID,
               let tank = world.tank(entityID: tankID) else { return }
         #expect(tank.speedLevel == 1)
         #expect(tank.powerLevel == 1)
-        #expect(world.player(.one)?.retainedSpeedLevel == 1) // respawn retention synced
+        #expect(world.player(.one)?.retainedPowerLevel == 1) // respawn retention synced
         #expect(world.pickups.isEmpty)
     }
 
-    @Test func gracePeriodPreventsInstantCollection() {
-        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+    /// GAME_RULES §10.2: a hidden pickup revealed under a tank waits out a
+    /// 90-tick avoidance window; stage pickups never appear under a tank.
+    @Test func revealUnderATankHasAnAvoidanceWindow() {
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999) { w in
+            w.stage?.hiddenPickups = [HiddenPickup(cell: Vec2i(x: 20, y: 20), pickupID: "speed_up")]
+        }
         var events: [DomainEvent] = []
-        // Spawn directly under the player with full grace.
-        world.spawnStagePickup("speed_up", nearCell: Vec2i(x: 20, y: 20), events: &events)
-        tick(&world, 20, events: &events)
-        #expect(!world.pickups.isEmpty) // still uncollected during grace
-        tick(&world, 30, events: &events)
-        #expect(world.pickups.isEmpty) // collected after grace expires
+        #expect(!world.spawnStagePickup("power_up", atCell: Vec2i(x: 21, y: 21), events: &events))
+        tick(&world, 1, events: &events)
+        #expect(world.pickups.first?.graceTicksRemaining == 90)
+        tick(&world, 60, events: &events)
+        #expect(!world.pickups.isEmpty) // still uncollected during the window
+        tick(&world, 40, events: &events)
+        #expect(world.pickups.isEmpty) // collected once it ends
     }
 
     @Test func freezeBombShieldAndLifePickups() {
-        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
+        var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999) { w in
+            w.stage?.fortTemplate = [Vec2i(x: 39, y: 21), Vec2i(x: 42, y: 24)]
+        }
         let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_b",
                                     positionSubunits: Vec2i(x: 40 * 1024, y: 5 * 1024), facing: .down)
         world.withTank(entityID: enemy) { $0.armor = 5; $0.maxArmor = 5; $0.spawnProtectionTicks = 0 }
         var events: [DomainEvent] = []
+        /// Drops a pickup two cells ahead of the player and drives onto it.
+        func collect(_ id: String) {
+            let x = (world.tank(entityID: world.player(.one)!.tankEntityID!)!.positionSubunits.x + 1023) / 1024 + 2
+            drop(id, into: &world, at: Vec2i(x: x, y: 20))
+            tick(&world, 60, direction: .right, events: &events)
+            tick(&world, 1, events: &events)
+        }
 
-        drop("freeze_enemy", into: &world)
-        tick(&world, 60, direction: .right, events: &events)
+        collect("freeze_enemy")
         #expect(world.tank(entityID: enemy)?.statusEffects["frozen"] != nil)
 
-        drop("bomb", into: &world, at: Vec2i(x: 24, y: 20))
-        tick(&world, 60, direction: .right, events: &events)
-        #expect((world.tank(entityID: enemy)?.armor ?? 99) <= 2)
+        collect("bomb")
+        #expect(world.tank(entityID: enemy) == nil) // §10.4: cleared outright
 
-        drop("extra_life", into: &world, at: Vec2i(x: 27, y: 20))
-        drop("base_shield", into: &world, at: Vec2i(x: 29, y: 20))
-        tick(&world, 160, direction: .right, events: &events)
+        collect("extra_life")
         #expect(world.player(.one)?.lives == 4)
+        collect("base_shield")
         #expect((world.base?.shieldRemainingTicks ?? 0) > 0)
-        // Shovel rule: the fort ring hardens to steel while shielded…
+        // §11.2: the authored template hardens to steel while shielded…
         #expect(world.terrain[39, 21].kind == .steel)
         #expect(world.terrain[42, 24].kind == .steel)
-        // …and is rebuilt as brick once the shield expires.
+        // …and returns to what it was (open ground here) once the shield expires.
         tick(&world, 1300, events: &events)
         #expect(world.base?.shieldRemainingTicks == 0)
-        #expect(world.terrain[39, 21].kind == .brick)
-        #expect(world.terrain[42, 24].kind == .brick)
+        #expect(world.terrain[39, 21].kind == .ground)
+        #expect(world.terrain[42, 24].kind == .ground)
+        #expect(world.base?.fortRecord.isEmpty == true)
     }
 
     @Test func carrierEnemyDropsItsItemSomewhereOnTheMap() {
         var world = makeStageWorld(enemies: ["normal_a"], maxAlive: 1, startDelay: 1) { w in
-            w.stage?.carriedPickupQueue = ["base_shield"]
+            w.stage?.carriedPickupQueue = [CarriedPickup(pickupID: "base_shield")]
             w.stage?.dropTable = [] // carriers are the only drop source here
         }
         var events: [DomainEvent] = []
@@ -464,7 +482,9 @@ private func tick(_ world: inout WorldState, _ n: Int,
                 let enemy = world.spawnTank(teamID: 2, ownerPlayerID: nil, archetypeID: "normal_a",
                                             positionSubunits: Vec2i(x: (30 + i * 4) * 1024, y: 5 * 1024),
                                             facing: .down)
-                world.withTank(entityID: enemy) { $0.armor = 0; $0.spawnProtectionTicks = 0 }
+                world.withTank(entityID: enemy) {
+                    $0.armor = 0; $0.spawnProtectionTicks = 0; $0.killedBy = KillAttribution(playerID: .one)
+                }
             }
             var events: [DomainEvent] = []
             tick(&world, 3, events: &events)

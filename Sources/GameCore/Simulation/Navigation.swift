@@ -1,36 +1,63 @@
-/// Deterministic grid cost maps for enemy navigation (§10.4): a distance
-/// field over footprint ANCHOR cells (the top-left cell of the 2×2 tank
-/// footprint) from a goal set, computed with integer Dijkstra. Steel, water
-/// and the base structure are impassable; brick is passable at extra cost
-/// for families that can dig (BreakTerrain with a brick-damaging weapon)
-/// and impassable for those that cannot (flame), so a walled-in base still
-/// attracts a siege instead of leaving enemies to wander. Other tanks are
-/// dynamic and are left to local steering.
+/// Deterministic grid cost maps for enemy navigation (GAME_RULES §9.2): a
+/// distance field over footprint ANCHOR cells (the top-left cell of the 2×2
+/// footprint) from a goal set, by integer Dijkstra. White steel and the
+/// base are impassable; brick and grey steel are passable at extra cost
+/// only for families whose weapon opens them; water follows the equipment
+/// profile; cells burning with fire that hurts enemies cost extra. Other
+/// tanks are left to local steering.
 ///
 /// Cost convention: `field[a]` is the total cost of the cells ENTERED after
-/// `a` up to and including the goal (a goal's own entry cost counts; the
-/// start anchor's does not). Forward choice therefore compares
-/// `entryCost(next) + field[next]`, and the reverse relaxation charges the
-/// cost of the node being expanded FROM.
+/// `a` up to and including the goal.
 enum Navigation {
     static let unreachable = Int.max / 4
-    /// Cost added per brick cell inside an anchor's footprint (a brick cell
-    /// takes two aligned shots to clear).
     static let brickCost = 6
+    static let whiteBrickCost = 12
+    static let steelCost = 8
+    static let fireCost = 4
 
-    /// Whether a footprint anchored at `anchor` fits the static world;
-    /// brick counts as passable only for a family that can dig.
-    static func isPassable(_ world: WorldState, anchor: Vec2i, canDig: Bool = true,
-                           profile: TraversalProfile = .normal) -> Bool {
+    /// Which wall materials a family's weapon can open.
+    struct DigAbility {
+        var brick: Bool
+        var steel: Bool
+        func opens(_ kind: TerrainKind) -> Bool {
+            if kind.isBrickFamily { return brick }
+            if kind == .steel { return steel }
+            return false
+        }
+    }
+
+    struct Context {
+        var dig: DigAbility
+        var profile: TraversalProfile
+        /// Row-major indices of cells burning with fire that hurts enemies.
+        var burning: Set<Int>
+        init(dig: DigAbility = DigAbility(brick: true, steel: false), profile: TraversalProfile = .normal,
+             burning: Set<Int> = []) {
+            self.dig = dig
+            self.profile = profile
+            self.burning = burning
+        }
+    }
+
+    /// Cells holding a fire patch that hurts `hurtingTeam`.
+    static func burningCells(_ world: WorldState, hurtingTeam: Int) -> Set<Int> {
+        var cells = Set<Int>()
+        for patch in world.fireHazards where patch.color.hurts(teamID: hurtingTeam) {
+            cells.insert(patch.cell.y * world.arena.cellsWide + patch.cell.x)
+        }
+        return cells
+    }
+
+    static func isPassable(_ world: WorldState, anchor: Vec2i, context: Context = Context()) -> Bool {
         let arena = world.arena
         guard anchor.x >= 0, anchor.y >= 0, anchor.x + 1 < arena.cellsWide, anchor.y + 1 < arena.cellsHigh
         else { return false }
         for dy in 0..<2 {
             for dx in 0..<2 {
-                let kind = world.terrain[anchor.x + dx, anchor.y + dy].kind
-                if kind.isSteelFamily || kind == .base { return false }
-                if kind == .water && profile != .amphibious { return false } // ADR-0016
-                if kind.isBrickFamily && !canDig { return false }
+                let cell = world.terrain[anchor.x + dx, anchor.y + dy]
+                if cell.kind == .base || cell.kind == .whiteSteel { return false }
+                if cell.hasWall && !context.dig.opens(cell.kind) { return false }
+                if cell.surfaceBlocksTank(profile: context.profile) { return false }
             }
         }
         if let base = world.base {
@@ -41,73 +68,63 @@ enum Navigation {
         return true
     }
 
-    /// Cost of entering an anchor: one step plus the brick it must dig.
-    static func entryCost(_ world: WorldState, anchor: Vec2i) -> Int {
-        var bricks = 0
+    static func entryCost(_ world: WorldState, anchor: Vec2i, context: Context = Context()) -> Int {
+        var cost = 1
         for dy in 0..<2 {
-            for dx in 0..<2 where world.terrain[anchor.x + dx, anchor.y + dy].kind.isBrickFamily {
-                bricks += 1
+            for dx in 0..<2 {
+                let x = anchor.x + dx, y = anchor.y + dy
+                let cell = world.terrain[x, y]
+                if cell.hasWall {
+                    cost += cell.kind == .whiteBrick ? whiteBrickCost : cell.kind == .steel ? steelCost : brickCost
+                }
+                if context.burning.contains(y * world.arena.cellsWide + x) { cost += fireCost }
             }
         }
-        return 1 + brickCost * bricks
+        return cost
     }
 
-    /// Anchors from which the base can be shot: the four positions flush
-    /// against a side and aligned with the base center (a shot from there
-    /// hits). Corner-touching anchors are the fallback when no aligned one
-    /// is passable (a base against a border wall).
-    static func baseApproachGoals(_ world: WorldState, canDig: Bool = true,
-                                  profile: TraversalProfile = .normal) -> [Vec2i] {
+    /// Anchors from which the base can be shot: flush against a side and
+    /// aligned with it; corner-touching anchors are the fallback.
+    static func baseApproachGoals(_ world: WorldState, context: Context = Context()) -> [Vec2i] {
         guard let base = world.base else { return [] }
         let cell = SpatialUnits.subunitsPerCell
         let bx = base.topLeftSubunits.x / cell, by = base.topLeftSubunits.y / cell
         let aligned = [Vec2i(x: bx, y: by - 2), Vec2i(x: bx, y: by + 2),
                        Vec2i(x: bx - 2, y: by), Vec2i(x: bx + 2, y: by)]
-            .filter { isPassable(world, anchor: $0, canDig: canDig, profile: profile) }
+            .filter { isPassable(world, anchor: $0, context: context) }
         if !aligned.isEmpty { return aligned }
         var goals: [Vec2i] = []
         for ay in (by - 2)...(by + 2) {
             for ax in (bx - 2)...(bx + 2) {
                 let anchor = Vec2i(x: ax, y: ay)
-                guard isPassable(world, anchor: anchor, canDig: canDig, profile: profile) else { continue }
-                // Touching: the expanded footprint intersects the base cells.
-                if ax - 1 < bx + 2 && ax + 3 > bx && ay - 1 < by + 2 && ay + 3 > by {
-                    goals.append(anchor)
-                }
+                guard isPassable(world, anchor: anchor, context: context) else { continue }
+                if ax - 1 < bx + 2 && ax + 3 > bx && ay - 1 < by + 2 && ay + 3 > by { goals.append(anchor) }
             }
         }
         return goals
     }
 
-    /// The anchor cell nearest to a tank's top-left position.
     static func anchor(of position: Vec2i) -> Vec2i {
         let cell = SpatialUnits.subunitsPerCell
         return Vec2i(x: (position.x + cell / 2) / cell, y: (position.y + cell / 2) / cell)
     }
 
-    /// Anchors within one cell of a tank's anchor (a shooting neighbourhood).
-    static func nearGoals(_ world: WorldState, around anchor: Vec2i, canDig: Bool = true,
-                          profile: TraversalProfile = .normal) -> [Vec2i] {
+    static func nearGoals(_ world: WorldState, around anchor: Vec2i, context: Context = Context()) -> [Vec2i] {
         var goals: [Vec2i] = []
         for dy in -1...1 {
             for dx in -1...1 {
                 let candidate = Vec2i(x: anchor.x + dx, y: anchor.y + dy)
-                if isPassable(world, anchor: candidate, canDig: canDig, profile: profile) { goals.append(candidate) }
+                if isPassable(world, anchor: candidate, context: context) { goals.append(candidate) }
             }
         }
         return goals
     }
 
-    /// Multi-source Dijkstra from the goal set; index = y * cellsWide + x.
-    /// Goals hold 0; expanding from `current` into a predecessor `next`
-    /// charges `entryCost(current)` — the cell the forward walker enters
-    /// after `next` — so a goal's own brick is priced like any other cell.
-    static func distanceField(_ world: WorldState, goals: [Vec2i], canDig: Bool = true,
-                              profile: TraversalProfile = .normal) -> [Int] {
+    static func distanceField(_ world: WorldState, goals: [Vec2i], context: Context = Context()) -> [Int] {
         let width = world.arena.cellsWide, height = world.arena.cellsHigh
         var distance = [Int](repeating: unreachable, count: width * height)
         var heap = MinHeap()
-        for goal in goals where isPassable(world, anchor: goal, canDig: canDig, profile: profile) {
+        for goal in goals where isPassable(world, anchor: goal, context: context) {
             let index = goal.y * width + goal.x
             if distance[index] > 0 {
                 distance[index] = 0
@@ -115,12 +132,12 @@ enum Navigation {
             }
         }
         while let (d, index) = heap.pop() {
-            guard d == distance[index] else { continue } // stale entry
+            guard d == distance[index] else { continue }
             let x = index % width, y = index / width
-            let stepCost = entryCost(world, anchor: Vec2i(x: x, y: y))
+            let stepCost = entryCost(world, anchor: Vec2i(x: x, y: y), context: context)
             for direction in Direction.allCases {
                 let next = Vec2i(x: x + direction.vector.x, y: y + direction.vector.y)
-                guard isPassable(world, anchor: next, canDig: canDig, profile: profile) else { continue }
+                guard isPassable(world, anchor: next, context: context) else { continue }
                 let nextIndex = next.y * width + next.x
                 let candidate = d + stepCost
                 if candidate < distance[nextIndex] {
@@ -132,21 +149,14 @@ enum Navigation {
         return distance
     }
 
-    /// Whether `anchor` is a goal of the field (remaining cost zero).
     static func isAtGoal(field: [Int], world: WorldState, anchor: Vec2i) -> Bool {
         let width = world.arena.cellsWide
         guard anchor.x >= 0, anchor.y >= 0, anchor.x < width, anchor.y < world.arena.cellsHigh else { return false }
         return field[anchor.y * width + anchor.x] == 0
     }
 
-    /// The optimal next steps from `anchor`: neighbours whose
-    /// `entryCost(next) + field[next]` does not exceed the remaining cost
-    /// here, ordered by that total then by a fixed tie order (`preferred`
-    /// first, then up/right/down/left). Empty at the goal or when nothing
-    /// is reachable.
-    static func descent(field: [Int], world: WorldState, anchor: Vec2i,
-                        preferred: Direction, canDig: Bool = true,
-                        profile: TraversalProfile = .normal) -> [(direction: Direction, distance: Int)] {
+    static func descent(field: [Int], world: WorldState, anchor: Vec2i, preferred: Direction,
+                        context: Context = Context()) -> [(direction: Direction, distance: Int)] {
         let width = world.arena.cellsWide
         guard anchor.x >= 0, anchor.y >= 0, anchor.x < width, anchor.y < world.arena.cellsHigh else { return [] }
         let here = field[anchor.y * width + anchor.x]
@@ -155,25 +165,68 @@ enum Navigation {
         let order = [preferred] + Direction.allCases.filter { $0 != preferred }
         for direction in order {
             let next = Vec2i(x: anchor.x + direction.vector.x, y: anchor.y + direction.vector.y)
-            guard isPassable(world, anchor: next, canDig: canDig, profile: profile) else { continue }
+            guard isPassable(world, anchor: next, context: context) else { continue }
             let remaining = field[next.y * width + next.x]
             guard remaining < unreachable else { continue }
-            let total = entryCost(world, anchor: next) + remaining
+            let total = entryCost(world, anchor: next, context: context) + remaining
             if total <= here || here >= unreachable { options.append((direction, total)) }
         }
         return options.sorted { $0.1 < $1.1 || ($0.1 == $1.1 && order.firstIndex(of: $0.0)! < order.firstIndex(of: $1.0)!) }
             .map { (direction: $0.0, distance: $0.1) }
     }
 
-    /// A tiny binary min-heap of (distance, index) pairs; ties by index so
-    /// the traversal order is fully deterministic.
+    /// Half-cell lane positions (index = (y/512) × lanesWide + x/512) a tank
+    /// can reach from its nearest lane with its current equipment, over
+    /// static terrain, current walls and the base — other tanks ignored
+    /// (GAME_RULES §10.2).
+    static func reachableLanes(_ world: WorldState, from tank: TankState, ruleset: MovementRuleset) -> Set<Int> {
+        let lane = SpatialUnits.subunitsPerQuadrant
+        let footprint = SpatialUnits.standardTankFootprintSubunits
+        let inset = ruleset.collisionInsetSubunits
+        let lanesWide = (world.arena.widthSubunits - footprint) / lane + 1
+        let lanesHigh = (world.arena.heightSubunits - footprint) / lane + 1
+        let profile = TraversalProfile(equipmentID: tank.equipmentID)
+        let baseBox = world.base.map { ($0.topLeftSubunits.x, $0.topLeftSubunits.y, $0.sizeSubunits) }
+        func free(minX: Int, minY: Int, maxX: Int, maxY: Int) -> Bool {
+            if world.terrain.blocksTank(minX: minX, minY: minY, maxX: maxX, maxY: maxY, profile: profile) { return false }
+            if let (bx, by, size) = baseBox, minX < bx + size && maxX > bx && minY < by + size && maxY > by { return false }
+            return true
+        }
+        func boxFree(_ lx: Int, _ ly: Int) -> Bool {
+            let x = lx * lane, y = ly * lane
+            return free(minX: x + inset, minY: y + inset, maxX: x + footprint - inset, maxY: y + footprint - inset)
+        }
+        let sx = max(0, min(lanesWide - 1, (tank.positionSubunits.x + lane / 2) / lane))
+        let sy = max(0, min(lanesHigh - 1, (tank.positionSubunits.y + lane / 2) / lane))
+        var start: (Int, Int)?
+        for (dx, dy) in [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)] {
+            let lx = sx + dx, ly = sy + dy
+            if lx >= 0, ly >= 0, lx < lanesWide, ly < lanesHigh, boxFree(lx, ly) { start = (lx, ly); break }
+        }
+        guard let start else { return [] }
+        var seen: Set<Int> = [start.1 * lanesWide + start.0]
+        var frontier = [start]
+        while let (lx, ly) = frontier.popLast() {
+            for direction in Direction.allCases {
+                let nx = lx + direction.vector.x, ny = ly + direction.vector.y
+                guard nx >= 0, ny >= 0, nx < lanesWide, ny < lanesHigh else { continue }
+                let key = ny * lanesWide + nx
+                guard !seen.contains(key) else { continue }
+                let ax = lx * lane, ay = ly * lane, bx = nx * lane, by = ny * lane
+                guard free(minX: min(ax, bx) + inset, minY: min(ay, by) + inset,
+                           maxX: max(ax, bx) + footprint - inset, maxY: max(ay, by) + footprint - inset) else { continue }
+                seen.insert(key)
+                frontier.append((nx, ny))
+            }
+        }
+        return seen
+    }
+
     private struct MinHeap {
         private var items: [(distance: Int, index: Int)] = []
-
         private func less(_ a: (distance: Int, index: Int), _ b: (distance: Int, index: Int)) -> Bool {
             a.distance < b.distance || (a.distance == b.distance && a.index < b.index)
         }
-
         mutating func push(distance: Int, index: Int) {
             items.append((distance, index))
             var child = items.count - 1
@@ -184,7 +237,6 @@ enum Navigation {
                 child = parent
             }
         }
-
         mutating func pop() -> (distance: Int, index: Int)? {
             guard !items.isEmpty else { return nil }
             let top = items[0]

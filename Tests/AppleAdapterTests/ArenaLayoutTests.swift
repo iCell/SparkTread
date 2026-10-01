@@ -49,6 +49,17 @@ import GameCore
         }
     }
 
+    /// GAME_RULES §15.1 (owner 2026-09-16): the arena scales to the FULL
+    /// screen — system cutouts overlap the decorative steel bezel, never
+    /// shrink the playfield.
+    @Test func arenaUsesTheFullSurface() {
+        let surface = CGSize(width: 874, height: 402)
+        let layout = ArenaLayout(surface: surface, arena: .universal)
+        #expect(abs(layout.cellPoints - min(surface.width / 56, surface.height / 27)) < 0.0001)
+        #expect(abs(layout.arenaRect.midX - surface.width / 2) < 0.001)
+        #expect(abs(layout.arenaRect.midY - surface.height / 2) < 0.001)
+    }
+
     @Test func conversionRoundTripsAndFlipsY() {
         let layout = ArenaLayout(surface: CGSize(width: 874, height: 402), arena: .universal)
         let topLeft = layout.scenePoint(Vec2i(x: 0, y: 0))

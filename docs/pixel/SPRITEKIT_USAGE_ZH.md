@@ -1,5 +1,7 @@
 # 新像素图集：SpriteKit 接入与制作契约
 
+> 2026-09-15（ADR-0018）：像素包仍包含地雷、地雷炮塔以及 Shield of Moon／Memory of Sea 的素材，但 `GAME_RULES.md` R5 已把它们移出 V1；应用不再加载或引用这些资源。
+
 当前交付的完整接入契约以 `Vendor/SparkTreadPixel/Docs/SPRITEKIT_USAGE_ZH.md` 为准；升级子模块时同时核对本文与运行时副本。本文的验证环境说明是素材交付时的历史记录，不是当前应用的验证结论。
 
 本文件只适用于 `PixelProduction`。不要把上一级旧 `ST3` 接入说明、纹理尺寸或图集名称套到这里。运行时代码是美术表现适配器，不实现原版游戏规则。权威规则与美术分离，延续项目 architecture 约束。

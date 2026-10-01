@@ -35,15 +35,15 @@ private let origin = Vec2i(x: 0, y: 0)
         #expect(brick == ["sfx_hit_brick"])
         #expect(names([.projectileDestroyed(entityID: 3, weaponID: "normal", position: origin, impact: .boundary)])
                 == ["sfx_hit_steel"])
-        #expect(names([.projectileHit(entityID: 3, weaponID: "ap", position: origin, impact: .steel)])
+        #expect(names([.projectileDestroyed(entityID: 3, weaponID: "ap", position: origin, impact: .steel)])
                 == ["sfx_hit_steel"])
         #expect(names([.projectileDestroyed(entityID: 3, weaponID: "normal", position: origin, impact: .projectile)])
                 == ["sfx_deflect"])
         #expect(names([.projectileDestroyed(entityID: 3, weaponID: "normal", position: origin, impact: .expired)])
                 .isEmpty)
-        // Dry fire is a player-only cue (§12.4): AI mine layers stay silent.
-        #expect(names([.dryFire(entityID: 9, ownerPlayerID: nil, weaponID: "mine")]).isEmpty)
-        #expect(names([.dryFire(entityID: 7, ownerPlayerID: .one, weaponID: "mine")]) == ["sfx_dry_fire"])
+        // Dry fire is a player-only cue (§12.4): AI tanks stay silent.
+        #expect(names([.dryFire(entityID: 9, ownerPlayerID: nil, weaponID: "ap")]).isEmpty)
+        #expect(names([.dryFire(entityID: 7, ownerPlayerID: .one, weaponID: "ap")]) == ["sfx_dry_fire"])
         // Base loss plays the collapse and the stinger, not the hit alarm.
         let loss = names([
             .baseDamaged(damage: 1, remaining: 0, allied: false),
@@ -71,7 +71,6 @@ private let origin = Vec2i(x: 0, y: 0)
         #expect(launch("ap") == ["sfx_fire_ap"])
         #expect(launch("explosion") == ["sfx_fire_explosion"])
         #expect(launch("fire") == ["sfx_fire_flame"]) // ignition, not a pellet gun
-        #expect(launch("mine") == []) // minePlaced carries the sound
     }
 
     @Test func hapticCuesTrackThePlayer() {

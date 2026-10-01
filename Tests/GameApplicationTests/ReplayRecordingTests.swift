@@ -53,13 +53,12 @@ private let vs01URL = repoRoot
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(1)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        // A REAL format-2 file: its embedded pickup rules predate
-        // `dropsSpawnAtRandomCells`, so field-by-field decoding would fail
-        // with a key-not-found error about that field. The header-first
+        // An older-format file whose embedded rules lack a current field:
+        // field-by-field decoding would fail on that key; the header-first
         // check reports the version boundary instead (R8-03 closeout).
         json["formatVersion"] = 2
         var oldPickups = try #require(json["pickups"] as? [String: Any])
-        #expect(oldPickups.removeValue(forKey: "dropsSpawnAtRandomCells") != nil)
+        #expect(oldPickups.removeValue(forKey: "revealGraceTicks") != nil)
         json["pickups"] = oldPickups
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(2)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
@@ -79,17 +78,19 @@ private let vs01URL = repoRoot
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(5)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        json["formatVersion"] = 6
-        #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(6)) {
-            try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
+        for old in [6, 7, 8, 9, 10, 11] { // 7 precedes GAME_RULES R5 (ADR-0018); 8 the brick strip field (ADR-0020); 9 the shell strength rule (ADR-0021); 10 the AP C speed (R5.8); 11 the AI stall fix (2026-09-16)
+            json["formatVersion"] = old
+            #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(old)) {
+                try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
+            }
         }
         // The same old shape with a current version number is a plain
         // schema error — the format number is the boundary, not the shape.
-        json["formatVersion"] = 7
+        json["formatVersion"] = 12
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        #expect(ReplayRecording.currentFormatVersion == 7)
+        #expect(ReplayRecording.currentFormatVersion == 12)
     }
 
     @Test func debugMutationsRebaseTheRecording() {
@@ -202,14 +203,14 @@ private let vs01URL = repoRoot
         }
         // Base speed at Int.max with a large multiplier: bounded before multiplying.
         #expect(throws: ReplayPlayer.ReplayError.self) {
-            try ReplayPlayer.replay(try mutated(["movement", "baseSpeedSubunitsPerSecond"], Int.max), ticks: 0)
+            try ReplayPlayer.replay(try mutated(["movement", "baseSpeedMilliSubunitsPerSecond"], Int.max), ticks: 0)
         }
         // The validators themselves never trap on such worlds and rules.
         let hostile = try mutated(["initialWorld", "tanks", 0, "positionSubunits", "x"], Int.max)
         #expect(!WorldInvariants.violations(in: hostile.initialWorld).isEmpty)
         var rules = MovementRuleset.provisional
         rules.collisionInsetSubunits = Int.max
-        rules.baseSpeedSubunitsPerSecond = Int.max
+        rules.baseSpeedMilliSubunitsPerSecond = Int.max
         rules.speedMultipliersPermille = [Int.max, 1, 1, 1]
         #expect(!rules.validationIssues().isEmpty)
         var weapons = WeaponRuleset.provisional

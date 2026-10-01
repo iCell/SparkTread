@@ -18,6 +18,19 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
         public let checksum: UInt64
     }
 
+    /// Format 11 (2026-09-15, ADR-0019 R5.8): AP C spawns at speed level −2,
+    /// read from the archetype table rather than a recorded ruleset.
+    /// Format 10 (2026-09-15, ADR-0021): opposing shells meet by strength
+    /// (fire bursts on any shell) and a tank may leave a spawn reservation
+    /// it stands in, so format-9 recordings would replay differently.
+    /// Format 9 (2026-09-15, ADR-0020): the AP brick strip field became
+    /// `brickStripDepthQuadrants` and covers white brick too, so a format-8
+    /// recording's weapon rules would replay differently.
+    /// Format 8 (2026-09-15, ADR-0018): GAME_RULES R5 — milli-subunit
+    /// speeds, the wall strip, immediate explosions, projectile clashes,
+    /// fire shells and source-keyed ground fire, layered terrain, 2×2
+    /// pickups with a placement queue, the spawn cadence and the removal
+    /// of mines. The format number doubles as the simulation version.
     /// Format 7 (2026-09-10, ADR-0017): flames on foliage spread to the
     /// neighbouring foliage and burn it away (hazards carry a spread tick).
     /// Format 6 (2026-09-10, ADR-0016): traversal profiles (water needs
@@ -45,7 +58,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 7
+    public static let currentFormatVersion = 12
 
     public let formatVersion: Int
     /// Campaign header (ADR-0013): the stage this recording plays and the

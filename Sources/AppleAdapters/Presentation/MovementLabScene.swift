@@ -35,16 +35,109 @@ final class MovementLabScene: SKScene {
     /// ordnance stays readable (§12.3); cells over the player's footprint
     /// fade so the player stays readable (vendor guidance).
     private var foliageNodes: [Int: SKSpriteNode] = [:]
+    /// Last applied (mask, frame) per liquid/foliage cell, packed mask << 2 | frame:
+    /// the texture is re-derived only when the joint mask or animation frame moves.
+    private var liquidAppliedKey: [Int: Int] = [:]
+    private var foliageAppliedKey: [Int: Int] = [:]
     static let foliageZPosition: CGFloat = 520
+    /// 8-neighbour joint bits and the diagonal gates shared by the foliage and
+    /// liquid tilers (a diagonal joint needs both adjacent edges).
+    private static let jointNeighbours = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
+                                          (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
+    private static let jointDiagonalGates = [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
     /// Foliage over the player: thin enough to keep one's own tank readable.
     static let foliageFadedAlpha: CGFloat = 0.45
-    /// Tints that turn the brick/steel atlases into the white tiers
-    /// (GAME_RULES §3.5). Cool tints cancel the atlas brick's warm hue so
-    /// white brick reads as a different material, not a lighter red one.
-    static let whiteWallBlend: CGFloat = 0.75
-    static let whiteBrickTint = SKColor(red: 0.83, green: 0.91, blue: 0.96, alpha: 1)
-    static let whiteBrickCrackedTint = SKColor(red: 0.59, green: 0.63, blue: 0.67, alpha: 1)
-    static let whiteSteelTint = SKColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1)
+    /// Recolouring that turns the brick/steel atlases into the white tiers
+    /// (GAME_RULES §3.1). SpriteKit's `colorBlendFactor` MULTIPLIES a tint
+    /// into the texture, which can only darken — a near-white tint left the
+    /// white brick red and the white steel grey on the device. The white
+    /// tiers therefore use textures recoloured on the CPU by luminance: a
+    /// pixel as bright as the atlas face (`reference`) takes the face colour;
+    /// `contrast` stretches the atlas relief around the face (darker joints,
+    /// brighter highlights) and `floor` keeps the darkest pixels from going
+    /// black. Owner direction 2026-09-15: pastel ivory and baby-blue looked
+    /// soft and alike; each tier should look HARDER than its base material.
+    /// White brick is a pale stone brick (warm light grey, firm dark joints),
+    /// white steel a polished silver plate (the brightest wall, near-black
+    /// joints) — separated from each other by brightness, hue and contrast,
+    /// and from red brick and blue-grey steel by all three as well.
+    /// Pickup icon scale relative to the art scale (see `syncPickups`).
+    static let pickupIconScale: CGFloat = 0.9
+
+    struct Recolor: Hashable {
+        let red: Double, green: Double, blue: Double
+        /// Atlas face luminance that maps to the face colour.
+        let reference: Double
+        /// Share of the face colour kept by the darkest pixels (0…1).
+        let floor: Double
+        /// Relief multiplier around the face (1 = the atlas's own).
+        let contrast: Double
+    }
+    static let whiteBrickRecolor = Recolor(red: 188, green: 184, blue: 174, reference: 139, floor: 0.12, contrast: 1.35)
+    static let whiteBrickCrackedRecolor = Recolor(red: 156, green: 150, blue: 140, reference: 139, floor: 0.12, contrast: 1.35)
+    static let whiteSteelRecolor = Recolor(red: 222, green: 230, blue: 238, reference: 134, floor: 0.06, contrast: 1.7)
+    private var recoloredTextures: [String: SKTexture] = [:]
+    private var clippedGroundTextures: [String: SKTexture] = [:]
+
+    /// A ground tile clipped to its top-left `spanX`×`spanY` of three cells,
+    /// for the arena edge where 56 (or a theme's height) is not a multiple
+    /// of three. The crop happens on the CGImage and NEVER through
+    /// `SKTexture(rect:in:)`: in the app the tile comes out of a compiled
+    /// `.atlas`, where a sub-rect of an atlas-backed texture resolves
+    /// against the PACKED PAGE, so the clipped column drew a strip of the
+    /// frozen/floodplain/citadel ground sprites that share PixelGround down
+    /// the arena's right edge. Tests never saw it: they load the art from
+    /// the delivery directory, where every texture is its own image and the
+    /// sub-rect is correct. Cached per tile and span; nil (→ the unclipped
+    /// tile) if the crop fails, so a miss never blanks the ground.
+    func clippedGroundTexture(_ art: PixelArt, id: String, spanX: Int, spanY: Int) -> SKTexture? {
+        let key = "\(id)|\(spanX)x\(spanY)"
+        if let cached = clippedGroundTextures[key] { return cached }
+        guard let source = try? art.texture(id).cgImage() else { return nil }
+        // CGImage space is top-down, and the visible part of an edge tile is
+        // its top-left corner, so the crop origin is (0, 0).
+        let width = source.width * spanX / 3, height = source.height * spanY / 3
+        guard width > 0, height > 0,
+              let clipped = source.cropping(to: CGRect(x: 0, y: 0, width: width, height: height))
+        else { return nil }
+        let texture = SKTexture(cgImage: clipped)
+        texture.filteringMode = .nearest
+        clippedGroundTextures[key] = texture
+        return texture
+    }
+
+    /// The atlas texture `id` recoloured by luminance; cached per texture and
+    /// recolour. Nil when the texture is missing.
+    func recoloredTexture(_ art: PixelArt, id: String, recolor: Recolor) -> SKTexture? {
+        let key = "\(id)|\(recolor.red),\(recolor.green),\(recolor.blue),\(recolor.reference),\(recolor.floor),\(recolor.contrast)"
+        if let cached = recoloredTextures[key] { return cached }
+        guard let source = try? art.texture(id).cgImage() else { return nil }
+        let width = source.width, height = source.height
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = context.data?.bindMemory(to: UInt8.self, capacity: width * height * 4) else { return nil }
+        context.draw(source, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let face = [recolor.red, recolor.green, recolor.blue]
+        for i in stride(from: 0, to: width * height * 4, by: 4) {
+            let alpha = Double(data[i + 3])
+            guard alpha > 0 else { continue }
+            let straight = (0..<3).map { Double(data[i + $0]) * 255 / alpha }
+            let luminance = 0.299 * straight[0] + 0.587 * straight[1] + 0.114 * straight[2]
+            let relief = 1 + (luminance / recolor.reference - 1) * recolor.contrast
+            let shade = max(0, min(1.2, relief))
+            let factor = recolor.floor + (1 - recolor.floor) * shade
+            for c in 0..<3 {
+                let value = min(255, face[c] * factor)
+                data[i + c] = UInt8(max(0, min(255, (value * alpha / 255).rounded())))
+            }
+        }
+        guard let image = context.makeImage() else { return nil }
+        let texture = SKTexture(cgImage: image)
+        texture.filteringMode = .nearest
+        recoloredTextures[key] = texture
+        return texture
+    }
 
     /// Foliage over any other tank. Owner rule (2026-09-11): a tank in the
     /// bushes stays visible, it is only hard to make out — so cover never
@@ -59,7 +152,6 @@ final class MovementLabScene: SKScene {
     private var tankPositions: [Int: Vec2i] = [:]
     private var tankEquipment: [Int: String?] = [:]
     private var projectileNodes: [Int: SKSpriteNode] = [:]
-    private var mineNodes: [Int: (node: PixelMineNode, surface: PixelMineSurface, firstSeen: Int)] = [:]
     private var hazardNodes: [Int: SKSpriteNode] = [:]
     private var wallNodes: [Int: SKSpriteNode] = [:]
     private var pickupNodes: [Int: (node: PixelPickupNode, firstSeen: Int)] = [:]
@@ -84,6 +176,13 @@ final class MovementLabScene: SKScene {
     private var haptics: GameHaptics { controller.haptics }
     /// Presentation clock for frame-rate-independent smoothing.
     private var lastUpdateTime: TimeInterval?
+    /// The last world tick the mirrors ran against: the authoritative state
+    /// only changes on a tick, so identical frames skip the whole mirror pass
+    /// (intros, outros and results render many frames of a frozen world).
+    private var lastMirroredTick: Int?
+    /// Lab overlay checksum, refreshed on the session's 60-tick cadence — a
+    /// full world walk per frame is exactly the churn the lab measures.
+    private var debugChecksum: (tick: Int, value: UInt64)?
     /// Base shield presentation edge: set on an observed inactive→active
     /// transition only (a rebuild with the shield already up shows `.active`).
     private var shieldActivatedTick: Int?
@@ -123,7 +222,7 @@ final class MovementLabScene: SKScene {
         builtGeneration = controller.worldGeneration
         removeAllChildren()
         liquidNodes.removeAll(); tankNodes.removeAll(); projectileNodes.removeAll()
-        mineNodes.removeAll(); hazardNodes.removeAll(); wallNodes.removeAll()
+        hazardNodes.removeAll(); wallNodes.removeAll()
         pickupNodes.removeAll(); telegraphNodes.removeAll()
         tankFacings.removeAll(); tankTravel.removeAll(); tankPositions.removeAll()
         tankEquipment.removeAll()
@@ -132,6 +231,8 @@ final class MovementLabScene: SKScene {
         curtainTiles.removeAll(); curtainStep = .some(nil)
         coverTiles.removeAll(); coverStep = .some(nil)
         foliageNodes.removeAll()
+        liquidAppliedKey.removeAll(); foliageAppliedKey.removeAll()
+        lastMirroredTick = nil
         let world = controller.session.world
         wasShielded = (world.base?.shieldRemainingTicks ?? 0) > 0
         shieldActivatedTick = nil
@@ -195,17 +296,36 @@ final class MovementLabScene: SKScene {
 
     private func buildTerrain(_ art: PixelArt, world: WorldState) throws {
         let arena = world.arena
+        // White-steel bezel (owner 2026-09-16, GAME_RULES §15.1): the arena
+        // scales to the FULL screen and the leftover gutter is dressed as
+        // the indestructible wall, so nothing reads as wasted space and the
+        // notch/Dynamic Island sits over decor, never over gameplay.
+        if let layout, let bezel = try? art.texture("px_white_steel_joint_15_15") {
+            let rect = layout.arenaRect
+            let columnsBefore = max(0, Int((rect.minX / cellPoints).rounded(.up)))
+            let columnsAfter = max(0, Int(((size.width - rect.maxX) / cellPoints).rounded(.up)))
+            let rowsAbove = max(0, Int(((size.height - rect.maxY) / cellPoints).rounded(.up)))
+            let rowsBelow = max(0, Int((rect.minY / cellPoints).rounded(.up)))
+            for y in -rowsAbove..<(arena.cellsHigh + rowsBelow) {
+                for x in -columnsBefore..<(arena.cellsWide + columnsAfter)
+                where !((0..<arena.cellsWide).contains(x) && (0..<arena.cellsHigh).contains(y)) {
+                    let n = SKSpriteNode(texture: bezel)
+                    n.size = CGSize(width: cellPoints, height: cellPoints)
+                    n.position = cellCenter(x: x, y: y)
+                    n.zPosition = 0
+                    addChild(n)
+                }
+            }
+        }
         // 3×3-cell ground tiles; the last column/row is clipped to the
-        // arena (UV rect AND displayed size), never spilled into the gutter.
+        // arena (texture AND displayed size), never spilled into the gutter.
         for y in stride(from: 0, to: arena.cellsHigh, by: 3) {
             for x in stride(from: 0, to: arena.cellsWide, by: 3) {
                 let spanX = min(3, arena.cellsWide - x), spanY = min(3, arena.cellsHigh - y)
                 let id = "px_ground_frontier_\((x / 3 + y / 3) % 9)"
                 let full = try art.texture(id)
                 let texture = spanX == 3 && spanY == 3 ? full
-                    : SKTexture(rect: CGRect(x: 0, y: 1 - CGFloat(spanY) / 3,
-                                             width: CGFloat(spanX) / 3, height: CGFloat(spanY) / 3),
-                                in: full)
+                    : (clippedGroundTexture(art, id: id, spanX: spanX, spanY: spanY) ?? full)
                 texture.filteringMode = .nearest
                 let n = SKSpriteNode(texture: texture)
                 n.size = CGSize(width: cellPoints * CGFloat(spanX), height: cellPoints * CGFloat(spanY))
@@ -231,11 +351,13 @@ final class MovementLabScene: SKScene {
         refreshWallTexture(art, world: world, cellX: cellX, cellY: cellY)
         let key = cellY * world.arena.cellsWide + cellX
         let kind = world.terrain[cellX, cellY].kind
-        if kind == .water || kind == .ice {
-            let name = kind == .water ? "water" : "ice"
+        let surface = world.terrain[cellX, cellY].surface
+        if (surface == .water || surface == .ice) && !kind.isWall {
+            let name = surface == .water ? "water" : "ice"
             if let existing = liquidNodes[key], existing.kind != name {
                 existing.node.removeFromParent()
                 liquidNodes[key] = nil
+                liquidAppliedKey[key] = nil
             }
             if liquidNodes[key] == nil,
                let n = try? art.sprite(String(format: "px_%@_000_0", name), scale: artScale) {
@@ -246,6 +368,7 @@ final class MovementLabScene: SKScene {
             }
         } else if let existing = liquidNodes.removeValue(forKey: key) {
             existing.node.removeFromParent()
+            liquidAppliedKey[key] = nil
         }
         if kind == .foliage {
             if foliageNodes[key] == nil, let n = try? art.sprite("px_foliage_000_0", scale: artScale) {
@@ -256,6 +379,7 @@ final class MovementLabScene: SKScene {
             }
         } else if let existing = foliageNodes.removeValue(forKey: key) {
             existing.removeFromParent()
+            foliageAppliedKey[key] = nil
         }
     }
 
@@ -274,18 +398,20 @@ final class MovementLabScene: SKScene {
             guard world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .foliage else {
                 node.removeFromParent()
                 foliageNodes[key] = nil
+                foliageAppliedKey[key] = nil
                 continue
             }
             var mask = 0
-            let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
-                           (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
-            for (bit, dx, dy) in offsets
+            for (bit, dx, dy) in Self.jointNeighbours
             where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy)
                 && world.terrain[cx + dx, cy + dy].kind == .foliage { mask |= bit }
-            for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
+            for (diag, a, b) in Self.jointDiagonalGates
             where mask & a == 0 || mask & b == 0 { mask &= ~diag }
-            if let texture = try? art.texture(String(format: "px_foliage_%03d_%d", mask, frame)) {
+            let applied = mask << 2 | frame
+            if foliageAppliedKey[key] != applied,
+               let texture = try? art.texture(String(format: "px_foliage_%03d_%d", mask, frame)) {
                 node.texture = texture
+                foliageAppliedKey[key] = applied
             }
             func covers(_ position: Vec2i) -> Bool {
                 cx * cell < position.x + footprint && (cx + 1) * cell > position.x
@@ -330,19 +456,22 @@ final class MovementLabScene: SKScene {
         // brick/steel atlases with a tint. The atlas brick is warm orange
         // (mean 167,100,63) and the steel blue-grey (98,117,127), so the
         // tints have to be strong enough to carry the material, not just
-        // lighten it: white brick lands near a neutral 200-grey, cracked
-        // white brick a dimmer 150-grey, white steel near 218.
+        // lighten it: see the tint constants for the resulting colours.
         let name = cell.kind.isBrickFamily ? "brick" : "steel"
-        switch cell.kind {
-        case .whiteBrick:
-            node.color = cell.crackMask != 0 ? Self.whiteBrickCrackedTint : Self.whiteBrickTint
-            node.colorBlendFactor = Self.whiteWallBlend
-        case .whiteSteel:
-            node.color = Self.whiteSteelTint
-            node.colorBlendFactor = Self.whiteWallBlend
-        default:
-            node.colorBlendFactor = 0
+        let recolor: Recolor? = switch cell.kind {
+        case .whiteBrick: cell.crackMask != 0 ? Self.whiteBrickCrackedRecolor : Self.whiteBrickRecolor
+        case .whiteSteel: Self.whiteSteelRecolor
+        default: nil
         }
+        // Dedicated white-tier atlas art wins when the delivery carries it
+        // (owner 2026-09-16); until then the CPU recolour below stands in,
+        // so a partial atlas never blanks a wall.
+        let dedicated: String? = switch cell.kind {
+        case .whiteBrick: cell.crackMask != 0 ? "white_brick_cracked" : "white_brick"
+        case .whiteSteel: "white_steel"
+        default: nil
+        }
+        node.colorBlendFactor = 0
         var mask = 0
         for (bit, dx, dy) in [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0)]
         where world.terrain.isInside(cellX: cellX + dx, cellY: cellY + dy)
@@ -350,7 +479,13 @@ final class MovementLabScene: SKScene {
         // Atlas remaining-mask ids use the delivery's quadrant numbering;
         // full cells use 15, damaged cells their mask. Keep the old texture
         // if a specific damage combination is missing from the atlas.
-        if let texture = try? art.texture(String(format: "px_%@_joint_%02d_%02d", name, mask, cell.quadrantMask)) {
+        let id = String(format: "px_%@_joint_%02d_%02d", name, mask, cell.quadrantMask)
+        if let dedicated,
+           let texture = try? art.texture(String(format: "px_%@_joint_%02d_%02d", dedicated, mask, cell.quadrantMask)) {
+            node.texture = texture
+        } else if let recolor, let texture = recoloredTexture(art, id: id, recolor: recolor) {
+            node.texture = texture
+        } else if recolor == nil, let texture = try? art.texture(id) {
             node.texture = texture
         }
     }
@@ -406,19 +541,24 @@ final class MovementLabScene: SKScene {
         presentationTime += elapsed
         guard let art else { return }
         let world = controller.session.world
-        syncTanks(art, world: world)
-        syncProjectiles(art, world: world)
-        syncMines(art, world: world, elapsed: elapsed)
-        syncHazards(art, world: world)
-        syncPickups(art, world: world)
-        syncTelegraphs(art, world: world)
-        syncBase(art, world: world)
+        let mirror = lastMirroredTick != world.tick
+        if mirror {
+            syncTanks(art, world: world)
+            syncProjectiles(art, world: world)
+            syncHazards(art, world: world)
+            syncPickups(art, world: world)
+            syncTelegraphs(art, world: world)
+            syncBase(art, world: world)
+        }
         syncCurtain(world: world)
         syncCover(world: world)
-        processEvents(art, world: world)
-        animateLiquids(art, world: world)
-        animateFoliage(art, world: world)
-        updateDebugOverlay(world: world)
+        processEvents(art, world: world) // events, audio, haptics and effect aging are per FRAME
+        if mirror {
+            animateLiquids(art, world: world)
+            animateFoliage(art, world: world)
+            updateDebugOverlay(world: world)
+            lastMirroredTick = world.tick
+        }
     }
 
     // MARK: - Intro curtain
@@ -494,8 +634,11 @@ final class MovementLabScene: SKScene {
         for pickup in world.pickups {
             seen.insert(pickup.entityID)
             if pickupNodes[pickup.entityID] == nil {
+                // Pickups occupy a 2×2-cell area (GAME_RULES §10.2); the 32-px
+                // icon at 0.9 is 1.8 cells wide, inside that area (owner: the
+                // 2.4-cell icon looked too big).
                 guard let catalogID = art.manifest.pickups.first(where: { $0.key == pickup.pickupID })?.id,
-                      let node = try? PixelPickupNode(id: catalogID, pixelScale: artScale * 0.65, art: art)
+                      let node = try? PixelPickupNode(id: catalogID, pixelScale: artScale * Self.pickupIconScale, art: art)
                 else { continue }
                 node.position = scenePoint(pickup.positionSubunits)
                 node.zPosition = 610
@@ -507,9 +650,11 @@ final class MovementLabScene: SKScene {
             // inferred from a default lifetime a restored pickup may not have.
             let age = Double(max(0, world.tick - entry.firstSeen)) / 60
             try? entry.node.update(phase: pickup.graceTicksRemaining > 0 ? .spawning : .idle, age: age)
-            // Expiry warning: blink through the last five seconds (authoritative remaining time).
-            entry.node.alpha = pickup.lifetimeRemainingTicks < 300 && (pickup.lifetimeRemainingTicks / 6) % 2 == 0
-                ? 0.35 : 1.0
+            // Expiry warning: blink through the last five seconds (authoritative
+            // remaining time); critical pickups never expire.
+            let blinkTicks = controller.session.pickups.pickupBlinkTicks
+            entry.node.alpha = !pickup.critical && pickup.lifetimeRemainingTicks < blinkTicks
+                && (pickup.lifetimeRemainingTicks / 15) % 2 == 0 ? 0.35 : 1.0
         }
         for (id, entry) in pickupNodes where !seen.contains(id) {
             entry.node.removeFromParent()
@@ -610,8 +755,6 @@ final class MovementLabScene: SKScene {
         switch id {
         case "amphi_tank": "amphi"
         case "anti_skid": "anti_skid"
-        case "shield_of_moon": "moon"
-        case "memory_of_sea": "memory"
         default: nil
         }
     }
@@ -670,8 +813,8 @@ final class MovementLabScene: SKScene {
                 frame: "px_status_freeze_\(tick / 10 % 5)", scale: 1.0, z: 10)
     }
 
-    // The §10.6 danger telegraph (a tinted ring with a warning triangle over
-    // AP/Explosion/Fire/Mine enemies) was removed on the owner's decision of
+    // The danger telegraph (a tinted ring with a warning triangle over
+    // AP/Explosion/Fire enemies) was removed on the owner's decision of
     // 2026-09-10 ("移除掉红圈这个设计，不需要警告"; ADR-0017). The
     // px_status_danger frames stay in the atlas, unused.
 
@@ -700,69 +843,18 @@ final class MovementLabScene: SKScene {
         }
     }
 
-    private func mineSurface(_ world: WorldState, _ mine: MineState) -> PixelMineSurface {
-        if mine.onWater { return .water }
-        let cell = SpatialUnits.subunitsPerCell
-        let cx = mine.positionSubunits.x / cell, cy = mine.positionSubunits.y / cell
-        return world.terrain.isInside(cellX: cx, cellY: cy) && world.terrain[cx, cy].kind == .ice ? .ice : .ground
-    }
-
-    /// Mines through the delivery's component: ownership badge (shape, not
-    /// colour), level digit, arming progress, surface overlay. Visibility
-    /// policy (ADR-0010, presentation): ENEMY mines cloak once armed and
-    /// only read faintly when a tank rolls near; the player's own mines
-    /// never drop below 0.6 alpha. Smoothing is elapsed-time based.
-    private func syncMines(_ art: PixelArt, world: WorldState, elapsed: TimeInterval) {
-        let footprint = SpatialUnits.standardTankFootprintSubunits
-        let cell = SpatialUnits.subunitsPerCell
-        let armingTicks = max(1, controller.session.weapons.mineArmingTicks)
-        var seen = Set<Int>()
-        for mine in world.mines {
-            seen.insert(mine.entityID)
-            let surface = mineSurface(world, mine)
-            if let existing = mineNodes[mine.entityID], existing.surface != surface {
-                existing.node.removeFromParent() // ice melted under it: re-dress the surface
-                mineNodes[mine.entityID] = nil
-            }
-            if mineNodes[mine.entityID] == nil {
-                guard let node = try? PixelMineNode(
-                    level: mine.level, owner: mine.ownerPlayerID != nil ? "player" : "enemy",
-                    surface: surface, pixelScale: artScale * 0.65, art: art) else { continue }
-                node.position = scenePoint(mine.positionSubunits)
-                node.zPosition = 600
-                node.alpha = 1
-                addChild(node)
-                mineNodes[mine.entityID] = (node, surface, world.tick)
-            }
-            guard let entry = mineNodes[mine.entityID] else { continue }
-            let age = Double(max(0, world.tick - entry.firstSeen)) / 60
-            let progress = mine.phase == .arming
-                ? max(0, min(1, 1 - Double(mine.phaseTicksRemaining) / Double(armingTicks))) : 1
-            try? entry.node.update(phase: mine.phase == .arming ? .arming : .armed, age: age, progress: progress)
-
-            var targetAlpha: CGFloat = 1
-            if mine.phase == .armed {
-                var nearest = Int.max
-                for tank in world.tanks {
-                    let dx = tank.positionSubunits.x + footprint / 2 - mine.positionSubunits.x
-                    let dy = tank.positionSubunits.y + footprint / 2 - mine.positionSubunits.y
-                    nearest = min(nearest, max(abs(dx), abs(dy)))
-                }
-                targetAlpha = nearest < 2 * cell ? 0.55 : nearest < 4 * cell ? 0.3 : 0.0
-                if mine.ownerPlayerID != nil { targetAlpha = max(0.6, targetAlpha) }
-            }
-            let rate = min(1, elapsed * 7) // ≈ 0.12 per frame at 60 Hz, half that at 120 Hz
-            entry.node.alpha += (targetAlpha - entry.node.alpha) * rate
-        }
-        for (id, entry) in mineNodes where !seen.contains(id) {
-            entry.node.removeFromParent()
-            mineNodes[id] = nil
-        }
-    }
-
+    /// Ground fire (GAME_RULES §7.3): one visible flame per cell, tinted by
+    /// who it hurts — player yellow as drawn, enemy orange, and red for
+    /// stage fire or a cell where yellow and orange overlap.
     private func syncHazards(_ art: PixelArt, world: WorldState) {
         var seen = Set<Int>()
         let frames = art.manifest.effects["fire"] ?? []
+        var colorsByCell: [Vec2i: Set<FireColor>] = [:]
+        var representative: [Vec2i: Int] = [:]
+        for hazard in world.fireHazards {
+            colorsByCell[hazard.cell, default: []].insert(hazard.color)
+            representative[hazard.cell] = min(representative[hazard.cell] ?? Int.max, hazard.entityID)
+        }
         for hazard in world.fireHazards {
             seen.insert(hazard.entityID)
             let node: SKSpriteNode
@@ -776,6 +868,17 @@ final class MovementLabScene: SKScene {
                 addChild(created)
                 hazardNodes[hazard.entityID] = created
                 node = created
+            }
+            node.isHidden = representative[hazard.cell] != hazard.entityID
+            let colors = colorsByCell[hazard.cell] ?? []
+            if colors.contains(.red) || (colors.contains(.yellow) && colors.contains(.orange)) {
+                node.color = SKColor(red: 0.95, green: 0.15, blue: 0.1, alpha: 1)
+                node.colorBlendFactor = 0.55
+            } else if colors.contains(.orange) {
+                node.color = SKColor(red: 1.0, green: 0.45, blue: 0.05, alpha: 1)
+                node.colorBlendFactor = 0.4
+            } else {
+                node.colorBlendFactor = 0
             }
             if !frames.isEmpty {
                 let frame = (world.tick / 8 + hazard.entityID) % frames.count
@@ -896,8 +999,7 @@ final class MovementLabScene: SKScene {
         let cell = SpatialUnits.subunitsPerCell
         let cx = position.x / cell, cy = position.y / cell
         guard world.terrain.isInside(cellX: cx, cellY: cy) else { return }
-        let kind = world.terrain[cx, cy].kind
-        guard kind != .water && kind != .ice else { return } // no soot on liquids
+        guard !world.terrain[cx, cy].isWaterOrIce else { return } // no soot on liquids
         guard let decal = try? art.sprite("px_decal_scorch_\(abs(index) % 3)", scale: artScale) else { return }
         decal.position = scenePoint(position)
         decal.zPosition = 10
@@ -925,7 +1027,7 @@ final class MovementLabScene: SKScene {
                 let key = cy * world.arena.cellsWide + cx
                 let wasFoliage = foliageNodes[key] != nil
                 reconcileTerrainCell(art, world: world, cellX: cx, cellY: cy)
-                if wasFoliage, world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind == .ground {
+                if wasFoliage, world.terrain.isInside(cellX: cx, cellY: cy), world.terrain[cx, cy].kind != .foliage {
                     addBurnedGrass(art, cellX: cx, cellY: cy) // burned away (ADR-0017)
                 }
                 for (dx, dy) in [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -942,21 +1044,16 @@ final class MovementLabScene: SKScene {
                 spawnEffect(art, kind: .armorHit, at: centerPoint(position, size: footprint), scale: 0.8)
             case .tankShieldHit(_, _, _, let position):
                 spawnEffect(art, kind: .shieldHit, at: centerPoint(position, size: footprint))
-            case .projectileHit(_, _, let position, let impact),
-                 .projectileDestroyed(_, _, let position, let impact):
+            case .projectileDestroyed(_, _, let position, let impact):
                 let kind: PixelEffectKind? = switch impact {
                 case .brick: .brickHit
                 case .steel, .boundary: .steelHit
                 case .deflected: .shieldHit
-                case .projectile, .mine: .projectileCancel
+                case .projectile: .projectileCancel
                 case .base: .baseHit
-                case .tank, .expired, .explosion: nil // damage/blast events carry the effect
+                case .tank, .expired: nil // damage/blast events carry the effect
                 }
                 if let kind { spawnEffect(art, kind: kind, at: scenePoint(position), scale: 0.7, z: 680) }
-            case .mineRemoved(_, let position):
-                spawnEffect(art, kind: .mineDisarm, at: scenePoint(position), scale: 0.7)
-            case .mineTriggered(_, let position):
-                spawnEffect(art, kind: .mineTrigger, at: scenePoint(position), scale: 0.8)
             case .pickupCollected(_, _, _, let position):
                 spawnEffect(art, kind: .pickupCollect, at: scenePoint(position), scale: 0.8)
             case .baseShieldChanged(let active):
@@ -972,24 +1069,9 @@ final class MovementLabScene: SKScene {
                     flashBase(art, allied: allied, damageState: state)
                     spawnEffect(art, kind: .baseHit, at: baseNode.position, scale: 1.0, z: 690)
                 }
-            case .tankLaunched(let entityID, _, _, _):
-                // Mine launch (§8.6): the tank lifts (scale) for its flight; the
-                // landing resets it. SKActions park with the scene on pause.
-                if let node = tankNodes[entityID] {
-                    node.removeAction(forKey: "flight")
-                    let up = SKAction.scale(to: 1.35, duration: 0.18)
-                    let down = SKAction.scale(to: 1.0, duration: 0.22)
-                    node.run(SKAction.sequence([up, down]), withKey: "flight")
-                }
-            case .tankLanded(let entityID, _, _):
-                if let node = tankNodes[entityID] {
-                    node.removeAction(forKey: "flight")
-                    node.setScale(1)
-                }
             case .tankSpawned(_, let owner, let position, _) where owner != nil:
                 spawnEffect(art, kind: .spawnComplete, at: centerPoint(position, size: footprint))
             case .weaponFired(let entityID, _, let weaponID, _, let position, let facing):
-                guard weaponID != "mine", weaponID != "fire" else { break }
                 let effectName = weaponID == "normal" ? "muzzle" : weaponID
                 guard let frames = art.manifest.effects[effectName], let first = frames.first,
                       let flash = try? art.sprite(first, scale: artScale * 0.48) else { break }
@@ -1023,21 +1105,23 @@ final class MovementLabScene: SKScene {
             let cx = key % width, cy = key / width
             let expected: TerrainKind = entry.kind == "water" ? .water : .ice
             guard world.terrain.isInside(cellX: cx, cellY: cy),
-                  world.terrain[cx, cy].kind == expected else {
-                entry.node.removeFromParent() // melted/removed (fire on ice)
+                  world.terrain[cx, cy].surface == expected, !world.terrain[cx, cy].kind.isWall else {
+                entry.node.removeFromParent() // covered by a wall (fort hardening)
                 liquidNodes[key] = nil
+                liquidAppliedKey[key] = nil
                 continue
             }
             var mask = 0
-            let offsets = [(1, 0, -1), (2, 1, 0), (4, 0, 1), (8, -1, 0),
-                           (16, 1, -1), (32, 1, 1), (64, -1, 1), (128, -1, -1)]
-            for (bit, dx, dy) in offsets
+            for (bit, dx, dy) in Self.jointNeighbours
             where world.terrain.isInside(cellX: cx + dx, cellY: cy + dy)
-                && world.terrain[cx + dx, cy + dy].kind == expected { mask |= bit }
-            for (diag, a, b) in [(16, 1, 2), (32, 2, 4), (64, 4, 8), (128, 8, 1)]
+                && world.terrain[cx + dx, cy + dy].surface == expected { mask |= bit }
+            for (diag, a, b) in Self.jointDiagonalGates
             where mask & a == 0 || mask & b == 0 { mask &= ~diag }
-            if let texture = try? art.texture(String(format: "px_%@_%03d_%d", entry.kind, mask, frame)) {
+            let applied = mask << 2 | frame
+            if liquidAppliedKey[key] != applied,
+               let texture = try? art.texture(String(format: "px_%@_%03d_%d", entry.kind, mask, frame)) {
                 entry.node.texture = texture
+                liquidAppliedKey[key] = applied
             }
         }
     }
@@ -1048,10 +1132,13 @@ final class MovementLabScene: SKScene {
             debugLabel?.text = "M2 COMBAT LAB  tick \(world.tick)  respawning…"
             return
         }
+        if debugChecksum == nil || world.tick % MovementLabSession.checksumInterval == 0 {
+            if debugChecksum?.tick != world.tick { debugChecksum = (world.tick, world.checksum()) }
+        }
         debugLabel?.text = String(
-            format: "M2 COMBAT LAB  tick %d  %@ ammo %d  pwr %d  proj %d  mines %d  base %d  checksum %llx",
+            format: "M2 COMBAT LAB  tick %d  %@ ammo %d  pwr %d  proj %d  fire %d  base %d  checksum %llx",
             world.tick, tank.specialWeaponID, controller.currentAmmo, tank.powerLevel,
-            world.projectiles.count, world.mines.count, world.base?.durability ?? 0,
-            world.checksum())
+            world.projectiles.count, world.fireHazards.count, world.base?.durability ?? 0,
+            debugChecksum?.value ?? 0)
     }
 }

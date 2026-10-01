@@ -9,12 +9,13 @@ audio-content acceptance.
 
 ## Scope and authority
 
-This is a one-stage development prototype (VS-01), not a completed V1
-campaign. Accepted ADRs override the product plan; reference-game behavior
-and older SVG/styleboard assets do not override those decisions. Runtime art
-is the `Vendor/SparkTreadPixel` submodule; no new artwork was generated.
-ADR-0010 is PROPOSED: it records owner-requested rules that were previously
-implicit and needs the owner's acceptance before it carries authority.
+This began as a one-stage development prototype (VS-01); three campaign
+stages exist as of the R5 consolidation, still short of the twelve-stage V1.
+`GAME_RULES.md` (R5, ADR-0018) wins every gameplay conflict; accepted ADRs
+override the product plan; reference-game behavior and older SVG/styleboard
+assets do not override those decisions. Runtime art is the
+`Vendor/SparkTreadPixel` submodule; no new artwork was generated.
+ADR-0010 has since been accepted and is partly superseded by ADR-0018.
 
 ## Corrections made in the joint review
 
@@ -862,6 +863,463 @@ delegate implementation to Opus-class agents. State:
 - Nothing in the code changed for this work; no implementation before the
   owner confirms §9.
 
+## GAME_RULES R5 consolidation (2026-09-15; ADR-0018 accepted)
+
+The owner asked for three steps: review the RC4 rules draft with the Astra
+agent and settle disagreements, make the agreed document the single rules
+authority, and move the code onto it.
+
+Review. Claude and Astra (Codex, gpt-6-astra) exchanged three written
+rounds plus two verification passes (`final agree`). The agreed changes are
+listed in `GAME_RULES.md` appendix B (B.1 cross-review, B.2 final check):
+AP against steel, the per-column damage strip, fire-landing geometry,
+input buffering and the press-edge fallback, exact milli-subunit motion,
+immediate explosions in the contact queue, blast occlusion along shared
+edges, the water-exit rule, ice-slide details, source-keyed ground fire,
+fort records, win priority, pickup placement, AI dig ability, results
+categories, MaxHits/MaxCombos and the stall pause.
+
+Documents. `sparktread-final-rules-review.md` became `GAME_RULES.md`; the
+old research compendium and `PROJECT_MASTER_SUMMARY_ZH.md` were retired
+(commit 4f2705e keeps them). The plan's gameplay sections 6–10 are an index
+into the rules; ADR-0004/0010/0012/0015/0016/0017 are marked superseded in
+part; asset lists drop mines and the two removed equipment items.
+
+Code. GameCore now implements R5: layered terrain cells (surface under
+walls and foliage), 4 915 200 mSU/s tanks starting at speed level 1,
+integer shell integration with signed acceleration and per-weapon
+lifetimes, the 10-tick normal-fire buffer and press-edge fallback, failed
+shots without cooldown, the four-column strip with first-material columns,
+immediate explosions with snapshot occlusion that ignore shells, symmetric
+shell clashes without effects, the muzzle-in-wall launch contact, fire
+shells landing clipped 2×2 footprints, source-keyed patches with a
+per-victim 30-tick cadence and base edge contact, once-per-cell foliage
+spread and burn-out, 2×2 pickups with a reachable placement queue and
+critical pickups, Bomb clearing, Hold covering protected enemies, fort
+templates with recorded originals and deferred per-quadrant restores, the
+first-wave-then-30-tick spawn cadence with reserved spawn points and a
+45-tick no-fire protection, loss priority with pending respawns, kill
+attribution, MaxHits/MaxCombos, the water exit, and ice slides that keep
+their speed and stop off the ice. Mines, mine launch, Shield of Moon and
+Memory of Sea are gone from state, events, content, UI and audio. The
+adapters fit the arena inside the safe area, space the fire buttons 96 pt
+apart with weapon icons, show reserve/waiting/on-field counts and the
+statistics, and pause on a frame gap above 250 ms. Replay format 8.
+
+Golden regeneration. `M1MovementGolden` was regenerated because GAME_RULES
+§4.1 raised the player base speed (2880 su/s → 4.8 cells/s) and R5 widened
+the checksum surface; `MovementLabFixture` itself is unchanged.
+
+Tests. Old combat, contract, mine-launch and foliage-fire suites that
+encoded removed mechanics were deleted; `R5WeaponWallTests`,
+`R5ExplosionFireTests` and `R5StageRulesTests` cover the §14.3 scenarios
+that apply to the kernel; the remaining suites were updated to R5 values.
+
+Not done in this pass: the twelve-stage content of §14.1 (three stages
+exist, updated to R5 with fort templates), physical-device checks of §15,
+and the §17 balance watch items, which wait for the owner's playtest.
+
+## R5.1 speed tuning (2026-09-15; ADR-0019 accepted)
+
+After the first device run the owner found movement and shells too fast and
+asked for both to be lowered. Every tank and shell speed was scaled by 0.8:
+player base 3 932 160 mSU/s, shell speeds and caps ×0.8, accelerations ×0.64,
+lifetimes ×1.25, so ranges stay those of R5; normal and rapid in-flight caps
+×1.25. Cooldowns and other timers are unchanged. `GAME_RULES.md` is now R5.1
+(§4.1, §5.2, §5.3, §9.1, §17, appendix B.3).
+
+Golden regeneration. `M1MovementGolden` was regenerated because GAME_RULES
+§4.1 lowered the player base speed again (R5.1); the fixture is unchanged.
+Recordings embed their rulesets, so the replay format stays 8.
+
+## R5.2 speed tuning (2026-09-15; ADR-0019 amended)
+
+After trying R5.1 the owner found the game still fast and asked for another
+50 %. Tanks and shells now run at 40 % of R5 (player base 1 966 080 mSU/s,
+shell speeds and caps ×0.4, accelerations ×0.16, lifetimes ×2.5); ranges
+still match R5 within 0.15 cell. Normal and rapid in-flight caps grew with the
+lifetimes (20/24/28/36, 60/70/80/90). `GAME_RULES.md` is R5.2.
+
+Golden regeneration. `M1MovementGolden` was regenerated because GAME_RULES
+§4.1 halved the player base speed again (R5.2); the fixture is unchanged.
+
+Observation for the owner: at this tempo the Training Arena enemies took more
+than 15 seconds to line up a first shot (the test window grew to 45 s), and
+AP A/C crawl at 0.288 cells/s. Tests that depend on speed now read the
+provisional rulesets, so further tuning needs no hand-edited expectations.
+
+## R5.3 normal-fire spacing (2026-09-15; ADR-0019 amended)
+
+On the R5.2 build the owner found the normal rounds too dense: shells ran at
+40 % speed while the cooldown stayed, so consecutive rounds sat 1.5 cells
+apart instead of R5's 3.7. The normal cooldown now follows the same time scale
+(14/12/10/8 → 35/30/25/20 ticks) and its in-flight caps are R5's 8/9/11/14
+again; players and enemies share the weapon. Rapid, AP, explosion and fire are
+unchanged. No golden moved (the M1 drive fires nothing).
+
+## R5.4 AP against red brick, white wall colours, safe area (2026-09-15; ADR-0020 accepted)
+
+Owner direction after a device run: AP twice as effective against red brick,
+white brick milky white, white steel whitish. The AP strip is now 2 cells deep
+in columns whose first material is red brick (white brick and steel keep
+1 cell); the depth is chosen per column. The white tiers had never shown on the
+device: `colorBlendFactor` multiplies, so near-white tints left them red and
+grey. They now use CPU-recoloured atlas textures mapped by luminance (bevels
+and joints kept), checked in simulator screenshots of the Training Arena.
+
+Correction to the R5 entry above: the safe-area fit did not work on the device
+— the SwiftUI proxy that ignores the safe area reported zero insets and the
+arena ran under the Dynamic Island. The scene now reads the insets from its
+SKView; the simulator screenshot shows the arena clear of the island.
+
+## Wall colours and pickup icon size (2026-09-15, owner follow-up)
+
+On the device the first white-tier colours (ivory against near-white) looked
+the same. White brick is now a warm ivory and white steel a cool silver-blue
+about 30 luma darker with deeper joints (ADR-0020 updated; checked in a
+simulator crop next to red brick and grey steel). Dropped pickups drew their
+32-px icon at 1.2× the art scale, 2.4 cells across a 2×2 area; the owner found
+them too big, so the icon is now 0.9× (1.8 cells). Presentation only; pickup
+contact still uses the 2×2 area.
+
+## R5.5 AP against white brick (2026-09-15; ADR-0020 amended)
+
+The owner confirmed white brick doubles too: the AP strip is 2 cells deep in
+columns whose first material is red or white brick, 1 cell in grey steel.
+White brick still cracks first, so two AP rounds open two cells and it keeps
+twice red brick's durability. The weapon field was renamed
+`brickStripDepthQuadrants`, so the replay format moved to 9 (format-8
+recordings and suspended sessions are refused). No golden moved.
+
+## 1UP crash, rapid spacing, harder white tiers (2026-09-15, owner follow-up)
+
+1UP crash: the Training Arena starts at 999 reserve tanks; a second 1UP made
+1001, past `WorldInvariants.maxLives`, and the debug-build invariant assert in
+`MovementLabSession.advance` killed the app. 1UP now stops at the domain
+limit; `TrainingArenaOneUpTests` reproduces the report (it failed with the
+same assertion before the fix).
+
+Rapid fire was dense for the same reason as normal fire: its cooldown now
+follows the time scale too (20/18/15/13 ticks, caps 24/28/32/36; R5.6).
+
+White tiers: the owner found ivory and silver-blue soft and alike and asked for
+harder-looking colours built on red brick and steel. White brick is a pale
+stone brick with deepened joints, white steel a polished silver plate with
+near-black joints; checked in simulator crops against red brick and grey
+steel (ADR-0020 updated).
+
+## Opening cue matches the stage end (2026-09-15, owner follow-up)
+
+The owner found the opening and stage-end music mismatched. The stage end is
+the 决战坦克 results excerpt, a sampled drum loop; the opening was a louder
+NES-style square-wave jingle. `sfx_stage_card` is now an original drum-led
+cue in the excerpt's idiom: its measured sixteenth grid (≈127 bpm), grouped
+fills, kick/tom/snare/cymbal kit in a small room, 8363 Hz 8-bit sheen and
+similar loudness, with its own pattern and a C-minor stab arpeggio (ADR-0011,
+new section; measurements in `Tools/reference_measure/README.md`). No audio
+or hit pattern of the excerpt is reused, and no Battle City material is
+involved. The audio check and its selftest pass; the device audition is
+the owner's.
+
+## Stuck reinforcements and the phase notice (2026-09-15, owner follow-up)
+
+The owner saw the stage-3 elite reinforcements stop at the top and never
+move. Cause: a spawn process may start on a point a tank still stands on
+(§9.3 lets it wait), and tank movement and AI steering treated that
+reservation as solid even for the tank inside it. The tank could not
+leave, the process could not finish, and the stage could never be won.
+Slow elites (AP C at 0.288 cells/s) made the overlap common. Movement and
+steering now ignore a reservation the tank already overlaps; entering one
+is still blocked. Two tests cover it (`R5 spawning and statistics`), and
+both fail on the old code. No replay golden moved.
+
+The owner also asked to drop the "精英部队来袭" text. The director phase HUD
+notice is gone; the phase's sounds stay (ADR-0015 updated).
+
+## Shell strength and invincibility (2026-09-15, GAME_RULES R5.7, ADR-0021)
+
+The owner rejected "opposing shells both vanish" and chose strength, with
+fire bursting on any shell. Normal and rapid shells cancel each other and
+vanish against AP or explosion shells, which fly on; heavy against heavy
+ends both, the explosion shell blasting where they meet; a fire shell lands
+its flame wherever it meets any opposing shell. Invincibility doubled to
+1200 ticks. The clash rule and the spawn-reservation fix change the
+simulation, so the replay format moved to 10 (format-9 recordings and
+suspended sessions are refused). No replay golden moved; the old
+cancel-without-effects test was replaced by per-kind clash tests.
+
+## AP C speed doubled (2026-09-15, GAME_RULES R5.8, ADR-0019)
+
+After the stuck-spawn fix the owner saw AP C move but crawl and asked for
+more speed. AP C now spawns at speed level −2 (0.576 cells/s, was 0.288),
+the same as explosion C; AP A, B and D are unchanged. The archetype table
+is not part of a recorded ruleset, so the replay format moved to 11. The
+fortress-versus-sprinter test now uses AP A, still at −4.
+
+## Post-R5 review and performance pass (2026-09-16, Claude solo)
+
+Astra was offline (`herdr agent list` had no astra pane), so this round ran
+without cross-review; findings below should be re-checked in the next joint
+round. Scope: GAME_RULES R5.8 vs the tree, a full hot-path code review, and
+the owner-reported symptom "sustained fire stutters tank movement and heats
+the phone".
+
+Rules-vs-code audit: every authoritative constant in R5.8 §2–§13, §15.3
+(~345 values — motion tables, cooldowns/caps, strip depths, blast radii,
+the 20-archetype roster incl. the R5.8 AP-C change, AI windows and
+difficulty tables, pickup/fort/lifecycle timers, scoring) matches
+`Sources/GameCore` and `Content/difficulties`. My own reading of
+Simulation/Combat/Fire/Navigation found no rule deviation: the R5.7 shell
+clash matrix, the §7 flame footprint/beat/spread/burn-out chain and the §6.4
+occlusion model implement the letter of the rulebook.
+
+The three shipped stages did NOT meet the §14.1 budgets (content, not
+engine): stage 1 lacked 普通B and the comparable red/white brick targets
+(no `white_brick` in any shipped stage); stage 2 lacked 普通D and 火焰B and
+shipped no guaranteed fire weapon; stage 3 shipped no guaranteed
+AP/explosion weapon and authored `maxAliveEnemies` 5 (rule says 6; 6 only
+after the `elite_siege` phase). **Owner approved all six fixes on
+2026-09-16** ("这几项都按照你的建议来就好"), applied the same day:
+
+- Stage 1: composition 14×normal_a + 4×normal_b + 2×rapid_a; the two inner
+  mid-row wall chunks ([15,13,18,14] and [37,13,40,14]) became
+  `white_brick`, so the mid row reads red-vs-white at equal width and
+  thickness on both flanks.
+- Stage 2: composition 6×normal_a + 6×normal_c + 1×normal_d + 4×rapid_a +
+  2×rapid_b + 2×fire_a + 1×fire_b (still 22); queue index 5 — a fire_a
+  under the round-robin interleave — carries a **critical `fire_weapon`**.
+- Stage 3: `maxAliveEnemies` 6 from the start; queue index 5 (ap_a)
+  carries a critical `ap_weapon`, index 11 (explosion_a) a critical
+  `explosion_weapon` — each teaching weapon drops from its own family.
+
+Content-validator and the full test suite pass on the new content. No
+stage golden existed yet, so nothing was regenerated.
+
+Performance (owner symptom):
+
+- **Root cause: device playtests installed Debug builds.**
+  `Scripts/deploy-device.sh` built without `-configuration` and installed
+  from `Debug-iphoneos` — the unoptimized (-Onone) kernel plus active
+  asserts/invariant walks is exactly "stutters under sustained fire and
+  runs hot". The script now builds and installs Release. The next device
+  run must confirm free-provisioning signing under Release.
+- Scene mirrors now run once per WORLD TICK, not per rendered frame
+  (`MovementLabScene.lastMirroredTick`); events, audio, haptics, curtain
+  and effect aging stay per frame. Intros/outros/results no longer re-run
+  full mirrors 60×/s over a frozen world.
+- The foliage and liquid tilers re-derive a cell's texture only when its
+  joint mask or animation frame changes (`foliageAppliedKey` /
+  `liquidAppliedKey`) instead of a `String(format:)` + atlas lookup per
+  cell per frame, and share static neighbour tables.
+- The lab overlay computed a full-world checksum per frame; it now follows
+  the session's 60-tick checksum cadence.
+- `Stage.runDirector` took the §2.2 collision inset as a hardcoded ±64;
+  it now reads `MovementRuleset.collisionInsetSubunits` (behaviour
+  identical for every shipped ruleset; no golden moved).
+
+White-tier wall art (2026-09-16, owner: "最好需要做…让 astra 来做"): Astra
+delivered `PixelWallsWhite.atlas` — 256 `px_white_brick_joint_MM_QQ`, 256
+`px_white_brick_cracked_joint_MM_QQ`, 256 `px_white_steel_joint_MM_QQ`
+(16×16, same joint/quadrant contract as the brick/steel atlases) plus
+manifest entries, its own QA (`Metadata/white_walls*_checks.json`, not
+bundled) and a pipeline doc. Verified here: 768 spec-conformant manifest
+entries, files present, sha256 samples match; visual check confirms the
+R5.6 reading (pale stone brick with deepened joints, clearly darker
+cracked state, polished near-white steel with near-black seams and a
+per-quadrant indestructible glyph — the brightest wall, distinct in
+grayscale too). `refreshWallTexture` now prefers these dedicated textures
+and falls back to the CPU recolour when an id is missing, so a partial
+atlas can never blank a wall.
+
+Documentation staleness fixed in the same pass (details in the git diff):
+plan §24 questions answered by R5 marked resolved, weapon/equipment/
+archetype counts aligned (4 special / 2 equipment / 20 types), D-016
+superseded note, fictional repo-tree entries corrected, ADR-0019 scope
+widened to R5.6/R5.8 and its stale format-8 claim corrected, the 2026-09-09
+handoff bannered as historical, asset docs stripped of mines/telegraph/
+engine-tread/48×27 leftovers, and both asset docs note that the white wall
+tiers currently reuse recoloured brick/steel atlases (dedicated art is an
+open owner item).
+
+No gameplay rule changed and no replay golden moved in this pass; the full
+gate (`Scripts/ci.sh`) passed after the changes.
+
+## Fullscreen arena, enemy stall fix (2026-09-16, owner round 2)
+
+**Fullscreen (GAME_RULES R5.9, ADR-0022).** Owner: "画面还是全屏吧…把边缘
+safe area 变成精钢". `ArenaLayout` lost its safe-inset input — the fit is
+min(surfaceW/56, surfaceH/27) over the whole screen, centred — and the
+scene tiles the gutter with `px_white_steel_joint_15_15` (the new
+PixelWallsWhite bezel). On notched iPhones the bezel bands sit exactly
+where the cutout is; controls and HUD keep their safe-area padding.
+Presentation only.
+
+**Enemy stall (owner screenshot, stage 2).** Two deterministic AI defects,
+both reproduced by the new `EnemyStallSoakTests` (three stages, 9000 ticks,
+stall = 15 s without moving or firing) before the fix — enemy 5 (normal_a)
+froze at subunits (7628, 4160) from tick 2400 to the end of the soak:
+
+1. `computeIntents.free()` credited the §4.2 alignment snap to PARALLEL
+   candidates. Movement only snaps on perpendicular turns, so a tank pushed
+   off-lane by another tank (swept moves stop at arbitrary subunits)
+   believed "forward is free via a half-lane sidestep" forever and pushed
+   into its blocker without ever rerouting. The snap is now restricted to
+   perpendicular candidates — exactly the moves the movement rules will
+   take.
+2. The stand-and-dig test probed 1.5 cells ahead of centre while the
+   break-terrain fire branch probed 2 cells ahead — adjacent to a thin
+   diggable wall a tank would stand (dig test hits the wall) but never
+   fire (fire probe lands past it). Both now share the shot's own
+   `Combat.firstSolidQuadrant` sweep, so "worth facing" and "the shot
+   connects" cannot disagree.
+
+AI behaviour changed → replay format (simulation version) 11 → 12 per §9.2;
+old recordings and suspended sessions are refused. No golden regenerated:
+the M1 movement golden runs the stage-free lab fixture, whose checksums do
+not involve `computeIntents`, and its expected values are unchanged (full
+suite green). The soak stays in the tree as a regression test.
+
+**Audio consistency pass (ADR-0011 amendment 2026-09-16).** Owner: keep
+the reference originals, fix inconsistent cues (the stage-entry cue named),
+remove unneeded ones. Two steps the same day: the stage card first became
+a plain 3.6 s slice of the results excerpt; the owner then asked for a cue
+that is NOT the same as the stage end — style-consistent and driving — so
+the final card is an original two-bar pattern re-sequenced from the
+excerpt's own drum strokes (grid-sliced at the measured ≈0.118 s
+sixteenth, roles picked by deterministic band-energy analysis; 4.26 s,
+≈45 % denser in actual strokes than the source, ending on the excerpt's
+own wash). The eleven provisional cues that were plain 22050 Hz synthesis
+moved into the generator's native 8363 Hz pipeline (recipes unchanged,
+reference sample-sheen added); `sfx_mine_place` (dead since R5) is
+deleted. All 8 excerpts byte-identical; `check-audio` and its selftest
+pass. The card runs ≈1.1 s past the ≈3.15 s intro into play (the accepted
+2026-09-15 composition ran ≈1.7 s past) — owner device listen pending.
+
+**Art and audio review (2026-09-25).** Owner: "review all the art resources
+and audios, if you think there are some issues, fix it directly. For the
+audio part, try to align the opening style with the ending audio style."
+
+*One rendering defect, found by capturing the real app.* The delivery
+manifest and the atlases are internally clean (2385 sprites, every file
+present, every sha256 matching, no unreferenced PNG, every sprite id the
+Swift reaches — literal or composed — resolving), so the review moved to
+simulator captures of the running app. Those show a vertical strip of
+FOREIGN ground down the arena's right edge: flat green, pale blue and grey
+blocks repeating every three cells against the frontier tan. Cause: the
+ground is laid as 3×3-cell tiles and 56 is not a multiple of three, so the
+last column group is clipped — and it was clipped with
+`SKTexture(rect:in:)`, whose rect resolves against the PACKED ATLAS PAGE
+rather than the sprite. `PixelGround` packs `frontier`, `floodplain`,
+`frozen` and `citadel` on one page, so the clip sampled the other three
+themes. 27 is a multiple of three, which is why only that one edge showed
+it. The tests could not see it: they load the delivery's loose files, where
+every texture is its own image and the sub-rect is correct; the smoke
+render could not either, since its classifier only inspects the central
+60 % × 50 % of the surface. The clip now crops the CGImage
+(`MovementLabScene.clippedGroundTexture`, cached, falling back to the
+unclipped tile) and `Scripts/check-architecture.sh` refuses
+`SKTexture(rect:` anywhere under `Sources` so the class cannot return.
+Re-captured: the edge is frontier ground to the boundary wall.
+
+*The stage card, aligned to the stage end.* Measured against the excerpt it
+is supposed to sound like, the 2026-09-16 card missed on three counts, all
+now fixed in the generator's stage-card block:
+
+| | stage end (excerpt) | card, 2026-09-16 | card now |
+|---|---:|---:|---:|
+| RMS | −20.8 dBFS | −23.5 | −21.2 |
+| quietest 50 ms frame (p10) | −27.3 dBFS | **−120 (silence)** | −28.2 |
+| 118 ms steps at digital silence | 0 of 35 | **10 of 36** | 0 of 28 |
+| 250 ms envelope | flat, −19…−24 | −28 ramping to −18 | flat, −17…−24 |
+| band split low/mid/high | −26.6/−28.9/−30.0 | −28.9/−31.1/−33.3 | −26.5/−28.6/−29.9 |
+| strokes per second | 8.3 | 9.4 | 9.0 |
+| last stroke | — | 4.07 s (≈0.9 s INTO play) | 3.13 s (as play opens) |
+
+The gate was the real mismatch: a sampled room never falls silent, and the
+card's rests were absolute zero. The pattern now plays over a room bed
+built from the excerpt's own band above 2 kHz — grains half-overlapped
+under a Bartlett window, read from positions advancing five eighths of a
+step so none lands on the source's grid, every other one reversed, so
+neither a transient nor a groove survives and what is left is the
+recording's air. Level is no longer a constant but the excerpt's own
+measured RMS (a re-extraction re-levels the card), capped at peak 0.9 so
+the two cues can overlap at a stage change without reaching the mixer's
+ceiling — that cap costs 0.4 dB of the parity. Bar one no longer plays at
+0.85. The phrase is two bars of twelve sixteenths instead of sixteen, which
+at the measured tempo lands the closing accent where the intro hands over
+to play (card 2.3 s + reveal 0.45 s + title-out 0.4 s = 3.13 s) instead of
+leaving a stroke ≈0.9 s inside gameplay; only the accent's wash rings past,
+to 3.32 s. Still the same samples on the same grid, so timbre, tempo and
+room are identical to the stage end by construction and the standing rule
+holds: an original pattern, never the stage end's own passage, never
+synthesized instruments, no Battle City material.
+
+*Mix hierarchy.* Every cue's level was measured together for the first
+time. The synthesized recipes were peak-normalised per voice and never
+against each other, and three had ended up out-shouting the game: a shield
+raise / base repair at −7.3 dBFS RMS was the LOUDEST sound in the product
+(above the player's own death at −10.2 and a base breakthrough at −9.2),
+the results tally tick at −8.6 stabbed 12 dB over the music it counts
+against, and the wave-spawn warp at −10.2 was louder than every weapon
+launch while firing on every wave and every director phase. Retuned by
+their generator peaks only: `sfx_base_shield_on` −7.3 → −16.2,
+`sfx_tally_tick` −8.6 → −18.1, `sfx_spawn_warp` −10.2 → −16.4. Nothing
+else moved: the loud end is now base breakthrough, AP launch and the
+player's death, then explosions and kills, then pickups and launches, then
+impacts, then UI and music. `sfx_fire_ap` sits 6 dB over the other launches
+(the owner asked for a missile that "sounds serious") — left alone, noted
+for the device listen. Excerpts are untouched by construction; all 8 still
+byte-identical, `check-audio` and its selftest pass.
+
+*Checked and found clean.* Cue set and bundle agree exactly in both
+directions (25 = 25, no cue in code without a file, no file without a cue);
+ADR-0017 holds (the `px_status_danger` frames stay unused and the scene
+says so); the white tiers draw the delivery's dedicated `PixelWallsWhite`
+art, so the CPU luminance recolour is a fallback that no longer runs; no
+`Current/`, `Tools/`, `Previews/` or QA JSON is bundled.
+
+*Left for the owner, not changed here.* (a) Since the full-screen fit
+(ADR-0022) the HUD pill and the pause button sit over live arena cells —
+captures show enemy tanks behind both — which §15.1's "不透明 HUD 不覆盖关键
+对象" speaks against; the fix is a layout decision, not a defect to patch.
+(b) The gutter bezel is 精钢 as §15.1 requires, and §3.1 makes 精钢 the
+brightest wall in the game, so the frame is now the brightest thing on
+screen and pulls the eye off the field; dimming it would work against the
+same rule's "不留黑边", so it needs the owner's call. (c) The delivery ships
+a complete unused UI set (`PixelUI`, 46 sprites: joystick, control knob,
+normal/special buttons, pause, panels, cards) while the touch controls and
+pause are drawn as plain SwiftUI shapes — wiring it up is a visible look
+change. (d) Art for mechanics R5 removed is still in the delivery and in
+the adapter: `PixelMines` (8 sprites) with `PixelMineNode` and three mine
+event recipes, the `mine_*` turrets, pickups 7/8/24, and the moon/memory
+equipment with its rotation special case in `PixelTankNode`. Dead, not
+wrong, and the submodule is a separate repository.
+
+**Three cues reworked on the owner's listen (2026-10-01).** The owner
+auditioned all 25 bundled cues and named three: `sfx_fire_explosion`
+"有点闷，和别的音效感觉不太符合", `sfx_explosion_blast` "也有点闷",
+`sfx_base_shield_on` "觉得很滑稽，有点奇怪". Each had a measurable cause —
+the demolition launch was led by a 160→65 Hz square glide and sat 9 dB
+heavier in the bass than the reference shot excerpt beside it; the blast
+was 3.4 dB thin through 400 Hz–1 kHz (the band the reference's own
+explosions put their body in) with 6 dB more mud under 150 Hz; the shield
+cue was a rising square GLIDE, which is what read as cartoonish. All three
+are rebuilt crack-led with the bodies they were missing, and the shield cue
+is now two struck metal plates rather than a glide. Details and the band
+profiles are in ADR-0011's 2026-10-01 amendment.
+
+The rework also exposed two gaps in the generator, both now closed:
+`write_native`'s `peak` says nothing about how loud a cue lands, so
+rebuilding a recipe silently re-levelled it (these three came out 5, 5 and
+13 dB under what the 2026-09-25 mix pass had set) — a reworked cue now
+declares its target RMS through `write_native_rms` and a capped peak is
+printed; and a crack-led recipe cannot reach its loudness inside the
+headroom ceiling while one transient sits 16 dB above the body, so
+`saturate` rounds that transient instead of trading bite for level. All
+three land within 0.1 dB of their 2026-09-25 loudness, so the owner's A/B
+is timbre only. The other 14 synthesized cues and all 8 excerpts are
+byte-identical; the full gate passes. Owner listen pending on these three.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -874,14 +1332,14 @@ Do not interpret green tests as product completion:
 - Still deferred: settings, tutorials, accessibility options, the
   input-selection screen (the rest of the former M4 deferral list —
   traversal, ice, foliage, difficulty, mine launch, persistence, pause,
-  title — landed on 2026-09-10 late evening).
-- Explosions resolve after the contact queue (documented approximation).
+  title — landed on 2026-09-10 late evening; mine launch was later removed
+  outright by the R5 consolidation, ADR-0018).
 - The ground tile family is fixed to the frontier theme until stage data
   selects it.
 - Reachability validation is a cell flood approximation.
 - Owner decisions: none open after 2026-09-10 late evening (invincibility
-  A; ADR-0012 answered — brackets by delegation, no MaxHits/MaxCombos,
-  icons; the designed outro and the centred card accepted on the device).
+  A; ADR-0012 answered — brackets by delegation, icons; MaxHits/MaxCombos
+  later reinstated by the owner's RC4 draft, GAME_RULES R5 §13; the designed outro and the centred card accepted on the device).
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
   items 1–5 landed on 2026-09-10 late evening (ADR-0013…0016 proposed):
   campaign progression, screen flow, checkpoint save, difficulty

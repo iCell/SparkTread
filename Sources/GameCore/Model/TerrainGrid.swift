@@ -1,7 +1,8 @@
-/// Terrain cell kinds (§7.3). Four wall materials, in the reference's
-/// durability order (GAME_RULES §3.5, owner testimony): red brick, white
-/// brick (twice the rounds), grey steel (only the AP shell, one round per
-/// cell) and white steel (indestructible).
+/// Terrain cell kinds (GAME_RULES §2.3, §3.1). A cell's `kind` is its top
+/// layer — a wall, foliage, the base marker, or a bare surface — and its
+/// `surface` is the ground, water or ice underneath. Four wall materials in
+/// durability order: red brick, white brick (two rounds per quadrant), grey
+/// steel (only AP) and white steel (indestructible).
 public enum TerrainKind: Int, Codable, Sendable, Equatable {
     case ground = 0
     case brick = 1
@@ -13,69 +14,85 @@ public enum TerrainKind: Int, Codable, Sendable, Equatable {
     case whiteBrick = 7
     case whiteSteel = 8
 
-    /// Whether the kind blocks a `normal`-profile tank (before quadrant
-    /// masks); `blocksTank(profile:)` applies the equipment profile.
-    public var blocksTanksByDefault: Bool {
-        switch self {
-        case .brick, .whiteBrick, .steel, .whiteSteel, .water, .base: true
-        case .ground, .ice, .foliage: false
-        }
-    }
-
-    /// Whether a pickup may sit on this kind (§9.3 placement legality). The
-    /// same predicate decides when a hidden treasure's covering cell counts
-    /// as destroyed: destruction normalizes an emptied brick/steel cell to
-    /// `.ground`, so "final quadrant destroyed" and "can hold a pickup" agree.
-    public var canHoldPickup: Bool {
-        switch self {
-        case .ground, .ice, .foliage: true
-        case .brick, .whiteBrick, .steel, .whiteSteel, .water, .base: false
-        }
-    }
-
-    /// Brick-family walls chip away quadrant by quadrant under any weapon
-    /// that lists brick damage; steel-family walls use the steel column.
+    /// Brick-family walls chip quadrant by quadrant under brick-damaging
+    /// weapons; steel-family walls resist everything but AP (grey steel).
     public var isBrickFamily: Bool { self == .brick || self == .whiteBrick }
     public var isSteelFamily: Bool { self == .steel || self == .whiteSteel }
     public var isWall: Bool { isBrickFamily || isSteelFamily }
+    /// Kinds that carry a quadrant mask and block by quadrant.
+    public var isSolidStructure: Bool { isWall || self == .base }
+    /// Kinds that are a surface on their own (the layer under walls/foliage).
+    public var isSurface: Bool { self == .ground || self == .water || self == .ice }
 
-    /// White steel takes no damage from anything (owner, §3.5).
+    /// White steel takes no damage from anything (GAME_RULES §3.1).
     public var isIndestructibleWall: Bool { self == .whiteSteel }
 
-    /// Rounds a single quadrant costs, relative to red brick. White brick is
-    /// the same wall with twice the durability: the first hit cracks the
-    /// quadrant, the second removes it.
+    /// Rounds a single quadrant costs: white brick cracks first.
     public var roundsPerQuadrant: Int { self == .whiteBrick ? 2 : 1 }
 }
 
 /// Outcome of one round of damage against a wall quadrant.
 public enum WallDamage: Sendable, Equatable { case none, cracked, removed }
 
-/// One terrain cell. Destructible kinds carry a four-bit quadrant mask
-/// (§7.4): bit 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right
-/// quadrant of 512×512 subunits, in the Y-down world convention.
+/// One terrain cell. Structures carry a four-bit quadrant mask: bit 0 =
+/// top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right quadrant of
+/// 512×512 subunits, in the Y-down world convention. Destroyed walls and
+/// burnt foliage reveal `surface` (GAME_RULES §2.3).
 public struct TerrainCell: Codable, Hashable, Sendable {
     public var kind: TerrainKind
     public var quadrantMask: Int
-    /// Quadrants that have taken one round but have not fallen yet — only
-    /// white brick uses it (`roundsPerQuadrant` 2). Always a subset of
-    /// `quadrantMask`; absent from older documents, where it decodes as 0.
+    /// Quadrants hit once but still standing (white brick only).
     public var crackMask: Int
+    /// The surface under the top layer: `.ground`, `.water` or `.ice`.
+    public var surface: TerrainKind
+    /// Foliage burning state (GAME_RULES §7.4): the tick the cell first
+    /// caught fire, and whether it has spread to its neighbours.
+    public var ignitedAtTick: Int?
+    public var hasSpread: Bool
 
-    public init(kind: TerrainKind, quadrantMask: Int = 0b1111, crackMask: Int = 0) {
+    public init(kind: TerrainKind, quadrantMask: Int = 0b1111, crackMask: Int = 0,
+                surface: TerrainKind? = nil) {
         self.kind = kind
-        self.quadrantMask = kind.blocksTanksByDefault ? quadrantMask : 0
-        self.crackMask = kind.blocksTanksByDefault ? (crackMask & self.quadrantMask) : 0
+        self.quadrantMask = kind.isSolidStructure ? quadrantMask : 0
+        self.crackMask = kind.isSolidStructure ? (crackMask & self.quadrantMask) : 0
+        self.surface = kind.isSurface ? kind : (surface ?? .ground)
+        self.ignitedAtTick = nil
+        self.hasSpread = false
     }
 
-    private enum CodingKeys: String, CodingKey { case kind, quadrantMask, crackMask }
+    /// The cell a destroyed structure or burnt foliage leaves behind.
+    public var revealedSurface: TerrainCell { TerrainCell(kind: surface) }
+
+    /// Whether any wall quadrant still stands in this cell.
+    public var hasWall: Bool { kind.isWall && quadrantMask != 0 }
+
+    /// Whether the cell's surface is water or ice (no lasting fire, no pickups).
+    public var isWaterOrIce: Bool { surface == .water || surface == .ice }
+
+    /// Whether a tank of the profile is blocked by the cell's surface
+    /// (structures block per quadrant, see `TerrainGrid.blocksTank`).
+    public func surfaceBlocksTank(profile: TraversalProfile) -> Bool {
+        surface == .water && profile != .amphibious && !kind.isSolidStructure
+    }
+
+    /// Whether a pickup may occupy this cell (GAME_RULES §10.2).
+    public var canHoldPickup: Bool {
+        !kind.isSolidStructure && surface != .water
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, quadrantMask, crackMask, surface, ignitedAtTick, hasSpread
+    }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(TerrainKind.self, forKey: .kind)
         let mask = try c.decode(Int.self, forKey: .quadrantMask)
         let cracks = try c.decodeIfPresent(Int.self, forKey: .crackMask) ?? 0
-        self.init(kind: kind, quadrantMask: mask, crackMask: cracks)
+        let surface = try c.decodeIfPresent(TerrainKind.self, forKey: .surface)
+        self.init(kind: kind, quadrantMask: mask, crackMask: cracks, surface: surface)
+        ignitedAtTick = try c.decodeIfPresent(Int.self, forKey: .ignitedAtTick)
+        hasSpread = try c.decodeIfPresent(Bool.self, forKey: .hasSpread) ?? false
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -83,6 +100,9 @@ public struct TerrainCell: Codable, Hashable, Sendable {
         try c.encode(kind, forKey: .kind)
         try c.encode(quadrantMask, forKey: .quadrantMask)
         if crackMask != 0 { try c.encode(crackMask, forKey: .crackMask) }
+        if !kind.isSurface && surface != .ground { try c.encode(surface, forKey: .surface) }
+        try c.encodeIfPresent(ignitedAtTick, forKey: .ignitedAtTick)
+        if hasSpread { try c.encode(hasSpread, forKey: .hasSpread) }
     }
 }
 
@@ -113,13 +133,25 @@ public struct TerrainGrid: Codable, Equatable, Sendable {
         }
     }
 
+    /// Whether the wall quadrant (qx, qy) — quadrant coordinates, 2 per
+    /// cell — is standing.
+    public func solidWallQuadrant(qx: Int, qy: Int) -> Bool {
+        guard qx >= 0, qy >= 0 else { return false }
+        let cx = qx / 2, cy = qy / 2
+        guard isInside(cellX: cx, cellY: cy) else { return false }
+        let cell = self[cx, cy]
+        guard cell.kind.isWall else { return false }
+        return cell.quadrantMask & (1 << ((qy % 2) * 2 + (qx % 2))) != 0
+    }
+
     /// Whether an axis-aligned rectangle in subunits (top-left origin,
-    /// exclusive max edge) intersects any tank-blocking geometry. Damaged
-    /// destructible cells block only through their remaining quadrants.
+    /// exclusive max edge) intersects any tank-blocking geometry. Structures
+    /// block only through their remaining quadrants; water blocks unless
+    /// the profile is amphibious.
     public func blocksTank(minX: Int, minY: Int, maxX: Int, maxY: Int,
                            profile: TraversalProfile = .normal) -> Bool {
         if minX < 0 || minY < 0 || maxX > arena.widthSubunits || maxY > arena.heightSubunits {
-            return true // outside the arena is always solid (§ M1 exit: never leave bounds)
+            return true // outside the arena is always solid
         }
         let cell = SpatialUnits.subunitsPerCell
         let quadrant = SpatialUnits.subunitsPerQuadrant
@@ -128,10 +160,10 @@ public struct TerrainGrid: Codable, Equatable, Sendable {
         for cy in firstCellY...lastCellY {
             for cx in firstCellX...lastCellX {
                 let c = self[cx, cy]
-                guard c.kind.blocksTank(profile: profile) else { continue }
+                if c.surfaceBlocksTank(profile: profile) { return true }
+                guard c.kind.isSolidStructure else { continue }
                 if c.quadrantMask == 0b1111 { return true }
                 if c.quadrantMask == 0 { continue }
-                // Test the overlap against each remaining quadrant.
                 for bit in 0..<4 where c.quadrantMask & (1 << bit) != 0 {
                     let qx = cx * cell + (bit % 2) * quadrant
                     let qy = cy * cell + (bit / 2) * quadrant
@@ -142,5 +174,27 @@ public struct TerrainGrid: Codable, Equatable, Sendable {
             }
         }
         return false
+    }
+
+    /// Area (subunits²) of a rectangle that lies over water surface cells
+    /// not covered by a structure — the monotone quantity of the water-exit
+    /// rule (GAME_RULES §4.4).
+    public func waterOverlapArea(minX: Int, minY: Int, maxX: Int, maxY: Int) -> Int {
+        let cell = SpatialUnits.subunitsPerCell
+        guard maxX > minX, maxY > minY else { return 0 }
+        let loX = max(0, minX), loY = max(0, minY)
+        let hiX = min(arena.widthSubunits, maxX), hiY = min(arena.heightSubunits, maxY)
+        guard hiX > loX, hiY > loY else { return 0 }
+        var area = 0
+        for cy in (loY / cell)...((hiY - 1) / cell) {
+            for cx in (loX / cell)...((hiX - 1) / cell) {
+                let c = self[cx, cy]
+                guard c.surface == .water, !c.kind.isSolidStructure else { continue }
+                let w = min(hiX, (cx + 1) * cell) - max(loX, cx * cell)
+                let h = min(hiY, (cy + 1) * cell) - max(loY, cy * cell)
+                if w > 0 && h > 0 { area += w * h }
+            }
+        }
+        return area
     }
 }

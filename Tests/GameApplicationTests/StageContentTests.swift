@@ -169,7 +169,7 @@ private let vs01URL = repoRoot
     /// under the configured lifetime and grace, not the defaults.
     @Test func loaderValidatesPickupRulesAndAppliesThemToAuthoredPickups() throws {
         var def = try StageLoader.decode(Data(contentsOf: vs01URL))
-        def.pickupSpawns = [.init(id: "power_up", cell: [14, 16])]
+        def.pickupSpawns = [.init(id: "power_up", cell: [23, 20])]
         let data = try JSONEncoder().encode(def)
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("sparktread-config-boundary-\(UUID().uuidString).json")
@@ -178,11 +178,11 @@ private let vs01URL = repoRoot
 
         var custom = PickupRuleset.provisional
         custom.pickupLifetimeTicks = 900
-        custom.pickupGraceTicks = 10
+        custom.revealGraceTicks = 10
         let world = try StageLoader.loadWorld(at: url, rules: custom)
         #expect(world.pickups.count == 1)
         #expect(world.pickups.first?.lifetimeRemainingTicks == 900)
-        #expect(world.pickups.first?.graceTicksRemaining == 10)
+        #expect(world.pickups.first?.graceTicksRemaining == 0) // authored pickups are never under a tank
 
         var broken = PickupRuleset.provisional
         broken.freezeTicks = 0

@@ -21,19 +21,18 @@ public enum TrainingArenaFixture {
         Vec2i(x: 2, y: 12), Vec2i(x: 53, y: 12),
     ]
 
-    /// Every pickup the content pipeline knows, in a display order.
+    /// Every pickup of GAME_RULES §10.1, in a display order.
     public static let pickupIDs: [String] = [
         "speed_up", "armor_up", "power_up", "level_up", "max_speed_power", "max_armor_ammo", "ammo_crate",
-        "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "mine_weapon",
-        "amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea",
+        "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon",
+        "amphi_tank", "anti_skid",
         "invincibility", "base_shield", "freeze_enemy", "bomb", "extra_life",
         "score_200", "score_500", "score_1000", "score_2000",
     ]
 
-    /// Every enemy archetype, offered on the training panel one button
-    /// each (owner 2026-09-10: "点击一个按钮增加一个类型的坦克"), sorted by
-    /// resistance — armour plus shield — from low to high, then by family
-    /// and tier for ties. The arena starts with no enemies.
+    /// Every enemy archetype, one button each, in the fixed GAME_RULES §1
+    /// order: armour plus shield ascending, ties in §9.1 table order
+    /// (normal, rapid, fire, AP, explosion). The arena starts with no enemies.
     public struct RosterEntry: Equatable, Sendable {
         public let archetypeID: String
         public let family: String
@@ -42,7 +41,7 @@ public enum TrainingArenaFixture {
     }
 
     public static let enemyRoster: [RosterEntry] = {
-        let families = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
+        let families = EnemyArchetypes.families
         var entries: [RosterEntry] = []
         for (f, family) in families.enumerated() {
             for (t, tier) in ["a", "b", "c", "d"].enumerated() {
@@ -63,11 +62,10 @@ public enum TrainingArenaFixture {
 
     public static let enemyArchetypes: [String] = enemyRoster.map(\.archetypeID)
 
-    /// The six weapon families the panel offers (owner 2026-09-10: one
-    /// button per family, then its power level and equipment).
-    public static let enemyFamilies = ["normal", "rapid", "fire", "ap", "explosion", "mine"]
-    /// Equipment an enemy can carry (§8.6).
-    public static let equipmentIDs = ["amphi_tank", "anti_skid", "shield_of_moon", "memory_of_sea"]
+    /// The five weapon families the panel offers.
+    public static let enemyFamilies = EnemyArchetypes.families
+    /// Equipment a tank can carry (GAME_RULES §8).
+    public static let equipmentIDs = ["amphi_tank", "anti_skid"]
 
     public static func makeWorld() -> WorldState {
         let arena = ArenaSpecification.universal
@@ -108,6 +106,8 @@ public enum TrainingArenaFixture {
         // below it, brick pillars either side (the smoke test's central crop
         // needs brick and ground).
         fill(.ice, 20, 12, 35, 16)
+        // Foliage over ice: slides, but does not burn (GAME_RULES §2.3).
+        for y in 12...13 { for x in 20...23 { terrain[x, y] = TerrainCell(kind: .foliage, surface: .ice) } }
         fill(.brick, 14, 12, 15, 17); fill(.brick, 40, 12, 41, 17)
         fill(.brick, 17, 14, 18, 14); fill(.brick, 37, 14, 38, 14)
         // Bottom-left: foliage cover with brick inside it.
@@ -151,7 +151,7 @@ public enum TrainingArenaFixture {
             $0.speedLevel = attributes.speedLevel
             $0.powerLevel = attributes.powerLevel
             $0.specialWeaponID = String(archetype.split(separator: "_").first ?? "normal")
-            $0.spawnProtectionTicks = 30
+            $0.spawnProtectionTicks = LifecycleRules.enemySpawnProtectionTicks
         }
         return id
     }

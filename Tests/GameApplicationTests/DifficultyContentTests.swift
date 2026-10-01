@@ -21,7 +21,8 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         #expect(casual.composition == .forgiving && veteran.composition == .advanced)
         #expect(casual.enemyBehavior.decisionIntervalTicks > standard.enemyBehavior.decisionIntervalTicks)
         #expect(veteran.enemyBehavior.decisionIntervalTicks < standard.enemyBehavior.decisionIntervalTicks)
-        #expect(casual.telegraphTicksPercent > 100 && veteran.telegraphTicksPercent >= 100)
+        // GAME_RULES §9.3: the spawn process is 45 ticks on every difficulty.
+        #expect(casual.telegraphTicksPercent == 100 && veteran.telegraphTicksPercent == 100)
         #expect(casual.enemySpecialAmmoPercent == 70 && veteran.enemySpecialAmmoPercent == 140)
         for def in [casual, standard, veteran] { #expect(DifficultyValidator.validate(def).isEmpty) }
     }
@@ -38,13 +39,13 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
     }
 
     @Test func compositionVariantsAndTheTelegraphFloor() {
-        let queue = ["normal_a", "rapid_b", "normal_c", "ap_d", "fire_a", "mine_b", "normal_a"]
+        let queue = ["normal_a", "rapid_b", "normal_c", "ap_d", "fire_a", "explosion_b", "normal_a"]
         var forgiving = DifficultyDefinition.standard
         forgiving.composition = .forgiving
-        #expect(forgiving.apply(toComposition: queue) == ["normal_a", "rapid_b", "normal_a", "ap_b", "fire_a", "mine_b", "normal_a"])
+        #expect(forgiving.apply(toComposition: queue) == ["normal_a", "rapid_b", "normal_a", "ap_b", "fire_a", "explosion_b", "normal_a"])
         var advanced = DifficultyDefinition.standard
         advanced.composition = .advanced // every third A/B entry is promoted
-        #expect(advanced.apply(toComposition: queue) == ["normal_a", "rapid_b", "normal_c", "ap_d", "fire_c", "mine_b", "normal_a"])
+        #expect(advanced.apply(toComposition: queue) == ["normal_a", "rapid_b", "normal_c", "ap_d", "fire_c", "explosion_b", "normal_a"])
         #expect(DifficultyDefinition.standard.apply(toComposition: queue) == queue)
         var slow = DifficultyDefinition.standard
         slow.telegraphTicksPercent = 140
@@ -56,7 +57,7 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
 
     @Test func theBuilderAppliesTheDifficultyAndTheAuthoredPhases() throws {
         let def = try StageLoader.loadDefinition(at: vs03URL)
-        #expect(def.directorPhases?.map(\.id) == ["elite_minelayer"])
+        #expect(def.directorPhases?.map(\.id) == ["elite_siege"])
         let casual = try DifficultyLoader.load(at: difficultyURL("casual"))
         let veteran = try DifficultyLoader.load(at: difficultyURL("veteran"))
         let standardWorld = try StageBuilder.build(def)
@@ -69,8 +70,8 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         #expect(veteranWorld.stage?.spawnQueue.contains { $0.hasSuffix("_c") || $0.hasSuffix("_d") } == true)
         #expect(standardWorld.stage?.spawnQueue.count == casualWorld.stage?.spawnQueue.count)
         let phase = try #require(standardWorld.stage?.directorPhases.first)
-        #expect(phase.reinforcements == ["mine_c", "ap_c", "ap_c"] && phase.maxAliveEnemies == 6 && phase.repairsBase)
-        #expect(casualWorld.stage?.directorPhases.first?.reinforcements == ["mine_a", "ap_a", "ap_a"])
+        #expect(phase.reinforcements == ["explosion_c", "ap_c", "ap_c"] && phase.maxAliveEnemies == 6 && phase.repairsBase)
+        #expect(casualWorld.stage?.directorPhases.first?.reinforcements == ["explosion_a", "ap_a", "ap_a"])
         #expect(standardWorld.checksum() != casualWorld.checksum())
         #expect(WorldInvariants.violations(in: veteranWorld).isEmpty)
         // Content: invalid phases are reported by the validator.

@@ -28,11 +28,17 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public var pickupSpawns: [PickupSpawn]
     public var dropTable: [String]
     public var dropChancePercent: Int
-    /// Carrier drops (reference rule): the enemy at `queueIndex` in the
-    /// interleaved spawn queue carries `pickup` and drops it on death.
+    /// Carrier drops: the enemy at `queueIndex` in the interleaved spawn
+    /// queue carries `pickup` and drops it on death (GAME_RULES §10.2).
     public var carriedDrops: [CarriedDrop]?
-    /// Treasures hidden under brick cells, revealed on destruction.
+    /// Pickups hidden under walls; `cell` is the top-left of the 2×2 area,
+    /// revealed once the area holds no wall.
     public var hiddenPickups: [PickupSpawn]?
+    /// Flag On Guard wall cells [[x, y]…] (GAME_RULES §11.2); absent or
+    /// empty means the flag protects the base without temporary walls.
+    public var fortTemplate: [[Int]]?
+    /// Red stage fire that hurts every tank (GAME_RULES §7.3).
+    public var environmentFires: [EnvironmentFire]?
     /// Authored director phases (ADR-0015): elite reinforcements, alive
     /// cap changes and base repair keyed on enemies scheduled so far.
     public var directorPhases: [DirectorPhase]?
@@ -55,13 +61,22 @@ public struct StageDefinition: Codable, Equatable, Sendable {
         public var count: Int
     }
 
+    /// A 2×2 pickup area anchored at its top-left `cell`; `critical`
+    /// pickups never expire.
     public struct PickupSpawn: Codable, Equatable, Sendable {
         public var id: String
         public var cell: [Int]
+        public var critical: Bool?
     }
 
     public struct CarriedDrop: Codable, Equatable, Sendable {
         public var queueIndex: Int
         public var pickup: String
+        public var critical: Bool?
+    }
+
+    public struct EnvironmentFire: Codable, Equatable, Sendable {
+        public var cell: [Int]
+        public var lifetimeTicks: Int
     }
 }

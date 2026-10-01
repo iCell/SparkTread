@@ -1,5 +1,7 @@
 # ADR-0012: Reference Results Table and Stage-Clear Bonuses
 
+> **Superseded in part by ADR-0018 (2026-09-15).** Where this record conflicts with `GAME_RULES.md` R5, R5 wins; see ADR-0018 item 3 for the exact clauses.
+
 Status: Accepted by the owner on 2026-09-10 (late evening) with its questions answered: the bonus rule was delegated ("我不知道原作怎么算的，你可以用一种最合理的方式来决定" — the stage-number brackets stand), MaxHits/MaxCombos "不要", table icons "坦克图标"
 
 Date: 2026-09-10
