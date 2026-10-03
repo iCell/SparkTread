@@ -675,14 +675,31 @@ enum HUDLabels {
     /// (`<theme>_<number>_<name>`), e.g. "STAGE 01" / "首战防御".
     static func stageCard(_ stageID: String?) -> (title: String, subtitle: String) {
         guard let stageID else { return ("STAGE", "") }
+        // The id is <theme>_<NN>_<name>, and the theme is not always one
+        // word: `iron_citadel_08_fine_steel_gates` broke a parser that read
+        // the number out of position 1, so stages 6, 8, 11 and 12 showed
+        // "STAGE" with their number stranded in the subtitle. Find the
+        // number, and the name is whatever follows it.
         let parts = stageID.split(separator: "_")
-        let number = parts.count > 1 ? Int(parts[1]) : nil
+        let numberIndex = parts.firstIndex { Int($0) != nil }
+        let number = numberIndex.map { Int(parts[$0])! }
         let title = number.map { String(format: "STAGE %02d", $0) } ?? "STAGE"
-        let name = parts.count > 2 ? parts[2...].joined(separator: "_") : ""
+        let name = numberIndex.map { parts[(parts.index(after: $0))...].joined(separator: "_") } ?? ""
         let subtitle: String = switch name {
         case "first_defense": "首战防御"
         case "hidden_in_grass": "隐于草丛"
         case "desert_stairs": "沙漠阶梯"
+        // Stages 4-12 (GAME_RULES §14.1): each name is the line its map
+        // teaches, so the select screen reads as a syllabus.
+        case "amphibious_crossing": "水路侧袭"
+        case "slick_lane": "长冰滑道"
+        case "white_bulwark": "白墙壁垒"
+        case "supply_run": "补给争夺"
+        case "fine_steel_gates": "精钢关隘"
+        case "firebreaks": "火线隔断"
+        case "double_tempo": "双速交锋"
+        case "siege_rotation": "围城轮转"
+        case "all_arms": "全军集结"
         default: name.replacingOccurrences(of: "_", with: " ").capitalized
         }
         return (title, subtitle)

@@ -1566,6 +1566,45 @@ tried twice and dropped: dimmed, a top-down tank is a smudge, and
 stencilled from its alpha it is a rectangle, because that is the shape a
 tank seen from above actually is. The plate carries the screens on its own.
 
+**Select screen, second pass (2026-10-03, later still).** The owner sent a
+screenshot: every card's title was clipped, the back button was too plain
+and sat too low, and the app wanted a launch sequence.
+
+*Two real defects behind the clipped text.* The card's map was a ZStack
+sibling with `scaledToFill`, so the image drove the card's layout instead of
+sitting behind it; the fixed frame then centred content wider than itself
+and cut the title at both ends. The map moved into `.background`, which is
+laid out to the view's bounds and cannot size it. And `HUDLabels.stageCard`
+read the stage number out of id position 1 — fine for `frontier_01_…`, wrong
+for `iron_citadel_08_…`, because the new theme ids are two words. Stages 6,
+8, 11 and 12 showed "STAGE" with their number stranded in the subtitle. It
+finds the number now, and the name is whatever follows it. Both are pinned
+by tests, the second by asserting every campaign stage resolves to its
+position and to a subtitle that is not ASCII — a Latin subtitle is the
+fallback spelling of the id, so that check catches a stage that lost its
+name as well as one that never had one. Stages 4–12 gained Chinese names,
+each the line its map teaches.
+
+*The back button* is dressed like the rest of the product now — the dark
+translucent plate with a bright rim that the HUD pill and the touch
+controls already use, with the menus' yellow on the chevron — and sits at
+the screen's own top-left corner rather than on the title's line.
+
+*The launch sequence.* `SparkTread` stamps in from 1.4× scale, a yellow
+spark runs left to right under it, and the subtitle and buttons rise after.
+Stamping is the motion this product already uses — it is how the stage
+outro puts its outcome title on screen — and the spark is the name's own
+half, so the sequence belongs to the logo rather than being an effect
+played in front of it. ≈0.9 s, and it runs once per app start: backing out
+of a menu onto the title does not replay it.
+
+Verified by rendering the views themselves (`ImageRenderer`) rather than by
+driving the simulator, which needs an accessibility grant: the card layout,
+the titles and the back button were checked that way, and the twelve card
+images against the stage data. The scrolling itself is structural only —
+`ScrollView` plus a `ScrollViewReader` that opens on the suggested stage —
+and is for the device pass to confirm.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

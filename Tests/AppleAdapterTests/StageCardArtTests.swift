@@ -65,4 +65,22 @@ import GameApplication
         let at = (y * image.width + x) * 4
         return Array(bytes[at..<(at + 3)])
     }
+
+    /// Every campaign stage must resolve to its own number and a Chinese
+    /// name. The id is <theme>_<NN>_<name> and the theme is not always one
+    /// word — `iron_citadel_08_…` broke a parser that read the number out of
+    /// position 1, so four stages showed "STAGE" with the number stranded in
+    /// the subtitle (2026-10-03).
+    @Test func everyStageResolvesANumberAndAChineseName() throws {
+        let root = contentRoot()
+        let campaign = try CampaignLoader.load(at: root.appendingPathComponent("Content/campaigns/campaign_v1.json"))
+        for (index, id) in campaign.stageIDs.enumerated() {
+            let card = HUDLabels.stageCard(id)
+            #expect(card.title == String(format: "STAGE %02d", index + 1), "\(id) titled '\(card.title)'")
+            #expect(!card.subtitle.isEmpty, "\(id) has no subtitle")
+            // A fallback subtitle is the id spelled out in Latin letters;
+            // a named stage is not.
+            #expect(card.subtitle.allSatisfy { !$0.isASCII }, "\(id) fell back to '\(card.subtitle)'")
+        }
+    }
 }

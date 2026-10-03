@@ -94,6 +94,9 @@ public struct AppRootView: View {
     @State private var model: AppFlowModel
     @State private var controller: MovementLabController?
     @State private var storeNotice: String?
+    /// The launch sequence is for the launch: backing out of a menu onto
+    /// the title again should not replay it.
+    @State private var introPlayed = false
     private let campaign: CampaignDefinition?
     private let store: CampaignPersistence?
     /// Each stage's own map, for the select screen's card art. Decoded once
@@ -167,7 +170,9 @@ public struct AppRootView: View {
                             onResume: resumeSuspended,
                             onContinue: { if let run = model.checkpoint { start(run) } },
                             onStart: { discardSuspended(); model.openCampaignSelect() },
-                            onTraining: { discardSuspended(); startTraining() })
+                            onTraining: { discardSuspended(); startTraining() },
+                            playsIntro: !introPlayed,
+                            onIntroFinished: { introPlayed = true })
             case .campaignSelect:
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model, stageMaps: stageMaps,
@@ -227,6 +232,19 @@ struct TitleScreen: View {
     var onContinue: () -> Void = {}
     let onStart: () -> Void
     let onTraining: () -> Void
+    /// The launch sequence runs once per app start, not every time the
+    /// player backs out of a menu onto the title again.
+    var playsIntro = false
+    var onIntroFinished: () -> Void = {}
+
+    /// The logo lands, a spark runs under it, then the rest arrives.
+    /// Stamping is the motion this product already uses — it is how the
+    /// stage outro puts its outcome title on screen — and the spark is the
+    /// name's own half, so the sequence belongs to the logo rather than
+    /// being an effect played in front of it.
+    @State private var stamped = false
+    @State private var sparked = false
+    @State private var settled = false
 
     var body: some View {
         VStack(spacing: 14) {
@@ -235,10 +253,16 @@ struct TitleScreen: View {
                 .font(.system(size: 54, weight: .black, design: .rounded))
                 .foregroundStyle(Color.yellow)
                 .shadow(color: .black, radius: 0, x: 3, y: 3)
+                .scaleEffect(stamped ? 1 : 1.4)
+                .opacity(stamped ? 1 : 0)
+                .overlay(alignment: .bottomLeading) { spark }
             Text("坦克大战")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
+                .opacity(settled ? 1 : 0)
+                .offset(y: settled ? 0 : 10)
             Spacer()
+            Group {
             if hasCampaign, canResume {
                 titleButton("继续上次战斗", action: onResume)
             }
@@ -256,10 +280,41 @@ struct TitleScreen: View {
                     .lineLimit(2)
                     .padding(.horizontal, 30)
             }
+            }
+            .opacity(settled ? 1 : 0)
+            .offset(y: settled ? 0 : 14)
             Spacer().frame(height: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MenuBackdrop())
+        .task { await runIntro() }
+    }
+
+    /// A hot leading edge dragging a yellow trail, swept under the logo on
+    /// the beat the logo lands.
+    private var spark: some View {
+        GeometryReader { proxy in
+            Capsule()
+                .fill(LinearGradient(colors: [.yellow.opacity(0), .yellow, .white],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(width: sparked ? proxy.size.width : 0, height: 4)
+                .opacity(settled ? 0.45 : 1)
+                .offset(y: proxy.size.height - 2)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func runIntro() async {
+        guard playsIntro, !stamped else {
+            stamped = true; sparked = true; settled = true
+            return
+        }
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.56)) { stamped = true }
+        try? await Task.sleep(for: .milliseconds(340))
+        withAnimation(.easeOut(duration: 0.34)) { sparked = true }
+        try? await Task.sleep(for: .milliseconds(240))
+        withAnimation(.easeOut(duration: 0.32)) { settled = true }
+        onIntroFinished()
     }
 
     private func titleButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -295,20 +350,10 @@ struct CampaignSelectScreen: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack {
-                Button(action: onBack) {
-                    Label("返回", systemImage: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                Spacer()
-                Text("选择关卡")
-                    .font(.system(size: 26, weight: .heavy))
-                    .foregroundStyle(Color.yellow)
-                Spacer()
-                Color.clear.frame(width: 60, height: 1)
-            }
-            .padding(.horizontal, 24)
+            Text("选择关卡")
+                .font(.system(size: 26, weight: .heavy))
+                .foregroundStyle(Color.yellow)
+                .padding(.top, 2)
             HStack(spacing: 10) {
                 Text("难度")
                     .font(.system(size: 15, weight: .bold))
@@ -346,6 +391,27 @@ struct CampaignSelectScreen: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Up at the screen's own top edge rather than on the title's line
+        // (owner 2026-10-03), and dressed like the rest of the product: the
+        // dark translucent plate with a bright rim that the HUD pill and the
+        // touch controls already use, with the menus' yellow on the chevron.
+        .overlay(alignment: .topLeading) {
+            Button(action: onBack) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(Color.yellow)
+                    Text("返回")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.black.opacity(0.55)))
+                .overlay(Capsule().stroke(Color.white.opacity(0.45), lineWidth: 1.5))
+            }
+            .padding(.leading, 20)
+        }
         .background(MenuBackdrop())
     }
 }
@@ -367,27 +433,38 @@ struct StageCard: View {
     var body: some View {
         let card = HUDLabels.stageCard(stageID)
         Button { onSelect(index) } label: {
-            ZStack(alignment: .bottomLeading) {
-                background
-                // The scrim: the map is busy, and the title has to stay
-                // readable over whichever stage it belongs to.
-                LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.82)],
-                               startPoint: .top, endPoint: .bottom)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(card.title)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                    Text(card.subtitle)
-                        .font(.system(size: 13, weight: .bold))
-                        .lineLimit(1)
-                    Text(completed ? "已通关" : unlocked ? "可进入" : "未解锁")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(completed ? Color.green : unlocked ? Color.yellow : Color.gray)
-                }
-                .foregroundStyle(unlocked ? Color.white : Color.gray)
-                .padding(.horizontal, 10)
-                .padding(.bottom, 9)
+            // The text is the view that sizes the card; the map goes in
+            // `.background`, which is laid out to the view's bounds instead of
+            // driving them. As a ZStack sibling a `scaledToFill` image made the
+            // card wider than its own frame, and the frame then centred the
+            // overflow — which clipped the title at both ends (owner report,
+            // 2026-10-03: 文字被截取了).
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.title)
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(card.subtitle)
+                    .font(.system(size: 13, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(completed ? "已通关" : unlocked ? "可进入" : "未解锁")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(completed ? Color.green : unlocked ? Color.yellow : Color.gray)
             }
-            .frame(width: Self.size.width, height: Self.size.height)
+            .foregroundStyle(unlocked ? Color.white : Color.gray)
+            .padding(.horizontal, 10)
+            .padding(.bottom, 9)
+            .frame(width: Self.size.width, height: Self.size.height, alignment: .bottomLeading)
+            .background {
+                ZStack {
+                    background
+                    // The scrim: the map is busy, and the title has to stay
+                    // readable over whichever stage it belongs to.
+                    LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.85)],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(RoundedRectangle(cornerRadius: 12)
                 .stroke(suggested ? Color.yellow : Color.gray.opacity(0.5),
