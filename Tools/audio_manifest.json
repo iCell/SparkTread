@@ -172,10 +172,16 @@
         21.86,
         22.72
       ]
+    },
+    "sfx_title_tread.wav": {
+      "attribution": "invented",
+      "milliseconds": 5300,
+      "note": "the launch sequence's sound, added 2026-10-03 at the owner's request (\u914d\u5408\u80cc\u666f\u97f3\u4e50\uff0c\u53ef\u4ee5\u662f\u5c65\u5e26\u78be\u8fc7\u7684\u58f0\u97f3): the tank that drives through the title, heard on its tracks \u2014 two tracks of jittered link slaps (clack, ping, ground thud), a rolling noise bed high-passed at 140 Hz so its weight sits where a phone speaker carries it, a metal-on-metal hiss following the slaps, a pitch factor that turns over as the tank passes, and from 2.565 s (its rear clearing the wordmark at 170 pt/s) a recession of \u221234 dB with the top closing to 500 Hz, silent at 5.3 s when the drive ends. Stereo \u2014 the only stereo cue in the set \u2014 panned by the tank's place on the screen: from 218 pt left of centre, through the middle at 1.28 s, to full right as it leaves (constant-power law referenced so the centre equals a mono cue on both speakers). No reference: \u51b3\u6218\u5766\u514b has no tread sound, and the game itself still has none (owner 2026-09-10) \u2014 this plays only under the launch, which is the one place a tank is heard moving. Steady part levelled to the two music cues' \u221220.8 dBFS RMS.",
+      "sha256": "c56afe21c0c5ced84eb41483aa32f3393d72e6a64b7b0e0f2ecd78abe46b014a"
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "0b3656cbfe7f99148a7ffe1194c92ce8052219cc524c599611474c9143e31da4",
+  "generator_sha256": "f9dfafe56347a6a2eaf0e10675cce790afdb9b2a393b86b97523acafb2c78980",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
   "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",

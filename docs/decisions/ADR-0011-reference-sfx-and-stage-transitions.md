@@ -611,3 +611,47 @@ overlapped itself at that rate.
 The excerpt itself is untouched and still serves the normal launch, and the
 extractor no longer cuts it three times. The set is now 17 synthesized, 6
 excerpts, and the owner's own stage card.
+
+## Amendment 2026-10-03 (sixth): the launch sequence is scored by the treads
+
+The owner asked (2026-10-03) for music under the launch sequence — the
+tank that drives through the title and leaves the wordmark behind it — and
+said the music could be the sound of its treads rolling. `sfx_title_tread`
+is that: 5.3 s, synthesized in the native 8363 Hz pipeline like every other
+generated cue, attribution `invented` (决战坦克 has no tread sound; nothing
+in it is measured from the recording, and nothing in it is anyone else's).
+
+The recipe (`tread_drive` in the generator): two tracks of link slaps at
+9.5 per second each, offset by 0.42 of a period and ±6 % jittered so the
+composite limps the way a real tread does; each slap a bandpassed clack, a
+brighter ping and a short ground thud; a rolling noise bed high-passed at
+140 Hz so its weight sits where a phone speaker carries it; a
+metal-on-metal hiss that follows the slaps; a pitch factor that turns over
+as the tank passes. It is cut to the drive's own timeline: the tank's rear
+clears the 370 pt wordmark plus its own 66 pt at 170 pt/s, 2.565 s in, and
+from there the cue recedes −34 dB with its top closing to 500 Hz, silent at
+5.3 s when the exit run ends. The envelope stops the sound; nothing in the
+app does, and `TitleIntroAudioTests` holds the cue's length to
+`TitleScreen`'s timeline. Its steady part is levelled to the two music
+cues' −20.8 dBFS RMS, since it stands in for music. It is the set's only
+stereo cue, because it is the only one that moves: the pan is baked into
+the file from the tank's place on the screen (218 pt left of centre at the
+start, centre at 1.28 s, full right as it leaves), with a constant-power law
+referenced so that dead centre is the mono signal on both channels — what
+every other cue is — so the drive-by crosses the iPhone's landscape speakers
+without the mixer learning to pan. Offered to the owner with an accent at
+the moment the title is complete; the owner left both to Claude's judgement
+(可以听你的意见), and the pan was taken while the accent was declined — the
+reveal closes visually, and a stinger there would compete with the treads
+receding.
+
+This NARROWS the no-engine-sound decision of 2026-09-10 (Decision §3) and
+does not reverse it: the game still has no engine or tread voice — the
+player's tank drives silently in every stage, and this cue is played by the
+title screen only — and the launch sequence, presentation outside any game,
+is the one place a tank is heard moving. The cue has no sustained pitched
+drone: treads, not an engine. Playback: the app now builds one `GameAudio`
+at its root, under the launch screen, so the voice pools warm once rather
+than at the first game start; the title plays the cue through it and every
+controller is handed the same instance. The set is 25 cues: 18 synthesized,
+6 excerpts, and the owner's stage card.

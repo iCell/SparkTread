@@ -43,7 +43,9 @@ public struct AVAudioBackend: AudioBackend {
 
 /// M3 provisional SFX (apple_adapters/Audio, §14): plays the synthesized
 /// placeholder set for this tick's domain events. Reference scope: game SFX
-/// plus win/loss stingers, no music. The sound CONTENT is provisional
+/// plus win/loss stingers, no music; the launch sequence's tread (owner
+/// 2026-10-03) is the one cue played outside a game, by the title screen
+/// through the same instance. The sound CONTENT is provisional
 /// (owner decision 2026-09-09: replicate the reference game's voices once
 /// the reference material is available); this class owns the structural
 /// rules — which event plays what, dedup per drain, priorities, throttles,
@@ -64,6 +66,7 @@ public final class GameAudio {
         "sfx_pickup_spawn", "sfx_pickup_collect",
         "sfx_spawn_warp", "sfx_stage_win",
         "sfx_tally_tick", "sfx_stage_card",
+        "sfx_title_tread",
     ]
 
 
@@ -90,7 +93,13 @@ public final class GameAudio {
     /// that comes up short stays short (R18-01) and two spare preloaded
     /// voices cost less than that risk. Playback never allocates beyond it.
     nonisolated static func poolSize(for name: String) -> Int {
-        name == "sfx_fire_rapid" ? 6 : 3
+        switch name {
+        case "sfx_fire_rapid": 6
+        // Once per app start and 5.3 s long: a second preloaded copy of
+        // the launch tread would never be heard.
+        case "sfx_title_tread": 1
+        default: 3
+        }
     }
     /// Looping ambience keyed by name: the DESIRED state survives a
     /// suspension; the voice is only alive while playing.

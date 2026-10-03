@@ -54,11 +54,13 @@ MANIFEST = os.environ.get("SPARKTREAD_AUDIO_MANIFEST") or COMMITTED_MANIFEST
 # Per-cue manifest note, in the same "note" field the excerpt entries carry:
 # how a voice was built, where that is not obvious from its attribution.
 NOTES = {
+    "sfx_title_tread": "the launch sequence's sound, added 2026-10-03 at the owner's request (配合背景音乐，可以是履带碾过的声音): the tank that drives through the title, heard on its tracks — two tracks of jittered link slaps (clack, ping, ground thud), a rolling noise bed high-passed at 140 Hz so its weight sits where a phone speaker carries it, a metal-on-metal hiss following the slaps, a pitch factor that turns over as the tank passes, and from 2.565 s (its rear clearing the wordmark at 170 pt/s) a recession of −34 dB with the top closing to 500 Hz, silent at 5.3 s when the drive ends. Stereo — the only stereo cue in the set — panned by the tank's place on the screen: from 218 pt left of centre, through the middle at 1.28 s, to full right as it leaves (constant-power law referenced so the centre equals a mono cue on both speakers). No reference: 决战坦克 has no tread sound, and the game itself still has none (owner 2026-09-10) — this plays only under the launch, which is the one place a tank is heard moving. Steady part levelled to the two music cues' −20.8 dBFS RMS.",
     "sfx_fire_rapid": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
     "sfx_stage_card": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased — standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured ≈0.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E♭4 — the key taken from this excerpt's own faint harmonic stabs — over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first — SHAPE in the generator selects",
 }
 
 ATTRIBUTION = {
+    "sfx_title_tread": "invented",
     "sfx_stage_card": "derived",
     "sfx_base_destroyed": "derived", "sfx_pickup_spawn": "derived", "sfx_deflect": "derived",
     "sfx_hit_brick": "derived", "sfx_tally_tick": "derived",
@@ -204,6 +206,17 @@ def lowpass(sig, cutoff, passes=1):
             y = a * y + (1 - a) * s
             res.append(y)
         out = res
+    return out
+
+
+def lowpass_glide(sig, cutoffs):
+    """One-pole lowpass whose cutoff is a per-sample list: a source moving
+    away loses its top before it loses its level."""
+    out, y = [], 0.0
+    for s, cutoff in zip(sig, cutoffs):
+        a = math.exp(-2 * math.pi * cutoff / RATE)
+        y = a * y + (1 - a) * s
+        out.append(y)
     return out
 
 
@@ -354,25 +367,43 @@ def silence(ms):
 def write(name, sig, peak=0.72):
     """Writes a signal generated at OUTPUT_RATE. Refuses a protected name
     BEFORE touching the file."""
+    top = max(1e-9, max(abs(s) for s in sig))
+    write_frames(name, [s * peak / top for s in sig], 1)
+
+
+def write_stereo(name, left, right, scale):
+    """Writes a stereo pair at OUTPUT_RATE with ONE explicit gain: the pan
+    law decides how the channels relate, so neither may be normalised on
+    its own. Only the launch tread is stereo (it moves); every other cue is
+    mono and plays the same on both speakers."""
+    frames = []
+    for l, r in zip(left, right):
+        frames.append(l * scale)
+        frames.append(r * scale)
+    write_frames(name, frames, 2)
+
+
+def write_frames(name, scaled, channels):
+    """The file step shared by mono and stereo: `scaled` is interleaved and
+    already in [-1, 1]. Refuses a protected name BEFORE touching the file."""
     if name + ".wav" in PROTECTED:
         raise SystemExit(f"{name}.wav is not this generator's to write "
                          f"(a reference excerpt, or an asset the owner supplied): not generated")
-    top = max(1e-9, max(abs(s) for s in sig))
-    scale = peak / top
     frames = b"".join(
-        struct.pack("<h", max(-32767, min(32767, int(s * scale * 32767))))
-        for s in sig)
+        struct.pack("<h", max(-32767, min(32767, int(s * 32767))))
+        for s in scaled)
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name + ".wav")
     with wave.open(path, "wb") as f:
-        f.setnchannels(1)
+        f.setnchannels(channels)
         f.setsampwidth(2)
         f.setframerate(OUTPUT_RATE)
         f.writeframes(frames)
     with open(path, "rb") as f:
         digest = hashlib.sha256(f.read()).hexdigest()
-    _written.append((name, len(sig) / OUTPUT_RATE * 1000, digest))
-    print(f"{name}.wav  {len(sig) / OUTPUT_RATE * 1000:.0f} ms")
+    ms = len(scaled) / channels / OUTPUT_RATE * 1000
+    _written.append((name, ms, digest))
+    print(f"{name}.wav  {ms:.0f} ms" + ("  stereo" if channels == 2 else ""))
 
 
 def write_manifest():
@@ -493,6 +524,91 @@ def note(freq, ms, duty=0.5, attack_ms=2, release_frac=0.3, gain=1.0):
     n = samples(ms)
     return [s * gain for s in apply(square(flat(freq, n), duty),
                                     env_hold(n, attack_ms, release_frac))]
+
+
+def tread_drive(total_ms, crossing_ms, rng):
+    """A tank driving past on its tracks and away: the launch sequence's
+    sound (owner 2026-10-03: 配合背景音乐，可以是履带碾过的声音).
+
+    Treads, not an engine — there is no sustained pitched drone anywhere in
+    it, since the game itself has no engine or tread voice by the owner's
+    2026-09-10 decision and the launch is the one place a tank is HEARD
+    moving. Two tracks of link slaps, one per side, offset by 0.42 of a
+    period so the composite limps the way a real tread does and each
+    ±6 % jittered; a slap is a bandpassed metal clack with a brighter ping
+    and a short ground thud. Under them a rolling bed of lowpassed noise,
+    high-passed at 140 Hz so its weight sits where a phone speaker can
+    carry it rather than under 150 Hz (the owner's "闷"), swelling a little
+    with each slap, and a narrow metal-on-metal hiss that follows the slaps.
+    A pitch factor turns over as the tank passes mid-word — higher coming,
+    lower going. From `crossing_ms`, when the tank's rear clears the word,
+    the cue RECEDES: −34 dB over 2.3 s with the top closing from open to
+    500 Hz, silent by `total_ms`, when the drive ends — so the sound stops
+    itself and nothing in the app has to."""
+    n = samples(total_ms)
+    rate_hz = 9.5                                   # slaps per second per track
+
+    def factor(t):
+        return 1.0 - 0.045 * math.tanh((t - 1.3) / 0.6)
+
+    slaps, slap_env = [0.0] * n, [0.0] * n
+
+    def add(buf, at, sig, gain):
+        for i, s in enumerate(sig):
+            if at + i < n:
+                buf[at + i] += s * gain
+
+    for phase0 in (0.0, 0.42):
+        t = phase0 / rate_hz
+        while t < total_ms / 1000:
+            at, f = int(t * RATE), factor(t)
+            seed_clack, seed_ping = rng.randrange(1, 0x7FFF), rng.randrange(1, 0x7FFF)
+            gain = rng.uniform(0.8, 1.0)
+            clack, ping, thud = samples(22), samples(8), samples(40)
+            add(slaps, at, apply(bandpass(noise(clack, NATIVE_RATE, seed_clack), 1600 * f, 1.3),
+                                 env_decay(clack, 1, 3.0)), gain)
+            add(slaps, at, apply(bandpass(noise(ping, NATIVE_RATE, seed_ping), 2500 * f, 4.0),
+                                 env_decay(ping, 1, 2.5)), 0.7 * gain)
+            add(slaps, at, apply(triangle(expo_sweep(160 * f, 90 * f, thud)),
+                                 env_decay(thud, 1, 3.0)), 0.5 * gain)
+            add(slap_env, at, env_decay(samples(45), 1, 2.0), 1.0)
+            t += rng.uniform(0.94, 1.06) / (rate_hz * f)
+    wobble = triangle(flat(4.3, n))
+    bed = dc_block(lowpass(noise(n, NATIVE_RATE, 0x7E), 600, 2), 140)
+    bed = [b * (1 + 0.2 * w) * (1 + 0.35 * min(1.0, e)) for b, w, e in zip(bed, wobble, slap_env)]
+    hiss = bandpass(noise(n, NATIVE_RATE, 0x5E), 2900, 6.0)
+    hiss = [h * (0.3 + 0.7 * min(1.0, e)) for h, e in zip(hiss, slap_env)]
+    sig = mix((bed, 1.0), (slaps, 1.8), (hiss, 0.7))
+    recede_ms = 2300
+    level = env_db(n, [(0, -14), (120, 0), (crossing_ms, 0),
+                       (crossing_ms + recede_ms, -34), (total_ms - 60, -60)])
+    top = [4000 * (500 / 4000) ** min(1.0, max(0.0, (i * 1000 / RATE - crossing_ms) / recede_ms))
+           for i in range(n)]
+    return saturate(apply(lowpass_glide(sig, top), level), 1.6)
+
+
+def pan_drive(sig, speed_pt_s=170.0, start_pt=-218.0, half_screen_pt=440.0):
+    """Stereo for the launch drive: the tank's place on the screen becomes
+    the sound's place between the speakers (owner 2026-10-03, on the option
+    being offered: 可以听你的意见). The tank starts with its nose at the
+    wordmark's leading edge — 218 pt left of centre, half the 370 pt word
+    plus half the 66 pt tank — and rolls right at 170 pt/s; its centre maps
+    to a constant-power pan across the 440 pt half-width of an iPhone's
+    landscape screen (437–478 pt over the current models), full right once
+    it is off the edge. Referenced so that dead centre is the mono signal on
+    BOTH channels — exactly what every other cue is — and full pan puts √2
+    of it on one side: the same acoustic power as a mono cue wherever the
+    tank is, no louder in the middle, no quieter at the sides. iOS routes
+    the built-in speakers by orientation, so left is the player's left in
+    either landscape."""
+    left, right = [], []
+    for i, s in enumerate(sig):
+        x = start_pt + speed_pt_s * i / RATE
+        pan = max(-1.0, min(1.0, x / half_screen_pt))
+        angle = (pan + 1.0) * math.pi / 4
+        left.append(s * math.sqrt(2) * math.cos(angle))
+        right.append(s * math.sqrt(2) * math.sin(angle))
+    return left, right
 
 
 def crackle_bed(n, rng, pops, base_gain):
@@ -739,6 +855,25 @@ def build():
                              ([0.0] * samples(115) + apply(bandpass(noise(tick, 9000, 0x2E), 2800, 1.0),
                                                            env_decay(tick, 1, 3.0)), 1.8)),
                          -16.4)
+
+        # The launch sequence (AppRootView.TitleScreen): the player's tank
+        # drives through the title at 170 pt/s and its rear clears the 370 pt
+        # wordmark plus its own 66 pt at 2.565 s; the exit run ends at 5.3 s.
+        # The cue is cut to that timeline (TitleIntroAudioTests holds the
+        # two together), and levelled so its steady part sits at the two
+        # music cues' own −20.8 dBFS RMS: it stands in for music under the
+        # launch. The recession is in the signal, so the level is set on the
+        # plateau rather than over the whole file — and on the MONO drive,
+        # before the pan, since the pan law conserves its power. The only
+        # stereo cue in the set: it is the only one that moves.
+        tread = tread_drive(5300, 2565, random.Random(0x7EAD))
+        scale = 10 ** (-20.8 / 20) / rms(tread[:samples(2500)])
+        left, right = pan_drive(tread)
+        top = scale * max(max(abs(v) for v in left), max(abs(v) for v in right))
+        if top > 0.9:
+            raise SystemExit(f"sfx_title_tread would peak at {top:.2f}: re-level the recipe")
+        write_stereo("sfx_title_tread", zoh(left, NATIVE_RATE, OUTPUT_RATE),
+                     zoh(right, NATIVE_RATE, OUTPUT_RATE), scale)
 
     # ---------------------------------------------- rapid launch (derived)
     # Owner 2026-10-01 review: `sfx_fire_rapid` was a third byte-identical

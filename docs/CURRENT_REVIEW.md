@@ -1644,6 +1644,57 @@ images against the stage data. The scrolling itself is structural only —
 `ScrollView` plus a `ScrollViewReader` that opens on the suggested stage —
 and is for the device pass to confirm.
 
+*The launch sequence has a sound (2026-10-03, owner follow-up).* The
+owner asked for music under the drive — from the tank appearing to the
+title coming out from under it — and said the music could be the sound of
+its treads. `sfx_title_tread` is that, and nothing else: 5.3 s synthesized
+in the native 8363 Hz pipeline like every generated cue, attribution
+`invented` (决战坦克 has no tread sound; nothing in it is measured from the
+recording). Two tracks of link slaps at 9.5 per second each, offset by 0.42
+of a period and ±6 % jittered so the composite limps rather than ticks;
+each slap a bandpassed clack (1.6 kHz), a brighter ping (2.5 kHz) and a
+short ground thud (160→90 Hz); under them a rolling noise bed high-passed at
+140 Hz so its weight sits where a phone speaker carries it — the first
+drafts put 39 % of their energy under 150 Hz, which is the "闷" the owner
+has rejected before — a metal-on-metal hiss that follows the slaps, and a
+pitch factor that turns over as the tank passes mid-word. It is CUT TO THE
+DRIVE: the tank's rear clears the 370 pt wordmark plus its own 66 pt at
+170 pt/s, 2.565 s in, and from there the cue recedes −34 dB with its top
+closing from open to 500 Hz, silent at 5.3 s when the exit run ends. The
+envelope stops the sound, so nothing in the app has to, and
+`TitleIntroAudioTests` holds the cue's length to `TitleScreen.introTimeline`
+so the drive's constants cannot move without the audio moving with them.
+Measured on the bundled file: steady part −20.8 dBFS RMS (the two music
+cues' own level — it stands in for music), whole file −23.5; band shares
+150–400 Hz −4.9 dB, 400 Hz–1 kHz −6.0, 1–3 kHz −6.2, under 150 Hz −9.2;
+envelope autocorrelation peaks at 106 ms, the per-track slap period.
+
+This narrows the 2026-09-10 no-engine-sound decision rather than reversing
+it: the game still has no engine or tread voice, and the launch — outside
+any game — is the one place a tank is heard moving. ADR-0011 sixth
+amendment; the standing rule in CLAUDE.md now says so. Playback: the app
+builds ONE `GameAudio` at the root, under the launch screen, so the voice
+pools warm once instead of at the first game start; the title plays the
+cue through it and every controller is handed the same instance (the
+`audio:` parameter the controllers already took). The tread's pool is one
+voice.
+
+Two options were put to the owner, who answered 可以听你的意见. Taken: the
+sound now MOVES with the tank — the only stereo cue in the set, panned in
+the file by the tank's place on the screen (from 218 pt left of centre,
+through the middle at 1.28 s, full right as it leaves; constant-power law
+referenced so the centre equals a mono cue on both speakers, so it is no
+louder in the middle and no quieter at the sides), which costs the mixer
+nothing: iOS routes the built-in speakers by orientation. Measured on the
+bundled file: left 5.3 dB over right in the first 0.6 s, equal through the
+crossing of centre (0.9–1.6 s), right 13.5 dB over left at 3–3.6 s and
+alone from 4 s, when the tank is off the edge; the two channels' power mean
+over the plateau is −20.8 dBFS, the mono target. Declined: an accent when the
+title is complete. The reveal already closes visually — the buttons rise at
+that instant — and a stinger there would compete with the treads receding
+and risk the 滑稽 the owner has rejected in a cue before; the soundscape is
+one thing, a tank driving past, and stays that.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

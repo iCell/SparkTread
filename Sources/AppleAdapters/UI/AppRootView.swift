@@ -99,6 +99,11 @@ public struct AppRootView: View {
     @State private var introPlayed = false
     private let campaign: CampaignDefinition?
     private let store: CampaignPersistence?
+    /// The app's one mixer. Built here, under the launch screen, so the
+    /// voice pools warm once instead of at the first game start — and so
+    /// the title can play the launch tread through the same instance every
+    /// controller is handed, rather than a second set of preloaded voices.
+    private let audio: GameAudio
     /// Each stage's own map, for the select screen's card art. Decoded once
     /// here with the campaign rather than per card: twelve small files, and
     /// a card must never do file I/O while the list is scrolling.
@@ -124,6 +129,7 @@ public struct AppRootView: View {
             }
         }
         stageMaps = maps
+        audio = GameAudio()
         // The save store: an unusable store or an unreadable document is a
         // notice on the title, never a crash (the file stays for inspection).
         var store: CampaignPersistence?
@@ -172,7 +178,8 @@ public struct AppRootView: View {
                             onStart: { discardSuspended(); model.openCampaignSelect() },
                             onTraining: { discardSuspended(); startTraining() },
                             playsIntro: !introPlayed,
-                            onIntroFinished: { introPlayed = true })
+                            onIntroFinished: { introPlayed = true },
+                            audio: audio)
             case .campaignSelect:
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model, stageMaps: stageMaps,
@@ -192,17 +199,17 @@ public struct AppRootView: View {
 
     private func start(_ run: CampaignRun) {
         guard model.startCampaign(at: run.stageIndex) else { return }
-        controller = MovementLabController(campaign: run, stages: .bundled(), persistence: store)
+        controller = MovementLabController(campaign: run, stages: .bundled(), audio: audio, persistence: store)
     }
 
     private func startTraining() {
         model.startTraining()
-        controller = MovementLabController(world: nil)
+        controller = MovementLabController(world: nil, audio: audio)
     }
 
     private func resumeSuspended() {
         guard let snapshot = model.resumeSuspended() else { return }
-        controller = MovementLabController(resuming: snapshot, stages: .bundled(), persistence: store)
+        controller = MovementLabController(resuming: snapshot, stages: .bundled(), audio: audio, persistence: store)
     }
 
     /// Declining the snapshot discards it (§17.5).
@@ -236,6 +243,17 @@ struct TitleScreen: View {
     /// player backs out of a menu onto the title again.
     var playsIntro = false
     var onIntroFinished: () -> Void = {}
+    /// Where the launch tread plays; nil renders the intro silent (previews,
+    /// tests).
+    var audio: GameAudio?
+
+    /// The launch sequence's sound (owner 2026-10-03: the drive should have
+    /// music, and the music can be the treads): the tank heard on its
+    /// tracks from the moment it is in frame, receding as it drives off. The
+    /// game has no engine or tread voice (owner, 2026-09-10, ADR-0011); the
+    /// launch is the one place a tank is heard moving. The cue's own
+    /// envelope ends with the drive, so nothing here has to stop it.
+    static let treadCue = "sfx_title_tread"
 
     /// Launch: the player's tank drives across the title band and the
     /// wordmark is what it leaves behind — revealed from the tank's rear
@@ -264,6 +282,16 @@ struct TitleScreen: View {
     /// and 460 − 66 (the tank's length) clears it; iPad widths are a later
     /// milestone and would want this measured from the screen instead.
     private static let exitRun: CGFloat = 460
+
+    /// The drive's two legs, in seconds, for a wordmark of `wordWidth`:
+    /// `crossing` ends when the tank's rear clears the word — the title is
+    /// complete and the buttons rise — and `total` when the tank has left.
+    /// The tread cue is cut to this timeline (`TitleIntroAudioTests` holds
+    /// the two together), so the constants above cannot move on their own.
+    static func introTimeline(wordWidth: CGFloat) -> (crossing: TimeInterval, total: TimeInterval) {
+        let crossing = wordWidth + tankLength
+        return (Double(crossing / tankSpeed), Double((crossing + exitRun) / tankSpeed))
+    }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -313,16 +341,18 @@ struct TitleScreen: View {
         // Measured on first layout; the fallback is the word's width at this
         // font, so a missed measurement shifts the hand-off by milliseconds.
         let width = wordWidth > 0 ? wordWidth : 370
-        let crossing = width + Self.tankLength          // until the rear clears the word
-        let total = crossing + Self.exitRun
+        let drive = Self.introTimeline(wordWidth: width)
+        // The treads start with the first frame of the drive; the cue
+        // recedes and ends on the same timeline by construction.
+        audio?.play(Self.treadCue)
         // Two linear legs at the same speed, so the motion is continuous and
         // the buttons rise at the exact moment the title is out from under
         // the tank — a completion, not a sleep that has to agree with the
         // animation about how long it took.
-        withAnimation(.linear(duration: Double(crossing / Self.tankSpeed))) {
-            progress = Double(crossing / total)
+        withAnimation(.linear(duration: drive.crossing)) {
+            progress = drive.crossing / drive.total
         } completion: {
-            withAnimation(.linear(duration: Double(Self.exitRun / Self.tankSpeed))) { progress = 1 }
+            withAnimation(.linear(duration: drive.total - drive.crossing)) { progress = 1 }
             withAnimation(.easeOut(duration: 0.4)) { settled = true }
             onIntroFinished()
         }

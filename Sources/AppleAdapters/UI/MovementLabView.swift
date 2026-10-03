@@ -126,6 +126,10 @@ public final class MovementLabController {
         session = made.session
         themeID = made.themeID
         self.audio = audio ?? GameAudio()
+        // The mixer is shared across games (AppRootView builds one), so a
+        // controller taking it over starts it clean: no loop wanted by a
+        // game the player quit mid-burn may survive into this one's start.
+        self.audio.resetForNewWorld()
         self.haptics = GameHaptics()
         flow = Self.makeFlow(for: session.world, lab: false)
         #if canImport(GameController)
@@ -150,6 +154,10 @@ public final class MovementLabController {
         self.persistence = persistence
         session = MovementLabSession(resuming: snapshot.world, recording: snapshot.recording)
         self.audio = audio ?? GameAudio()
+        // The mixer is shared across games (AppRootView builds one), so a
+        // controller taking it over starts it clean: no loop wanted by a
+        // game the player quit mid-burn may survive into this one's start.
+        self.audio.resetForNewWorld()
         self.haptics = GameHaptics()
         flow = .playing()
         isPaused = true
@@ -173,6 +181,10 @@ public final class MovementLabController {
             isLab = true
         }
         self.audio = audio ?? GameAudio()
+        // The mixer is shared across games (AppRootView builds one), so a
+        // controller taking it over starts it clean: no loop wanted by a
+        // game the player quit mid-burn may survive into this one's start.
+        self.audio.resetForNewWorld()
         self.haptics = GameHaptics()
         flow = Self.makeFlow(for: session.world, lab: isLab)
         #if canImport(GameController)
