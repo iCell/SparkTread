@@ -31,6 +31,36 @@ import SwiftUI
         return image
     }
 
+    /// The right-facing player rig's muzzle in the cropped icon's own
+    /// pixels (origin top-left), so the intro's shells leave the gun
+    /// wherever and however large the icon is drawn — the manifest's muzzle
+    /// point, not a number read off a screenshot.
+    static var playerTankMuzzle: CGPoint? {
+        guard let art, let rig = art.manifest.rigs["player_right"],
+              let turret = art.manifest.turrets["player_normal_right"],
+              let muzzle = turret.muzzles.first, muzzle.count == 2, rig.bodyBounds.count == 4
+        else { return nil }
+        return CGPoint(x: muzzle[0] - rig.bodyBounds[0], y: muzzle[1] - rig.bodyBounds[1])
+    }
+
+    /// One sprite as the atlas holds it, by id — the intro's shell and
+    /// muzzle flash are the scene's own, at the scene's own proportions.
+    static func sprite(_ id: String) -> CGImage? {
+        if let cached = cache[id] { return cached }
+        guard let image = try? art?.texture(id).cgImage() else { return nil }
+        cache[id] = image
+        return image
+    }
+
+    /// A sprite's anchor as a unit point of its canvas — for an effect
+    /// frame, the point that sits on the muzzle.
+    static func anchor(of id: String) -> UnitPoint? {
+        guard let spec = art?.manifest.sprites[id], spec.anchorTopLeft.count == 2,
+              spec.pixelSize.count == 2, spec.pixelSize[0] > 0, spec.pixelSize[1] > 0 else { return nil }
+        return UnitPoint(x: spec.anchorTopLeft[0] / spec.pixelSize[0],
+                         y: spec.anchorTopLeft[1] / spec.pixelSize[1])
+    }
+
     /// A sprite upscaled by a whole factor with no interpolation, so a
     /// 16 px plate tiles as 16 blocks and not as a blur.
     static func upscaled(_ id: String, by factor: Int) -> CGImage? {

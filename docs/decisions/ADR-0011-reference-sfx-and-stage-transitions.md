@@ -643,7 +643,10 @@ without the mixer learning to pan. Offered to the owner with an accent at
 the moment the title is complete; the owner left both to Claude's judgement
 (可以听你的意见), and the pan was taken while the accent was declined — the
 reveal closes visually, and a stinger there would compete with the treads
-receding.
+receding. The next day (2026-10-04) the owner asked for two shots as the
+tank drives through, with their sounds: these are the normal gun's own
+excerpt (`sfx_fire_normal`) twice, at the gun's LV1 cadence, over the
+treads — no new cue, and nothing invented; the cue set is unchanged at 25.
 
 This NARROWS the no-engine-sound decision of 2026-09-10 (Decision §3) and
 does not reverse it: the game still has no engine or tread voice — the

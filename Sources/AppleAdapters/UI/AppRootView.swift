@@ -255,6 +255,27 @@ struct TitleScreen: View {
     /// envelope ends with the drive, so nothing here has to stop it.
     static let treadCue = "sfx_title_tread"
 
+    /// The two shots the tank fires as it comes in (owner 2026-10-03: 开过去
+    /// 的时候再放两枪，并加上两声子弹音). They are the game's own gun: the
+    /// second follows the first at the normal weapon's LV1 cooldown
+    /// (GAME_RULES §5.3), the shells outrun the tank by the game's own
+    /// shell-to-tank speed ratio, and the voice is the normal shot's — so
+    /// the title's tank shoots like the one the player is about to drive,
+    /// only at the intro's pace.
+    static let shotCue = "sfx_fire_normal"
+    static let firstShotTime: TimeInterval = 0.4
+    static var shotTimes: [TimeInterval] {
+        let ticks = WeaponRuleset.provisional.weapon("normal")?.cooldownTicks.first ?? 35
+        return [firstShotTime, firstShotTime + Double(ticks) / Double(MovementRuleset.ticksPerSecond)]
+    }
+    /// Shell speed over tank speed in the game: 6.4 cells/s over 1.92.
+    static var shellSpeedRatio: CGFloat {
+        let shell = WeaponRuleset.provisional.weapon("normal")?.initialSpeedMilliSubunitsPerSecond ?? 6_553_600
+        return CGFloat(shell) / CGFloat(MovementRuleset.provisional.baseSpeedMilliSubunitsPerSecond)
+    }
+    /// How long the muzzle flash shows — the scene's own tenth of a second.
+    static let flashDuration: TimeInterval = 0.1
+
     /// Launch: the player's tank drives across the title band and the
     /// wordmark is what it leaves behind — revealed from the tank's rear
     /// edge, over the tracks it lays — then the tank rolls off the far side
@@ -288,9 +309,9 @@ struct TitleScreen: View {
     /// complete and the buttons rise — and `total` when the tank has left.
     /// The tread cue is cut to this timeline (`TitleIntroAudioTests` holds
     /// the two together), so the constants above cannot move on their own.
-    static func introTimeline(wordWidth: CGFloat) -> (crossing: TimeInterval, total: TimeInterval) {
+    static func introTimeline(wordWidth: CGFloat) -> (shots: [TimeInterval], crossing: TimeInterval, total: TimeInterval) {
         let crossing = wordWidth + tankLength
-        return (Double(crossing / tankSpeed), Double((crossing + exitRun) / tankSpeed))
+        return (shotTimes, Double(crossing / tankSpeed), Double((crossing + exitRun) / tankSpeed))
     }
 
     var body: some View {
@@ -299,7 +320,14 @@ struct TitleScreen: View {
             TitleWordmark()
                 .modifier(TankReveal(progress: progress, tankLength: Self.tankLength,
                                      exitRun: Self.exitRun, tankHeight: Self.tankHeight,
-                                     tank: MenuArt.playerTank))
+                                     tank: MenuArt.playerTank,
+                                     shots: Self.shotTimes.map { CGFloat($0) * Self.tankSpeed },
+                                     flashTravel: CGFloat(Self.flashDuration) * Self.tankSpeed,
+                                     shellSpeedRatio: Self.shellSpeedRatio,
+                                     muzzle: MenuArt.playerTankMuzzle,
+                                     shell: MenuArt.sprite("px_projectile_normal"),
+                                     flash: MenuArt.sprite("px_fx_muzzle_0"),
+                                     flashAnchor: MenuArt.anchor(of: "px_fx_muzzle_0")))
                 .background { GeometryReader { proxy in
                     Color.clear.onAppear { wordWidth = proxy.size.width }
                 } }
@@ -345,16 +373,31 @@ struct TitleScreen: View {
         // The treads start with the first frame of the drive; the cue
         // recedes and ends on the same timeline by construction.
         audio?.play(Self.treadCue)
-        // Two linear legs at the same speed, so the motion is continuous and
-        // the buttons rise at the exact moment the title is out from under
-        // the tank — a completion, not a sleep that has to agree with the
-        // animation about how long it took.
-        withAnimation(.linear(duration: drive.crossing)) {
-            progress = drive.crossing / drive.total
-        } completion: {
-            withAnimation(.linear(duration: drive.total - drive.crossing)) { progress = 1 }
+        // One linear leg per milestone, all at the same speed, so the motion
+        // is continuous and everything that happens along it — a shot, the
+        // buttons rising the moment the title is out from under the tank —
+        // is a completion, not a sleep that has to agree with the animation
+        // about how long it took. The shells draw themselves from the same
+        // progress the tank moves on; only their voice needs a moment.
+        var milestones: [(at: TimeInterval, then: () -> Void)] = drive.shots.map { at in
+            (at, { audio?.play(Self.shotCue) })
+        }
+        milestones.append((drive.crossing, {
             withAnimation(.easeOut(duration: 0.4)) { settled = true }
             onIntroFinished()
+        }))
+        milestones.append((drive.total, {}))
+        advance(through: milestones[...], from: 0, total: drive.total)
+    }
+
+    private func advance(through milestones: ArraySlice<(at: TimeInterval, then: () -> Void)>,
+                         from start: TimeInterval, total: TimeInterval) {
+        guard let next = milestones.first else { return }
+        withAnimation(.linear(duration: next.at - start)) {
+            progress = next.at / total
+        } completion: {
+            next.then()
+            advance(through: milestones.dropFirst(), from: next.at, total: total)
         }
     }
 
@@ -388,6 +431,18 @@ struct TankReveal: ViewModifier, Animatable {
     let exitRun: CGFloat
     let tankHeight: CGFloat
     let tank: CGImage?
+    /// The shots: the travel (points since the nose entered the band) at
+    /// which each is fired, how far the tank travels while a flash shows,
+    /// how much faster than the tank a shell flies, and the art — the gun's
+    /// muzzle in icon pixels, the scene's shell, its first flash frame and
+    /// that frame's anchor (the point that sits on the muzzle).
+    var shots: [CGFloat] = []
+    var flashTravel: CGFloat = 0
+    var shellSpeedRatio: CGFloat = 1
+    var muzzle: CGPoint?
+    var shell: CGImage?
+    var flash: CGImage?
+    var flashAnchor: UnitPoint?
 
     // `Animatable` is a nonisolated protocol while a ViewModifier is
     // main-actor isolated; the interpolated value is a plain Double, so the
@@ -410,21 +465,75 @@ struct TankReveal: ViewModifier, Animatable {
             }
             .overlay {
                 GeometryReader { proxy in
+                    let width = proxy.size.width
+                    // Riding on the tracks under the baseline, hull over the
+                    // bottom of the letters it has just left behind.
+                    let tankY = proxy.size.height - 10
                     if let tank {
                         Image(decorative: tank, scale: 1)
                             .interpolation(.none)
                             .resizable()
                             .scaledToFit()
                             .frame(height: tankHeight)
-                            // Riding on the tracks under the baseline, hull over
-                            // the bottom of the letters it has just left behind.
-                            .position(x: rear(proxy.size.width) + tankLength / 2,
-                                      y: proxy.size.height - 10)
+                            .position(x: rear(width) + tankLength / 2, y: tankY)
                             .transaction { $0.animation = nil }
+                    }
+                    // The shells and the flash are the scene's own sprites at
+                    // the scene's proportions to the tank (projectiles at 0.8
+                    // of the art scale, the flash at 0.48), turned a quarter
+                    // to face the way it drives. A shell leaves the muzzle
+                    // where the gun WAS when it fired and flies on its own;
+                    // the flash rides the muzzle for its tenth of a second.
+                    if let tank, let muzzle {
+                        let scale = tankHeight / CGFloat(tank.height)
+                        let travel = rear(width) + tankLength
+                        ForEach(Array(shots.enumerated()), id: \.offset) { _, fired in
+                            if travel >= fired {
+                                let flown = travel - fired
+                                let gun = muzzlePoint(muzzle, tank: tank, scale: scale,
+                                                      rear: rear(width) - flown, y: tankY)
+                                if let shell {
+                                    let side = CGFloat(shell.width) * scale * 0.8
+                                    Image(decorative: shell, scale: 1)
+                                        .interpolation(.none)
+                                        .resizable()
+                                        .frame(width: side, height: side)
+                                        .rotationEffect(.degrees(90))
+                                        .position(x: gun.x + flown * shellSpeedRatio, y: gun.y)
+                                        .transaction { $0.animation = nil }
+                                }
+                                if let flash, let flashAnchor, flown < flashTravel {
+                                    let now = muzzlePoint(muzzle, tank: tank, scale: scale,
+                                                          rear: rear(width), y: tankY)
+                                    let side = CGFloat(flash.width) * scale * 0.48
+                                    // The frame points up with its anchor on
+                                    // the muzzle: place the anchor there and
+                                    // turn the frame about it.
+                                    Image(decorative: flash, scale: 1)
+                                        .interpolation(.none)
+                                        .resizable()
+                                        .frame(width: side, height: side)
+                                        .rotationEffect(.degrees(90), anchor: flashAnchor)
+                                        .position(x: now.x - (flashAnchor.x - 0.5) * side,
+                                                  y: now.y - (flashAnchor.y - 0.5) * side)
+                                        .transaction { $0.animation = nil }
+                                }
+                            }
+                        }
                     }
                 }
                 .allowsHitTesting(false)
             }
+    }
+
+    /// The gun's muzzle for a tank whose rear edge is `rear`: the icon is
+    /// drawn `tankHeight` tall with its aspect kept, centred on the tank's
+    /// point, and the muzzle is a pixel position inside it.
+    private func muzzlePoint(_ muzzle: CGPoint, tank: CGImage, scale: CGFloat,
+                             rear: CGFloat, y: CGFloat) -> CGPoint {
+        let size = CGSize(width: CGFloat(tank.width) * scale, height: tankHeight)
+        let topLeft = CGPoint(x: rear + tankLength / 2 - size.width / 2, y: y - size.height / 2)
+        return CGPoint(x: topLeft.x + muzzle.x * scale, y: topLeft.y + muzzle.y * scale)
     }
 
     /// The tank's rear edge in the wordmark's space: it enters from beyond

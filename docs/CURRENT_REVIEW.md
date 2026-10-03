@@ -1695,6 +1695,31 @@ that instant — and a stinger there would compete with the treads receding
 and risk the 滑稽 the owner has rejected in a cue before; the soundscape is
 one thing, a tank driving past, and stays that.
 
+*Two shots on the way through (2026-10-04, owner follow-up).* The owner:
+让坦克开过去的时候再放两枪，并加上两声子弹音. The tank now fires twice as
+it comes in, and everything about the shots is the game's own rather than
+invented for the title: the first at 0.4 s, the second at the normal gun's
+LV1 cooldown after it (GAME_RULES §5.3, 35 ticks = 0.583 s, read from
+`WeaponRuleset.provisional`); the shells outrun the tank by the game's
+shell-to-tank speed ratio (6.4 cells/s over 1.92 — ×3.33, so 567 pt/s at
+the intro's 170 pt/s, read from the same rulesets); the shell is
+`px_projectile_normal` and the flash `px_fx_muzzle_0` at the scene's own
+proportions to the tank (0.8 and 0.48 of the art scale), turned a quarter
+to face the drive, the flash placed by the manifest's anchor on the
+manifest's muzzle point for the right-facing player rig (not a number read
+off a screenshot); and the voice is `sfx_fire_normal`, the reference's own
+shot, twice, over the treads. Both shots fall while the tank is over the
+word (0.4 s and 0.98 s against a 2.57 s crossing), so the shells streak
+across the still-unrevealed band ahead of it and leave the screen on their
+own. The drive is now four linear legs instead of two — a leg ends at each
+shot and at the crossing, every boundary a completion — so the voice fires
+at the frame the shell appears, and the shells themselves are drawn from
+the same interpolated progress the tank moves on. `TitleIntroAudioTests`
+holds the shots inside the crossing at the gun's cadence. Verified on the
+simulator with timestamped screenshots: the first shell ahead of the tank
+as "S" comes out, the flash on the barrel tip pointing right as the second
+fires, both shells in flight over the unrevealed band.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
