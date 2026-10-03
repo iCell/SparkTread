@@ -1528,6 +1528,44 @@ atlas missing from the counts and a stale manifest hash; the derivable
 fields are recomputed and a `recountedFor` note says which figures are
 still the earlier run's and where that increment's own verification lives.
 
+**The select screen: a scroll bug, and art for twelve stages (2026-10-03,
+later).** The owner found the select page unscrollable and asked for a
+background behind every stage on it, then for the title and select screens
+themselves, which were bare text on black.
+
+*The bug.* The stage cards sat in a plain `HStack`. Twelve cards at 150 pt
+plus spacing is about 2000 pt of row against a 956 pt screen, so everything
+past the fifth stage was off-screen with no way to reach it — it fit while
+three stages existed and broke silently when nine more arrived. The row is a
+horizontal `ScrollView` now, and a `ScrollViewReader` opens it centred on the
+stage you would play next rather than at stage 1.
+
+*The card art is each stage's own map.* Rather than twelve drawings, a card
+shows the place it loads: `StagePreview` (content layer, pure) replays the
+terrain layers exactly as the builder stacks them and returns one value per
+cell, plus markers for the base and the two kinds of spawn — the three
+things that tell two maps apart at a glance. `StageCardArt` paints that at
+one pixel per cell in a palette sampled from the delivery's own art (the
+mean colour of each atlas face, measured the same day), so a card reads as
+the world its stage renders in. Nothing new is bundled, the art cannot drift
+from the content, and a thirteenth stage brings its own background.
+
+Verifying it caught a real defect: a bitmap context's MEMORY is top-down
+even though its drawing space is y-up, and flipping the rows on the way in
+put every base at the top of its card and every enemy spawn at the bottom.
+`StageCardArtTests` now asserts the base marker lands on the stage's own
+`baseSpawn`, that all three markers exist, that no two stages render the
+same card, and that the four themes reach four distinct ground colours.
+
+*The menus.* `MenuBackdrop` builds the title and select screens out of the
+game's own material: the steel plate the arena walls are made of, tiled at
+whole-pixel scale, taken right down, under the same top light and vignette
+the playfield reads with — so the menus sit inside the fortress the battles
+happen in and the look cannot drift from the game's. A tank watermark was
+tried twice and dropped: dimmed, a top-down tank is a smudge, and
+stencilled from its alpha it is a rectangle, because that is the shape a
+tank seen from above actually is. The plate carries the screens on its own.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

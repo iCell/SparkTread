@@ -96,6 +96,10 @@ public struct AppRootView: View {
     @State private var storeNotice: String?
     private let campaign: CampaignDefinition?
     private let store: CampaignPersistence?
+    /// Each stage's own map, for the select screen's card art. Decoded once
+    /// here with the campaign rather than per card: twelve small files, and
+    /// a card must never do file I/O while the list is scrolling.
+    private let stageMaps: [String: StagePreview.Map]
 
     public init() {
         let env = ProcessInfo.processInfo.environment
@@ -107,6 +111,16 @@ public struct AppRootView: View {
             catch { fatalError("bundled campaign failed to load: \(error)") }
         }
         self.campaign = campaign
+        var maps: [String: StagePreview.Map] = [:]
+        for stageID in campaign?.stageIDs ?? [] {
+            // The campaign loader already proved every stage decodes; a card
+            // without art is a missing background, never a failure to start.
+            if let url = try? StageLoader.stageURL(id: stageID, bundle: .main),
+               let def = try? StageLoader.loadDefinition(at: url) {
+                maps[stageID] = StagePreview.map(of: def)
+            }
+        }
+        stageMaps = maps
         // The save store: an unusable store or an unreadable document is a
         // notice on the title, never a crash (the file stays for inspection).
         var store: CampaignPersistence?
@@ -156,7 +170,7 @@ public struct AppRootView: View {
                             onTraining: { discardSuspended(); startTraining() })
             case .campaignSelect:
                 if let campaign {
-                    CampaignSelectScreen(campaign: campaign, model: model,
+                    CampaignSelectScreen(campaign: campaign, model: model, stageMaps: stageMaps,
                                          onSelect: { index in if let run = model.run(forStageIndex: index) { start(run) } },
                                          onDifficulty: { id in model.difficultyID = id },
                                          onBack: { model.backToTitle() })
@@ -245,6 +259,7 @@ struct TitleScreen: View {
             Spacer().frame(height: 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(MenuBackdrop())
     }
 
     private func titleButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -264,6 +279,7 @@ struct TitleScreen: View {
 struct CampaignSelectScreen: View {
     let campaign: CampaignDefinition
     let model: AppFlowModel
+    var stageMaps: [String: StagePreview.Map] = [:]
     let onSelect: (Int) -> Void
     var onDifficulty: (String) -> Void = { _ in }
     let onBack: () -> Void
@@ -307,32 +323,90 @@ struct CampaignSelectScreen: View {
                     }
                 }
             }
-            HStack(spacing: 18) {
-                ForEach(Array(campaign.stageIDs.enumerated()), id: \.offset) { index, id in
-                    let card = HUDLabels.stageCard(id)
-                    let unlocked = model.isUnlocked(stageIndex: index)
-                    let completed = model.completedStageIDs.contains(id)
-                    Button { onSelect(index) } label: {
-                        VStack(spacing: 8) {
-                            Text(card.title)
-                                .font(.system(size: 22, weight: .black, design: .rounded))
-                            Text(card.subtitle)
-                                .font(.system(size: 15, weight: .bold))
-                            Text(completed ? "已通关" : unlocked ? "可进入" : "未解锁")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(completed ? Color.green : unlocked ? Color.yellow : Color.gray)
+            // Twelve cards are far wider than any phone: this row was a
+            // plain HStack, so everything past the fifth stage was off the
+            // screen with no way to reach it (owner, 2026-10-03). It scrolls
+            // now, and opens on the stage you would play next.
+            ScrollViewReader { scroll in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 18) {
+                        ForEach(Array(campaign.stageIDs.enumerated()), id: \.offset) { index, id in
+                            StageCard(index: index, stageID: id, map: stageMaps[id],
+                                      unlocked: model.isUnlocked(stageIndex: index),
+                                      completed: model.completedStageIDs.contains(id),
+                                      suggested: index == model.suggestedStageIndex,
+                                      onSelect: onSelect)
+                                .id(index)
                         }
-                        .foregroundStyle(unlocked ? Color.white : Color.gray)
-                        .frame(width: 150, height: 120)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.95)))
-                        .overlay(RoundedRectangle(cornerRadius: 12)
-                            .stroke(index == model.suggestedStageIndex ? Color.yellow : Color.gray.opacity(0.5),
-                                    lineWidth: index == model.suggestedStageIndex ? 3 : 1.5))
                     }
-                    .disabled(!unlocked)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 6)
                 }
+                .onAppear { scroll.scrollTo(model.suggestedStageIndex, anchor: .center) }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(MenuBackdrop())
+    }
+}
+
+/// One stage on the select screen, backed by its own map (ADR-free content
+/// art: `StageCardArt` draws the stage's authored terrain, so the card shows
+/// the place rather than a decoration of it).
+struct StageCard: View {
+    let index: Int
+    let stageID: String
+    let map: StagePreview.Map?
+    let unlocked: Bool
+    let completed: Bool
+    let suggested: Bool
+    let onSelect: (Int) -> Void
+
+    private static let size = CGSize(width: 184, height: 132)
+
+    var body: some View {
+        let card = HUDLabels.stageCard(stageID)
+        Button { onSelect(index) } label: {
+            ZStack(alignment: .bottomLeading) {
+                background
+                // The scrim: the map is busy, and the title has to stay
+                // readable over whichever stage it belongs to.
+                LinearGradient(colors: [.black.opacity(0.15), .black.opacity(0.82)],
+                               startPoint: .top, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(card.title)
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                    Text(card.subtitle)
+                        .font(.system(size: 13, weight: .bold))
+                        .lineLimit(1)
+                    Text(completed ? "已通关" : unlocked ? "可进入" : "未解锁")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(completed ? Color.green : unlocked ? Color.yellow : Color.gray)
+                }
+                .foregroundStyle(unlocked ? Color.white : Color.gray)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 9)
+            }
+            .frame(width: Self.size.width, height: Self.size.height)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(suggested ? Color.yellow : Color.gray.opacity(0.5),
+                        lineWidth: suggested ? 3 : 1.5))
+        }
+        .disabled(!unlocked)
+    }
+
+    @ViewBuilder private var background: some View {
+        if let map, let image = StageCardArt.image(for: map, id: stageID) {
+            Image(decorative: image, scale: 1)
+                .interpolation(.none)          // one pixel per cell stays one block
+                .resizable()
+                .scaledToFill()
+                // A locked stage shows its shape, not its detail.
+                .saturation(unlocked ? 1 : 0)
+                .opacity(unlocked ? 1 : 0.45)
+        } else {
+            Color(red: 0.06, green: 0.05, blue: 0.03)
+        }
     }
 }
