@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 1,
+  "id": "floodplain_07_supply_run",
+  "stageNumber": 7,
+  "displayNameKey": "stage.s07.name",
+  "themeID": "floodplain",
+  "arenaSpecID": "universal",
+  "seed": "2938471056620118843",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "water",
+        "rects": [
+          [
+            2,
+            9,
+            6,
+            11
+          ],
+          [
+            49,
+            9,
+            53,
+            11
+          ]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            2,
+            8,
+            6,
+            8
+          ],
+          [
+            49,
+            8,
+            53,
+            8
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            4,
+            6,
+            9,
+            7
+          ],
+          [
+            14,
+            6,
+            25,
+            7
+          ],
+          [
+            30,
+            6,
+            41,
+            7
+          ],
+          [
+            46,
+            6,
+            51,
+            7
+          ],
+          [
+            4,
+            13,
+            5,
+            14
+          ],
+          [
+            10,
+            13,
+            25,
+            14
+          ],
+          [
+            30,
+            13,
+            45,
+            14
+          ],
+          [
+            50,
+            13,
+            51,
+            14
+          ],
+          [
+            4,
+            20,
+            9,
+            21
+          ],
+          [
+            14,
+            20,
+            25,
+            21
+          ],
+          [
+            30,
+            20,
+            41,
+            21
+          ],
+          [
+            46,
+            20,
+            51,
+            21
+          ],
+          [
+            26,
+            23,
+            29,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            2,
+            23,
+            9,
+            24
+          ],
+          [
+            46,
+            23,
+            53,
+            24
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_a",
+      "count": 4
+    },
+    {
+      "archetype": "normal_b",
+      "count": 5
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 7
+    },
+    {
+      "archetype": "rapid_d",
+      "count": 6
+    },
+    {
+      "archetype": "fire_a",
+      "count": 2
+    },
+    {
+      "archetype": "explosion_a",
+      "count": 2
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 6,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [
+    {
+      "id": "ammo_crate",
+      "cell": [
+        2,
+        15
+      ],
+      "critical": true
+    },
+    {
+      "id": "max_armor_ammo",
+      "cell": [
+        50,
+        15
+      ],
+      "critical": false
+    }
+  ],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 5,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 11,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 17,
+      "pickup": "bomb"
+    },
+    {
+      "queueIndex": 23,
+      "pickup": "extra_life"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        4,
+        6
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        48,
+        20
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "fast_wave",
+      "afterSpawned": 20,
+      "reinforcements": [
+        "rapid_d",
+        "rapid_c",
+        "normal_b",
+        "explosion_a"
+      ],
+      "maxAliveEnemies": 6,
+      "repairsBase": false
+    }
+  ]
+}

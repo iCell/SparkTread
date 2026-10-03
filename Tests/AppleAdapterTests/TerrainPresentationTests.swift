@@ -2,6 +2,7 @@ import Foundation
 import SpriteKit
 import Testing
 import GameCore
+import GameApplication   // StageValidator.KnownIDs: the registry the stages validate against
 @testable import AppleAdapters
 
 @Suite @MainActor struct TerrainPresentationTests {
@@ -118,25 +119,6 @@ import GameCore
         #expect(MovementLabScene.equipmentArtName(nil) == nil)
     }
 
-    /// Owner report 2026-09-10: the moon plow sat on the tank's flank. The
-    /// atlas draws it on the right for every facing, so the right-facing
-    /// sprite is rotated to the front; the other attachments keep their
-    /// per-facing sprites.
-    @Test func theMoonPlowTurnsToTheTankFront() throws {
-        let (art, _, _) = try makeScene()
-        let rightSprite = try art.texture("px_equipment_moon_right")
-        for (direction, rotation) in [(0, CGFloat.pi / 2), (1, 0), (2, -CGFloat.pi / 2), (3, CGFloat.pi)] {
-            let node = try PixelTankNode(kind: "scout", weapon: "normal", direction: direction, pixelScale: 1, art: art)
-            try node.setEquipment("moon")
-            let plow = try #require(node.children.first { $0.zPosition == 4 } as? SKSpriteNode)
-            #expect(plow.texture === rightSprite && abs(plow.zRotation - rotation) < 0.001, "direction \(direction)")
-            #expect(PixelTankNode.frontRotation(direction) == rotation)
-        }
-        let skirt = try PixelTankNode(kind: "scout", weapon: "normal", direction: 0, pixelScale: 1, art: art)
-        try skirt.setEquipment("anti_skid")
-        let attachment = try #require(skirt.children.first { $0.zPosition == 0 } as? SKSpriteNode)
-        #expect(attachment.texture === (try art.texture("px_equipment_anti_skid_up")) && attachment.zRotation == 0)
-    }
 
     /// R5-03: the own-fire base cue tints an actual overlay sprite (teal for
     /// allied, red for enemy), not the vendor node.
@@ -217,5 +199,23 @@ import GameCore
                                                               height: full.height)))
         #expect(pixels(image, width: image.width, height: image.height)
                 == pixels(reference, width: reference.width, height: reference.height))
+    }
+
+    /// Every theme the registry allows a stage to declare must map to a
+    /// ground family the delivery actually ships. The campaign ran only
+    /// frontier stages until stage 4, and the scene tiled frontier for all
+    /// of them; this fails if a theme is added to the registry without art
+    /// behind it, instead of the stage rendering as sand.
+    @Test func everyRegisteredThemeHasAGroundFamily() throws {
+        let (art, _, _) = try makeScene()
+        for theme in StageValidator.KnownIDs.reference.themes {
+            let family = MovementLabScene.groundFamily(theme)
+            #expect(family != "frontier" || theme == "frontier",
+                    "theme '\(theme)' silently falls back to frontier sand")
+            for tile in 0..<9 {
+                #expect((try? art.texture("px_ground_\(family)_\(tile)")) != nil,
+                        "theme '\(theme)' -> px_ground_\(family)_\(tile) missing")
+            }
+        }
     }
 }

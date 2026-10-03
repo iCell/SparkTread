@@ -9,8 +9,8 @@ audio-content acceptance.
 
 ## Scope and authority
 
-This began as a one-stage development prototype (VS-01); three campaign
-stages exist as of the R5 consolidation, still short of the twelve-stage V1.
+This began as a one-stage development prototype (VS-01); the campaign has
+carried all twelve V1 stages since 2026-10-03.
 `GAME_RULES.md` (R5, ADR-0018) wins every gameplay conflict; accepted ADRs
 override the product plan; reference-game behavior and older SVG/styleboard
 assets do not override those decisions. Runtime art is the
@@ -1463,6 +1463,71 @@ own cue and this does not); and a cue for the results reward line (the
 reference has no isolated instance to take, and synthesising one would add
 a placeholder voice to a set that just lost two).
 
+**The twelve-stage campaign, and the loose ends (2026-10-03).** The owner
+played the three stages through ("体验还行") and asked for the rest of the
+content plus the small cleanups that had been accumulating.
+
+*Stages 4–12.* §14.1 already fixed every stage's teaching goal, enemy
+budget, alive cap and required elements, so this was execution against a
+written spec rather than design. Each map is laid out to teach its own
+line: the river and its three bridges with flank channels only an
+amphibious hull can use (4); a long straight ice lane kerbed in brick with
+a dry detour beside it (5); red and white blocks of identical shape in
+matched pairs, a four-deep white band, and steel pillars that shadow a
+blast (6); three long lanes with the supply crates out on the flanks (7);
+two unbreakable fine-steel spines whose gates are offset so the west and
+east routes differ (8); grass fields broken by water, ice and a fine-steel
+spine (9); an ice shortcut walled in steel against a slower brick detour
+(10); a deeper fort with a top gate for the flag rotation to restore, and a
+phase that repairs the base (11); and all eight terrain kinds with every
+weapon family on the board (12). All twelve validate, build deterministically
+and keep the base reachable on the undamaged map.
+
+Enemy coverage was tracked rather than assumed: stages 1–3 introduce 14 of
+the 20 types, and §14.1's required appearances bring in the other six —
+`explosion_b` and `ap_d` at stage 4, `explosion_d` at 5, `rapid_d` at 7,
+`fire_c`/`fire_d` at 9 and `ap_b` at 10 — so §16's "20 型全部在正式内容中
+出现" is satisfied by stage 10, before the summary stage needs them.
+
+The maps were authored as ASCII and converted to the schema's rects, which
+is why the committed JSON still reads as rectangle lists: a 56×27 layout is
+designed by looking at it, and the rect form is what stays diffable.
+
+*The theme finally reaches the scene.* `themeID` has been in the stage
+schema from the start and the delivery ships four ground families, but the
+scene tiled `px_ground_frontier_*` unconditionally — correct while every
+stage was frontier, wrong the moment stage 4 existed. `StageLoader.loadStage`
+now returns the definition alongside the world (one decode, one validation),
+`StageBuild` carries the theme, and the scene maps it to the family. A test
+asserts every theme the registry allows resolves to nine tiles that exist,
+so a theme added without art fails rather than rendering as sand.
+
+*Two tests had to change, and one of them was over-specified.*
+`everyShippedStageValidatesBuildsAndNumbersContiguously` compared stage
+numbers in FILE-NAME order against 1…N. Stage files are named theme-first
+and the file name has to stay the stage id, so the directory stopped
+sorting by campaign position as soon as a second theme existed; the
+invariant that matters — every number once — is now asserted on the sorted
+list. The chained campaign replay was named and written for three stages;
+it now plays the whole campaign and derives the expected score from
+`ScoreRules.reference` per position instead of three pasted numbers, which
+makes it §16's completion criterion ("12 关能从新战役打到结局") in scripted
+form. It is still scripted instant wins, so it does not discharge the
+played golden.
+
+*The loose ends.* `MovementLabView` gained the `import Combine` its
+`Timer.publish` needed (a standing build warning). The mine presentation —
+`PixelMineNode`, its phase and surface enums and the three mine effect
+kinds — left with the mechanic R5 removed, as did the Shield of Moon's
+rotation special case and its test, since §8 keeps two equipment items and
+neither is the moon; the art stays in the delivery, which is an archive,
+but `PixelMines.atlas` is no longer bundled into the app. In the submodule,
+`delivery_summary.json` still described the set before the white-wall
+increment — 1617 textures across 17 atlases, with the delivery's largest
+atlas missing from the counts and a stale manifest hash; the derivable
+fields are recomputed and a `recountedFor` note says which figures are
+still the earlier run's and where that increment's own verification lives.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
@@ -1477,8 +1542,6 @@ Do not interpret green tests as product completion:
   traversal, ice, foliage, difficulty, mine launch, persistence, pause,
   title — landed on 2026-09-10 late evening; mine launch was later removed
   outright by the R5 consolidation, ADR-0018).
-- The ground tile family is fixed to the frontier theme until stage data
-  selects it.
 - Reachability validation is a cell flood approximation.
 - Owner decisions: none open after 2026-09-10 late evening (invincibility
   A; ADR-0012 answered — brackets by delegation, icons; MaxHits/MaxCombos
@@ -1486,7 +1549,9 @@ Do not interpret green tests as product completion:
   M3's slice is complete at the owner's acceptance level; M4 (plan §19)
   items 1–5 landed on 2026-09-10 late evening (ADR-0013…0016 proposed):
   campaign progression, screen flow, checkpoint save, difficulty
-  profiles and director phases, the deferred mechanics. Remaining M4
+  profiles and director phases, the deferred mechanics, and — on
+  2026-10-03 — the twelve-stage content of §14.1. Remaining M4
   deliverables: settings/accessibility/controller support (owner's item
   6), the external playtest build, the "final replacement visual
-  language", performance/export targets, and a played three-stage golden.
+  language", performance/export targets, and a PLAYED golden (the chained
+  campaign replay is scripted instant wins, not a played run).

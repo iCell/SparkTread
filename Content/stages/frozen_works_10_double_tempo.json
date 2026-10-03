@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "id": "frozen_works_10_double_tempo",
+  "stageNumber": 10,
+  "displayNameKey": "stage.s10.name",
+  "themeID": "frozen_works",
+  "arenaSpecID": "universal",
+  "seed": "3326708841590273462",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "ice",
+        "rects": [
+          [
+            23,
+            7,
+            32,
+            22
+          ]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            21,
+            5,
+            22,
+            12
+          ],
+          [
+            33,
+            5,
+            34,
+            8
+          ],
+          [
+            33,
+            11,
+            34,
+            22
+          ],
+          [
+            21,
+            15,
+            22,
+            22
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            4,
+            8,
+            7,
+            9
+          ],
+          [
+            12,
+            8,
+            17,
+            9
+          ],
+          [
+            38,
+            8,
+            43,
+            9
+          ],
+          [
+            48,
+            8,
+            51,
+            9
+          ],
+          [
+            4,
+            14,
+            7,
+            15
+          ],
+          [
+            12,
+            14,
+            17,
+            15
+          ],
+          [
+            38,
+            14,
+            43,
+            15
+          ],
+          [
+            48,
+            14,
+            51,
+            15
+          ],
+          [
+            4,
+            20,
+            7,
+            21
+          ],
+          [
+            12,
+            20,
+            17,
+            21
+          ],
+          [
+            38,
+            20,
+            43,
+            21
+          ],
+          [
+            48,
+            20,
+            51,
+            21
+          ],
+          [
+            23,
+            23,
+            32,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            23,
+            5,
+            32,
+            6
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_d",
+      "count": 5
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 7
+    },
+    {
+      "archetype": "rapid_d",
+      "count": 5
+    },
+    {
+      "archetype": "ap_b",
+      "count": 6
+    },
+    {
+      "archetype": "ap_d",
+      "count": 3
+    },
+    {
+      "archetype": "explosion_c",
+      "count": 3
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 7,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 5,
+      "pickup": "ammo_crate",
+      "critical": true
+    },
+    {
+      "queueIndex": 11,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 17,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 24,
+      "pickup": "invincibility"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        4,
+        8
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        48,
+        20
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "tempo_break",
+      "afterSpawned": 22,
+      "reinforcements": [
+        "ap_b",
+        "rapid_d",
+        "rapid_c",
+        "ap_d",
+        "normal_d"
+      ],
+      "maxAliveEnemies": 7,
+      "repairsBase": false
+    }
+  ]
+}

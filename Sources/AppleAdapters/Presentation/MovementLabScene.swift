@@ -145,6 +145,22 @@ final class MovementLabScene: SKScene {
     /// own brightness, which is what the playfield's own 精钢 walls keep.
     static let bezelDimming: CGFloat = 0.34
 
+    /// Stage theme → the delivery's ground family. The art ships four
+    /// families of nine tiles and the stage schema has carried `themeID`
+    /// from the start, but the campaign only had frontier stages, so the
+    /// scene tiled frontier unconditionally; stages 4–12 brought the other
+    /// three in. Unknown themes fall back to frontier rather than throwing:
+    /// a stage that validated has a known theme, and a missing tile would
+    /// blank the field.
+    static func groundFamily(_ themeID: String) -> String {
+        switch themeID {
+        case "floodplain": "floodplain"
+        case "frozen_works": "frozen"
+        case "iron_citadel": "citadel"
+        default: "frontier"
+        }
+    }
+
     /// Foliage over any other tank. Owner rule (2026-09-11): a tank in the
     /// bushes stays visible, it is only hard to make out — so cover never
     /// hides a tank outright, it just thins over one.
@@ -336,7 +352,7 @@ final class MovementLabScene: SKScene {
         for y in stride(from: 0, to: arena.cellsHigh, by: 3) {
             for x in stride(from: 0, to: arena.cellsWide, by: 3) {
                 let spanX = min(3, arena.cellsWide - x), spanY = min(3, arena.cellsHigh - y)
-                let id = "px_ground_frontier_\((x / 3 + y / 3) % 9)"
+                let id = "px_ground_\(Self.groundFamily(controller.themeID))_\((x / 3 + y / 3) % 9)"
                 let full = try art.texture(id)
                 let texture = spanX == 3 && spanY == 3 ? full
                     : (clippedGroundTexture(art, id: id, spanX: spanX, spanY: spanY) ?? full)

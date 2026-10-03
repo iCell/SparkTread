@@ -120,7 +120,7 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
         #expect(CampaignValidator.validate(CampaignDefinition(id: "c", displayNameKey: "k", stageIDs: ["a", "a"]))
                 .contains { $0.contains("repeats") })
         let def = try loadCampaign()
-        #expect(def.id == "campaign_v1" && def.stageIDs.count == 3)
+        #expect(def.id == "campaign_v1" && def.stageIDs.count == 12)  // the full V1 campaign
         var stages: [String: StageDefinition] = [:]
         for id in def.stageIDs { stages[id] = try StageLoader.loadDefinition(at: stageURL(id)) }
         // A stage numbered against its position, and a missing stage, are reported.
@@ -135,7 +135,12 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
     /// Three real stages, each won at once, recorded with the carried state
     /// in their headers: the chain verifies, the exit states carry the
     /// clear bonuses, and a tampered header breaks the chain.
-    @Test func threeStageChainedReplayPasses() throws {
+    /// The whole campaign, chained: every stage builds from the previous
+    /// stage's exit state, and the run reports complete only after the last
+    /// one. This is §16's completion criterion — "12 关能从新战役打到结局" —
+    /// in scripted form; it was a three-stage check while three stages
+    /// existed.
+    @Test func campaignChainedReplayPasses() throws {
         let def = try loadCampaign()
         var run = CampaignRun(campaign: def)
         var recordings: [ReplayRecording] = []
@@ -151,11 +156,20 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
             let exit = try #require(SessionState.carried(from: session.world))
             done = !run.advance(exitState: exit)
         }
-        #expect(recordings.count == 3 && run.isComplete)
+        #expect(recordings.count == def.stageIDs.count && run.isComplete)
         #expect(recordings.map(\.stageID) == def.stageIDs)
         let results = try ReplayPlayer.replayCampaign(CampaignReplay(stages: recordings), ticks: ticks)
-        #expect(results.map(\.exitState.score) == [530, 1060, 1590]) // 200 + 330 per stage (ADR-0012 tier 1)
-        #expect(results.map(\.exitState.lives) == [3, 3, 3])
+        // Scores accumulate the stage-clear bonus of each position's tier
+        // (ADR-0012), stated as the rule rather than as pasted numbers so a
+        // tier change shows up as one failure here and not twelve.
+        var running = 0
+        let expectedScores = (1...def.stageIDs.count).map { number -> Int in
+            let bonus = ScoreRules.reference.clearBonus(stageNumber: number)
+            running += bonus.tally + bonus.reward
+            return running
+        }
+        #expect(results.map(\.exitState.score) == expectedScores)
+        #expect(results.map(\.exitState.lives) == Array(repeating: 3, count: def.stageIDs.count))
         #expect(recordings[1].sessionState == results[0].exitState && recordings[2].sessionState == results[1].exitState)
 
         // A header that is not the previous exit state breaks the chain.

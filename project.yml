@@ -18,6 +18,11 @@ targets:
       - Sources/GoldenEagleApp
       - path: Vendor/SparkTreadPixel/Atlases
         buildPhase: resources
+        # The mine atlas is art for a mechanic R5 removed (ADR-0018). It stays
+        # in the delivery, which is an archive, but there is no reason to ship
+        # it: nothing in the app can reference it.
+        excludes:
+          - PixelMines.atlas
       - path: Vendor/SparkTreadPixel/Metadata/pixel_assets.json
         buildPhase: resources
       - path: Content/stages

@@ -1,0 +1,373 @@
+{
+  "schemaVersion": 1,
+  "id": "iron_citadel_12_all_arms",
+  "stageNumber": 12,
+  "displayNameKey": "stage.s12.name",
+  "themeID": "iron_citadel",
+  "arenaSpecID": "universal",
+  "seed": "9174452063318890714",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "water",
+        "rects": [
+          [
+            17,
+            5,
+            22,
+            8
+          ],
+          [
+            33,
+            5,
+            38,
+            8
+          ]
+        ]
+      },
+      {
+        "kind": "ice",
+        "rects": [
+          [
+            23,
+            10,
+            32,
+            13
+          ]
+        ]
+      },
+      {
+        "kind": "white_steel",
+        "rects": [
+          [
+            21,
+            10,
+            22,
+            13
+          ],
+          [
+            33,
+            10,
+            34,
+            13
+          ],
+          [
+            22,
+            20,
+            24,
+            21
+          ],
+          [
+            31,
+            20,
+            33,
+            21
+          ]
+        ]
+      },
+      {
+        "kind": "foliage",
+        "rects": [
+          [
+            3,
+            5,
+            14,
+            9
+          ],
+          [
+            41,
+            5,
+            52,
+            9
+          ],
+          [
+            22,
+            16,
+            33,
+            19
+          ]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            17,
+            16,
+            20,
+            17
+          ],
+          [
+            35,
+            16,
+            38,
+            17
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            3,
+            16,
+            6,
+            17
+          ],
+          [
+            11,
+            16,
+            14,
+            17
+          ],
+          [
+            41,
+            16,
+            44,
+            17
+          ],
+          [
+            49,
+            16,
+            52,
+            17
+          ],
+          [
+            25,
+            20,
+            25,
+            21
+          ],
+          [
+            30,
+            20,
+            30,
+            21
+          ],
+          [
+            26,
+            23,
+            29,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            3,
+            12,
+            7,
+            13
+          ],
+          [
+            12,
+            12,
+            16,
+            13
+          ],
+          [
+            39,
+            12,
+            43,
+            13
+          ],
+          [
+            48,
+            12,
+            52,
+            13
+          ],
+          [
+            10,
+            20,
+            21,
+            21
+          ],
+          [
+            34,
+            20,
+            45,
+            21
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_c",
+      "count": 3
+    },
+    {
+      "archetype": "normal_d",
+      "count": 4
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 4
+    },
+    {
+      "archetype": "rapid_d",
+      "count": 3
+    },
+    {
+      "archetype": "fire_c",
+      "count": 3
+    },
+    {
+      "archetype": "fire_d",
+      "count": 3
+    },
+    {
+      "archetype": "ap_b",
+      "count": 3
+    },
+    {
+      "archetype": "ap_d",
+      "count": 3
+    },
+    {
+      "archetype": "explosion_c",
+      "count": 3
+    },
+    {
+      "archetype": "explosion_d",
+      "count": 3
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 8,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 5,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 11,
+      "pickup": "max_armor_ammo"
+    },
+    {
+      "queueIndex": 17,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 23,
+      "pickup": "invincibility"
+    },
+    {
+      "queueIndex": 29,
+      "pickup": "extra_life"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        3,
+        16
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        41,
+        16
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "all_arms",
+      "afterSpawned": 24,
+      "reinforcements": [
+        "normal_d",
+        "rapid_d",
+        "fire_d",
+        "ap_d",
+        "explosion_d",
+        "ap_b",
+        "rapid_c",
+        "explosion_c"
+      ],
+      "maxAliveEnemies": 8,
+      "repairsBase": true
+    }
+  ]
+}

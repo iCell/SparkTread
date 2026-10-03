@@ -37,11 +37,22 @@ public enum StageLoader {
     public static func loadWorld(at url: URL, rules: PickupRuleset = .provisional,
                                  session: SessionState = .campaignStart,
                                  difficulty: DifficultyDefinition = .standard) throws -> WorldState {
+        try loadStage(at: url, rules: rules, session: session, difficulty: difficulty).world
+    }
+
+    /// The world together with the definition it was built from. The loader
+    /// is the only place that holds both, and presentation needs something
+    /// the simulation deliberately does not carry: `themeID`, which chooses
+    /// the ground family. One decode, one validation pass.
+    public static func loadStage(at url: URL, rules: PickupRuleset = .provisional,
+                                 session: SessionState = .campaignStart,
+                                 difficulty: DifficultyDefinition = .standard)
+        throws -> (world: WorldState, definition: StageDefinition) {
         let def = try loadDefinition(at: url)
         let issues = StageValidator.validate(def) + rules.validationIssues() + session.validationIssues
             + DifficultyValidator.validate(difficulty)
         if !issues.isEmpty { throw LoadError.build(issues.joined(separator: "; ")) }
-        do { return try StageBuilder.build(def, rules: rules, session: session, difficulty: difficulty) }
+        do { return (try StageBuilder.build(def, rules: rules, session: session, difficulty: difficulty), def) }
         catch { throw LoadError.build(String(describing: error)) }
     }
 

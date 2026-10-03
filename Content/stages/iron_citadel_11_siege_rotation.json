@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 1,
+  "id": "iron_citadel_11_siege_rotation",
+  "stageNumber": 11,
+  "displayNameKey": "stage.s11.name",
+  "themeID": "iron_citadel",
+  "arenaSpecID": "universal",
+  "seed": "5583099214476630188",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            14,
+            16,
+            15,
+            20
+          ],
+          [
+            40,
+            16,
+            41,
+            20
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            4,
+            11,
+            8,
+            13
+          ],
+          [
+            13,
+            11,
+            17,
+            13
+          ],
+          [
+            22,
+            11,
+            26,
+            13
+          ],
+          [
+            31,
+            11,
+            35,
+            13
+          ],
+          [
+            40,
+            11,
+            44,
+            13
+          ],
+          [
+            49,
+            11,
+            53,
+            13
+          ],
+          [
+            18,
+            17,
+            25,
+            18
+          ],
+          [
+            30,
+            17,
+            37,
+            18
+          ],
+          [
+            24,
+            21,
+            26,
+            21
+          ],
+          [
+            29,
+            21,
+            31,
+            21
+          ],
+          [
+            24,
+            22,
+            25,
+            22
+          ],
+          [
+            30,
+            22,
+            31,
+            22
+          ],
+          [
+            25,
+            23,
+            30,
+            23
+          ],
+          [
+            25,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            30,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            4,
+            5,
+            8,
+            7
+          ],
+          [
+            13,
+            5,
+            17,
+            7
+          ],
+          [
+            22,
+            5,
+            26,
+            7
+          ],
+          [
+            31,
+            5,
+            35,
+            7
+          ],
+          [
+            40,
+            5,
+            44,
+            7
+          ],
+          [
+            49,
+            5,
+            53,
+            7
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_d",
+      "count": 5
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 4
+    },
+    {
+      "archetype": "ap_c",
+      "count": 3
+    },
+    {
+      "archetype": "explosion_a",
+      "count": 4
+    },
+    {
+      "archetype": "explosion_c",
+      "count": 8
+    },
+    {
+      "archetype": "explosion_d",
+      "count": 6
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 8,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 4,
+      "pickup": "base_shield",
+      "critical": true
+    },
+    {
+      "queueIndex": 10,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 16,
+      "pickup": "ammo_crate"
+    },
+    {
+      "queueIndex": 22,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 28,
+      "pickup": "bomb"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        4,
+        11
+      ]
+    },
+    {
+      "id": "extra_life",
+      "cell": [
+        49,
+        11
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      24,
+      21
+    ],
+    [
+      25,
+      21
+    ],
+    [
+      26,
+      21
+    ],
+    [
+      29,
+      21
+    ],
+    [
+      30,
+      21
+    ],
+    [
+      31,
+      21
+    ],
+    [
+      24,
+      22
+    ],
+    [
+      25,
+      22
+    ],
+    [
+      30,
+      22
+    ],
+    [
+      31,
+      22
+    ],
+    [
+      25,
+      23
+    ],
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      30,
+      23
+    ],
+    [
+      25,
+      24
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      30,
+      24
+    ],
+    [
+      25,
+      25
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ],
+    [
+      30,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "siege_rotation",
+      "afterSpawned": 24,
+      "reinforcements": [
+        "explosion_d",
+        "explosion_c",
+        "explosion_c",
+        "ap_c",
+        "normal_d",
+        "rapid_c"
+      ],
+      "maxAliveEnemies": 8,
+      "repairsBase": true
+    }
+  ]
+}

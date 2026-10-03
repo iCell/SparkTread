@@ -5,6 +5,15 @@
   "stageIDs": [
     "frontier_01_first_defense",
     "frontier_02_hidden_in_grass",
-    "frontier_03_desert_stairs"
+    "frontier_03_desert_stairs",
+    "floodplain_04_amphibious_crossing",
+    "frozen_works_05_slick_lane",
+    "iron_citadel_06_white_bulwark",
+    "floodplain_07_supply_run",
+    "iron_citadel_08_fine_steel_gates",
+    "floodplain_09_firebreaks",
+    "frozen_works_10_double_tempo",
+    "iron_citadel_11_siege_rotation",
+    "iron_citadel_12_all_arms"
   ]
 }

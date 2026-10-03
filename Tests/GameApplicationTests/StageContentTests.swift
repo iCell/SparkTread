@@ -68,7 +68,12 @@ private let vs01URL = repoRoot
             numbers.append(try #require(def.stageNumber))
             #expect(a.stage?.clearBonus == ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 0))
         }
-        #expect(numbers == Array(1...urls.count))
+        // Sorted, not in file order: stage files are named theme-first
+        // (`frontier_01_…`, `floodplain_04_…`) and the file name has to stay
+        // the stage id, so once the campaign ran more than one theme the
+        // directory stopped sorting by campaign position. The invariant that
+        // matters is unchanged — every number from 1 to N, each exactly once.
+        #expect(numbers.sorted() == Array(1...urls.count))
     }
 
     /// ADR-0012: the campaign position is required content and selects the

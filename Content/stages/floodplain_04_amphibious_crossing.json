@@ -1,0 +1,383 @@
+{
+  "schemaVersion": 1,
+  "id": "floodplain_04_amphibious_crossing",
+  "stageNumber": 4,
+  "displayNameKey": "stage.s04.name",
+  "themeID": "floodplain",
+  "arenaSpecID": "universal",
+  "seed": "4411902733185620447",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "water",
+        "rects": [
+          [
+            1,
+            12,
+            5,
+            14
+          ],
+          [
+            12,
+            12,
+            24,
+            14
+          ],
+          [
+            31,
+            12,
+            43,
+            14
+          ],
+          [
+            50,
+            12,
+            54,
+            14
+          ],
+          [
+            3,
+            15,
+            4,
+            21
+          ],
+          [
+            51,
+            15,
+            52,
+            21
+          ],
+          [
+            22,
+            18,
+            26,
+            20
+          ],
+          [
+            29,
+            18,
+            33,
+            20
+          ]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            27,
+            8,
+            28,
+            9
+          ],
+          [
+            6,
+            12,
+            6,
+            14
+          ],
+          [
+            11,
+            12,
+            11,
+            14
+          ],
+          [
+            25,
+            12,
+            25,
+            14
+          ],
+          [
+            30,
+            12,
+            30,
+            14
+          ],
+          [
+            44,
+            12,
+            44,
+            14
+          ],
+          [
+            49,
+            12,
+            49,
+            14
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            5,
+            4,
+            6,
+            9
+          ],
+          [
+            11,
+            4,
+            12,
+            9
+          ],
+          [
+            17,
+            4,
+            18,
+            9
+          ],
+          [
+            23,
+            4,
+            31,
+            5
+          ],
+          [
+            35,
+            4,
+            36,
+            9
+          ],
+          [
+            41,
+            4,
+            42,
+            9
+          ],
+          [
+            47,
+            4,
+            48,
+            9
+          ],
+          [
+            23,
+            6,
+            24,
+            9
+          ],
+          [
+            29,
+            6,
+            30,
+            9
+          ],
+          [
+            8,
+            16,
+            9,
+            21
+          ],
+          [
+            14,
+            16,
+            15,
+            21
+          ],
+          [
+            20,
+            16,
+            21,
+            21
+          ],
+          [
+            35,
+            16,
+            36,
+            23
+          ],
+          [
+            41,
+            16,
+            42,
+            21
+          ],
+          [
+            47,
+            16,
+            48,
+            21
+          ],
+          [
+            37,
+            22,
+            38,
+            23
+          ],
+          [
+            26,
+            23,
+            29,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            17,
+            22,
+            20,
+            23
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_a",
+      "count": 4
+    },
+    {
+      "archetype": "normal_b",
+      "count": 6
+    },
+    {
+      "archetype": "rapid_b",
+      "count": 4
+    },
+    {
+      "archetype": "fire_a",
+      "count": 2
+    },
+    {
+      "archetype": "explosion_b",
+      "count": 5
+    },
+    {
+      "archetype": "ap_d",
+      "count": 3
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 6,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 3,
+      "pickup": "amphi_tank",
+      "critical": true
+    },
+    {
+      "queueIndex": 8,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 13,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 19,
+      "pickup": "ammo_crate"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        8,
+        16
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        47,
+        16
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "amphibious_flank",
+      "afterSpawned": 16,
+      "reinforcements": [
+        "ap_d",
+        "explosion_b",
+        "normal_b",
+        "rapid_b"
+      ],
+      "maxAliveEnemies": 6,
+      "repairsBase": false
+    }
+  ]
+}

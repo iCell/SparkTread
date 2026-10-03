@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "id": "iron_citadel_08_fine_steel_gates",
+  "stageNumber": 8,
+  "displayNameKey": "stage.s08.name",
+  "themeID": "iron_citadel",
+  "arenaSpecID": "universal",
+  "seed": "6017344829935521176",
+  "terrain": {
+    "border": "steel",
+    "layers": [
+      {
+        "kind": "white_steel",
+        "rects": [
+          [
+            17,
+            4,
+            25,
+            5
+          ],
+          [
+            30,
+            4,
+            38,
+            5
+          ],
+          [
+            17,
+            6,
+            18,
+            9
+          ],
+          [
+            37,
+            6,
+            38,
+            14
+          ],
+          [
+            17,
+            13,
+            18,
+            20
+          ],
+          [
+            37,
+            18,
+            38,
+            20
+          ],
+          [
+            8,
+            21,
+            15,
+            22
+          ],
+          [
+            40,
+            21,
+            47,
+            22
+          ]
+        ]
+      },
+      {
+        "kind": "steel",
+        "rects": [
+          [
+            19,
+            9,
+            24,
+            10
+          ],
+          [
+            31,
+            9,
+            36,
+            10
+          ]
+        ]
+      },
+      {
+        "kind": "brick",
+        "rects": [
+          [
+            6,
+            7,
+            11,
+            8
+          ],
+          [
+            44,
+            7,
+            49,
+            8
+          ],
+          [
+            6,
+            16,
+            11,
+            17
+          ],
+          [
+            44,
+            16,
+            49,
+            17
+          ],
+          [
+            26,
+            23,
+            29,
+            23
+          ],
+          [
+            26,
+            24,
+            26,
+            25
+          ],
+          [
+            29,
+            24,
+            29,
+            25
+          ]
+        ]
+      },
+      {
+        "kind": "white_brick",
+        "rects": [
+          [
+            19,
+            14,
+            24,
+            15
+          ],
+          [
+            31,
+            14,
+            36,
+            15
+          ],
+          [
+            20,
+            21,
+            25,
+            22
+          ],
+          [
+            30,
+            21,
+            35,
+            22
+          ]
+        ]
+      }
+    ]
+  },
+  "baseSpawn": [
+    27,
+    24
+  ],
+  "playerSpawnsByID": {
+    "1": [
+      23,
+      24
+    ]
+  },
+  "enemyComposition": [
+    {
+      "archetype": "normal_c",
+      "count": 5
+    },
+    {
+      "archetype": "normal_d",
+      "count": 4
+    },
+    {
+      "archetype": "rapid_c",
+      "count": 5
+    },
+    {
+      "archetype": "ap_a",
+      "count": 4
+    },
+    {
+      "archetype": "ap_c",
+      "count": 4
+    },
+    {
+      "archetype": "explosion_b",
+      "count": 5
+    }
+  ],
+  "enemySpawns": [
+    [
+      1,
+      1
+    ],
+    [
+      27,
+      1
+    ],
+    [
+      53,
+      1
+    ]
+  ],
+  "maxAliveEnemies": 6,
+  "initialEnemyDelayTicks": 240,
+  "telegraphTicks": 45,
+  "pickupSpawns": [],
+  "dropTable": [],
+  "dropChancePercent": 0,
+  "carriedDrops": [
+    {
+      "queueIndex": 4,
+      "pickup": "power_up"
+    },
+    {
+      "queueIndex": 10,
+      "pickup": "ammo_crate"
+    },
+    {
+      "queueIndex": 15,
+      "pickup": "base_shield"
+    },
+    {
+      "queueIndex": 21,
+      "pickup": "invincibility"
+    }
+  ],
+  "hiddenPickups": [
+    {
+      "id": "armor_up",
+      "cell": [
+        6,
+        7
+      ]
+    },
+    {
+      "id": "speed_up",
+      "cell": [
+        46,
+        16
+      ]
+    }
+  ],
+  "fortTemplate": [
+    [
+      26,
+      23
+    ],
+    [
+      27,
+      23
+    ],
+    [
+      28,
+      23
+    ],
+    [
+      29,
+      23
+    ],
+    [
+      26,
+      24
+    ],
+    [
+      29,
+      24
+    ],
+    [
+      26,
+      25
+    ],
+    [
+      29,
+      25
+    ]
+  ],
+  "directorPhases": [
+    {
+      "id": "gate_press",
+      "afterSpawned": 20,
+      "reinforcements": [
+        "ap_c",
+        "explosion_b",
+        "normal_d",
+        "rapid_c",
+        "ap_a"
+      ],
+      "maxAliveEnemies": 6,
+      "repairsBase": false
+    }
+  ]
+}

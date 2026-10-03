@@ -1,3 +1,4 @@
+import Combine          // Timer.publish's Publishers namespace
 import GameApplication
 import GameCore
 import SpriteKit
@@ -45,9 +46,14 @@ public final class MovementLabController {
         public struct StageBuild {
             public var world: WorldState
             public var weapons: WeaponRuleset
-            public init(world: WorldState, weapons: WeaponRuleset = .provisional) {
+            /// The stage's theme, which picks the ground family the scene
+            /// tiles with. Presentation only — the simulation never sees it.
+            public var themeID: String
+            public init(world: WorldState, weapons: WeaponRuleset = .provisional,
+                        themeID: String = "frontier") {
                 self.world = world
                 self.weapons = weapons
+                self.themeID = themeID
             }
         }
         public let build: (_ run: CampaignRun) throws -> StageBuild
@@ -63,11 +69,13 @@ public final class MovementLabController {
         public static func bundled(_ bundle: Bundle = .main, rules: PickupRuleset = .provisional) -> StageProvider {
             StageProvider { run in
                 let difficulty = try DifficultyLoader.load(id: run.difficultyID, bundle: bundle)
-                let world = try StageLoader.loadWorld(id: run.stageID, bundle: bundle, rules: rules,
-                                                      session: run.checkpoint, difficulty: difficulty)
+                let stage = try StageLoader.loadStage(at: StageLoader.stageURL(id: run.stageID, bundle: bundle),
+                                                      rules: rules, session: run.checkpoint,
+                                                      difficulty: difficulty)
                 var weapons = WeaponRuleset.provisional
                 weapons.alliedBaseDamage = difficulty.alliedBaseDamage
-                return StageBuild(world: world, weapons: weapons)
+                return StageBuild(world: stage.world, weapons: weapons,
+                                  themeID: stage.definition.themeID)
             }
         }
     }
@@ -114,7 +122,9 @@ public final class MovementLabController {
         campaignRun = campaign
         self.stages = stages
         self.persistence = persistence
-        session = Self.makeSession(for: campaign, stages: stages)
+        let made = Self.makeStage(for: campaign, stages: stages)
+        session = made.session
+        themeID = made.themeID
         self.audio = audio ?? GameAudio()
         self.haptics = GameHaptics()
         flow = Self.makeFlow(for: session.world, lab: false)
@@ -186,14 +196,28 @@ public final class MovementLabController {
     /// Builds the run's current stage from its checkpoint. Stage content
     /// that fails to build is a build error (§15.4): the campaign was
     /// validated against its stages when it was loaded.
-    private static func makeSession(for run: CampaignRun, stages: StageProvider) -> MovementLabSession {
+    private static func makeStage(for run: CampaignRun, stages: StageProvider)
+        -> (session: MovementLabSession, themeID: String) {
         do {
             let built = try stages.build(run)
-            return MovementLabSession(world: built.world, weapons: built.weapons, stageID: run.stageID,
-                                      sessionState: run.checkpoint, difficultyID: run.difficultyID)
+            return (MovementLabSession(world: built.world, weapons: built.weapons, stageID: run.stageID,
+                                       sessionState: run.checkpoint, difficultyID: run.difficultyID),
+                    built.themeID)
         } catch {
             fatalError("campaign stage '\(run.stageID)' failed to build: \(error)")
         }
+    }
+
+    /// The current stage's theme, which picks the ground family the scene
+    /// tiles with. Presentation state, not simulation state: the campaign
+    /// has run four themes since stage 4, and the scene drew frontier sand
+    /// under all of them until this carried the choice through.
+    public private(set) var themeID = "frontier"
+
+    /// Swaps in a built stage and the theme it is drawn with.
+    private func adopt(_ made: (session: MovementLabSession, themeID: String)) {
+        themeID = made.themeID
+        replaceSession(made.session)
     }
 
     /// Stage worlds open with the intro card; the lab and worlds without a
@@ -209,7 +233,7 @@ public final class MovementLabController {
     public func restart() {
         if flow.outcome != nil { lastCompletedRecording = session.recording }
         if let campaignRun, let stages {
-            replaceSession(Self.makeSession(for: campaignRun, stages: stages))
+            adopt(Self.makeStage(for: campaignRun, stages: stages))
         } else if let injectedWorld {
             replaceSession(MovementLabSession(world: injectedWorld, ruleset: session.ruleset,
                                               weapons: session.weapons, pickups: session.pickups))
@@ -236,7 +260,7 @@ public final class MovementLabController {
                 checkpoint: hasNext ? run : nil, bestScore: bestScore))
         }
         if hasNext {
-            replaceSession(Self.makeSession(for: run, stages: stages))
+            adopt(Self.makeStage(for: run, stages: stages))
         } else {
             campaignComplete = true
             syncInputAdmission()
@@ -257,7 +281,7 @@ public final class MovementLabController {
             try store.saveProgress(CampaignProgress(campaignID: fresh.campaign.id, completedStageIDs: completed,
                                                     checkpoint: nil, bestScore: try store.loadProgress()?.bestScore ?? 0))
         }
-        replaceSession(Self.makeSession(for: fresh, stages: stages))
+        adopt(Self.makeStage(for: fresh, stages: stages))
     }
 
     /// Leaving the game screen mid-run (返回标题): the suspended session, if

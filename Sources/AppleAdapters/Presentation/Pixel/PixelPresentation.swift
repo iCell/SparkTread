@@ -2,10 +2,12 @@ import Foundation
 import SpriteKit
 
 /// Visual event identifiers only. Gameplay chooses when and where they occur.
+/// The mine kinds and `PixelMineNode` left with the mechanic (R5, ADR-0018);
+/// the delivery still carries their recipes and sprites, unreferenced.
 enum PixelEffectKind:String,CaseIterable {
     case brickHit,steelHit,armorHit,shieldHit,waterHit,projectileCancel
     case tankExplosion,groundExplosion,apEntry,apExit,fireIgnite,fireBurn,fireExtinguish,waterExtinguish
-    case mineArming,mineTrigger,mineDisarm,spawnWarning,spawnComplete,pickupSpawn,pickupCollect,upgrade
+    case spawnWarning,spawnComplete,pickupSpawn,pickupCollect,upgrade
     case repair,baseHit,baseCritical,baseShieldAppear,baseShieldEnd,freezeBurst,iceHit,foliageHit,amphiWake,skidTrail
 }
 
@@ -77,52 +79,6 @@ enum PixelPickupPhase:String,CaseIterable {case spawning,idle,collecting,replaci
         case .expired:isHidden=true
         }
     }
-}
-
-enum PixelMinePhase:String,CaseIterable {case placing,unarmed,arming,armed,triggered,disarming,detonating,removed}
-enum PixelMineSurface:String,CaseIterable {case ground,water,ice}
-@MainActor final class PixelMineNode:SKNode {
-    let level:Int,owner:String,surface:PixelMineSurface
-    private let art:PixelArt,scale:CGFloat,body:SKSpriteNode,badge:SKSpriteNode,warning:SKSpriteNode,water:SKSpriteNode
-    private let hardware=SKNode(),number=SKLabelNode(fontNamed:"Menlo-Bold")
-    private let blast:PixelEffectNode,impact:PixelEffectNode?
-    private(set) var phase:PixelMinePhase = .unarmed
-    init(level:Int,owner:String,surface:PixelMineSurface,pixelScale:CGFloat,art:PixelArt) throws {
-        guard (0...3).contains(level),["player","enemy"].contains(owner) else {throw PixelArtError.missing("mine level/owner")}
-        self.level=level;self.owner=owner;self.surface=surface;self.art=art;scale=pixelScale
-        body=try art.sprite("px_mine_\(level)_dormant",scale:pixelScale)
-        badge=try art.sprite("px_badge_"+owner,scale:pixelScale*0.6)
-        warning=try art.sprite("px_status_mine_warning_0",scale:pixelScale*0.65)
-        water=try art.sprite("px_status_shield_0",scale:pixelScale*0.55)
-        blast=try PixelEffectNode(kind:.tankExplosion,pixelScale:pixelScale,art:art)
-        impact=surface == .ground ? nil : try PixelEffectNode(kind:surface == .water ? .waterHit : .iceHit,pixelScale:pixelScale,art:art)
-        super.init();name="mine_\(level)_\(owner)";addChild(hardware);hardware.addChild(body);hardware.addChild(badge);hardware.addChild(number)
-        badge.position=CGPoint(x:9*scale,y:-8*scale);badge.zPosition=2
-        number.text=String(level);number.fontSize=6*scale;number.fontColor = .white;number.position=CGPoint(x:-8*scale,y:5*scale);number.zPosition=3
-        addChild(warning);warning.zPosition=4;addChild(water);water.zPosition = -1;addChild(blast);blast.zPosition=5
-        if let impact {addChild(impact);impact.zPosition=6}
-        try update(phase:.unarmed,age:0,progress:0)
-    }
-    required init?(coder:NSCoder){fatalError("Use registered mine")}
-    func update(phase:PixelMinePhase,age:Double,progress:Double,revealed:Bool=true) throws {
-        guard age>=0,age.isFinite,progress.isFinite,(0...1).contains(progress) else {throw PixelArtError.missing("mine snapshot")}
-        self.phase=phase;isHidden = !revealed || phase == .removed
-        hardware.isHidden=false;hardware.alpha=1;hardware.setScale(1);warning.isHidden=true;warning.alpha=1;warning.setScale(1)
-        blast.isHidden=true;impact?.isHidden=true;water.isHidden=surface != .water || phase == .removed;water.alpha=0.55
-        body.texture=try art.texture("px_mine_\(level)_"+([.armed,.triggered].contains(phase) ? "armed" : "dormant"))
-        switch phase {
-        case .placing:hardware.alpha=min(1,age/0.25);hardware.setScale(0.8+0.2*min(1,age/0.25))
-        case .unarmed:hardware.alpha=0.6
-        case .arming:warning.isHidden=false;warning.alpha=0.25+0.5*progress;warning.setScale(1.3-0.3*progress)
-        case .armed:break
-        case .triggered:warning.isHidden=false;warning.alpha=0.7+0.2*sin(age*3)
-        case .disarming:hardware.alpha=1-progress;warning.isHidden=false;warning.alpha=1-progress;warning.setScale(1-0.5*progress)
-        case .detonating:hardware.isHidden=true;water.isHidden=true;blast.isHidden=false;try blast.advance(to:age);impact?.isHidden=false;try impact?.advance(to:age)
-        case .removed:break
-        }
-    }
-    /// Presentation intentionally does not invent a blast radius from the level.
-    var hardwareVisible:Bool {!isHidden && !hardware.isHidden && hardware.alpha>0.001}
 }
 
 enum PixelBaseShieldPhase:String,CaseIterable {case absent,appearing,active,warning,ending}
