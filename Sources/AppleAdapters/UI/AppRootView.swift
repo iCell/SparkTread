@@ -245,6 +245,14 @@ struct TitleScreen: View {
     /// reveal's edge IS the tank's rear and the two cannot drift apart.
     @State private var progress: Double = 0
     @State private var settled = false
+    /// The wordmark's measured width; the drive's timing is derived from it.
+    @State private var wordWidth: CGFloat = 0
+
+    /// How fast the tank rolls, in points per second. Owner on the first
+    /// cut: too fast — and it was eased, so it was FASTEST over the word,
+    /// which is the one stretch that has to be read. A tank crosses at one
+    /// deliberate speed; the duration falls out of the distance.
+    private static let tankSpeed: CGFloat = 170
 
     private static let tankHeight: CGFloat = 50
     /// The right-facing sprite's length at that height (its body is wider
@@ -261,13 +269,12 @@ struct TitleScreen: View {
         VStack(spacing: 18) {
             Spacer()
             TitleWordmark()
-                .mask { reveal }
-                .overlay { tankPass }
-            Text("坦克大战")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.white)
-                .opacity(settled ? 1 : 0)
-                .offset(y: settled ? 0 : 10)
+                .modifier(TankReveal(progress: progress, tankLength: Self.tankLength,
+                                     exitRun: Self.exitRun, tankHeight: Self.tankHeight,
+                                     tank: MenuArt.playerTank))
+                .background { GeometryReader { proxy in
+                    Color.clear.onAppear { wordWidth = proxy.size.width }
+                } }
             Spacer()
             Group {
             if hasCampaign, canResume {
@@ -294,55 +301,31 @@ struct TitleScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MenuBackdrop())
-        .task { await runIntro() }
+        .onAppear { runIntro() }
     }
 
-    /// The tank's rear edge for the current progress, in the wordmark's own
-    /// space: it enters from beyond the leading edge and exits well past the
-    /// trailing one.
-    private func tankRear(width: CGFloat) -> CGFloat {
-        -Self.tankLength + (width + Self.tankLength + Self.exitRun) * progress
-    }
-
-    /// Everything from the wordmark's leading edge to the tank's rear is
-    /// visible; the rest is still under the tank, or not yet reached.
-    private var reveal: some View {
-        GeometryReader { proxy in
-            Rectangle()
-                .frame(width: max(0, min(proxy.size.width, tankRear(width: proxy.size.width))))
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ViewBuilder private var tankPass: some View {
-        if let image = MenuArt.playerTank {
-            GeometryReader { proxy in
-                Image(decorative: image, scale: 1)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: Self.tankHeight)
-                    // Riding on the tracks under the baseline, hull over the
-                    // bottom of the letters it has just left behind.
-                    .position(x: tankRear(width: proxy.size.width) + Self.tankLength / 2,
-                              y: proxy.size.height - 10)
-            }
-            .allowsHitTesting(false)
-        }
-    }
-
-    private func runIntro() async {
+    private func runIntro() {
         guard playsIntro, progress == 0 else {
             progress = 1
             settled = true
             return
         }
-        withAnimation(.easeInOut(duration: 1.35)) { progress = 1 }
-        // The subtitle and buttons come up once the title is fully out from
-        // under the tank, while it is still rolling off the far side.
-        try? await Task.sleep(for: .milliseconds(860))
-        withAnimation(.easeOut(duration: 0.34)) { settled = true }
-        onIntroFinished()
+        // Measured on first layout; the fallback is the word's width at this
+        // font, so a missed measurement shifts the hand-off by milliseconds.
+        let width = wordWidth > 0 ? wordWidth : 370
+        let crossing = width + Self.tankLength          // until the rear clears the word
+        let total = crossing + Self.exitRun
+        // Two linear legs at the same speed, so the motion is continuous and
+        // the buttons rise at the exact moment the title is out from under
+        // the tank — a completion, not a sleep that has to agree with the
+        // animation about how long it took.
+        withAnimation(.linear(duration: Double(crossing / Self.tankSpeed))) {
+            progress = Double(crossing / total)
+        } completion: {
+            withAnimation(.linear(duration: Double(Self.exitRun / Self.tankSpeed))) { progress = 1 }
+            withAnimation(.easeOut(duration: 0.4)) { settled = true }
+            onIntroFinished()
+        }
     }
 
     private func titleButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -358,6 +341,69 @@ struct TitleScreen: View {
 }
 
 
+/// Drives the launch reveal from ONE interpolated value.
+///
+/// SwiftUI animates a modifier's `animatableData` per frame and re-evaluates
+/// its body at each step, so the mask's edge and the tank's position are
+/// recomputed together from the same progress every frame. Derived from a
+/// plain animated @State they were not: SwiftUI interpolated each modifier
+/// between its start and end VALUES over the whole duration, and because the
+/// reveal is clamped to the word, its edge crawled across the word for the
+/// entire run while the unclamped tank moved at the declared speed. Measured
+/// on 2026-10-03 with timestamped screenshots: the edge at ≈112 pt/s against
+/// a declared 270, and the buttons arriving with the title 80 % revealed.
+struct TankReveal: ViewModifier, Animatable {
+    var progress: Double
+    let tankLength: CGFloat
+    let exitRun: CGFloat
+    let tankHeight: CGFloat
+    let tank: CGImage?
+
+    // `Animatable` is a nonisolated protocol while a ViewModifier is
+    // main-actor isolated; the interpolated value is a plain Double, so the
+    // accessor can be nonisolated without crossing anything that matters.
+    nonisolated var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .mask {
+                GeometryReader { proxy in
+                    // Everything from the leading edge to the tank's rear.
+                    Rectangle()
+                        .frame(width: max(0, min(proxy.size.width, rear(proxy.size.width))))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transaction { $0.animation = nil }   // the per-frame value IS the motion
+                }
+            }
+            .overlay {
+                GeometryReader { proxy in
+                    if let tank {
+                        Image(decorative: tank, scale: 1)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: tankHeight)
+                            // Riding on the tracks under the baseline, hull over
+                            // the bottom of the letters it has just left behind.
+                            .position(x: rear(proxy.size.width) + tankLength / 2,
+                                      y: proxy.size.height - 10)
+                            .transaction { $0.animation = nil }
+                    }
+                }
+                .allowsHitTesting(false)
+            }
+    }
+
+    /// The tank's rear edge in the wordmark's space: it enters from beyond
+    /// the leading edge and exits well past the trailing one.
+    private func rear(_ width: CGFloat) -> CGFloat {
+        -tankLength + (width + tankLength + exitRun) * progress
+    }
+}
+
 /// The wordmark. Two materials the game is made of: "Spark" in the fire
 /// yellow the menus accent with, "Tread" in the arena's own steel; a hard
 /// extruded block under both — stepped copies, no blur, so it keeps the
@@ -365,7 +411,7 @@ struct TitleScreen: View {
 /// the tank left when it drove through. Plain type was the owner's
 /// complaint (2026-10-03: 标题可以设计一下，而不是很单调的字体).
 struct TitleWordmark: View {
-    private static let font = Font.system(size: 58, weight: .black, design: .rounded)
+    private static let font = Font.system(size: 62, weight: .black, design: .rounded)
     private static let depth = 5
     private static let rim: CGFloat = 1.3
     private static let rimOffsets: [CGSize] = [
@@ -433,7 +479,7 @@ struct TitleWordmark: View {
                 path.move(to: CGPoint(x: 0, y: 1.5))
                 path.addLine(to: CGPoint(x: proxy.size.width, y: 1.5))
             }
-            .stroke(Color.black.opacity(0.6), style: StrokeStyle(lineWidth: 3, dash: [8, 6]))
+            .stroke(Color.black.opacity(0.7), style: StrokeStyle(lineWidth: 3.5, dash: [9, 6]))
         }
         .frame(height: 3)
     }

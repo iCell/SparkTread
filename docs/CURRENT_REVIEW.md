@@ -1588,35 +1588,48 @@ each the line its map teaches.
 *The back button* moved off the title's line; its styling was revised again
 the same day (below).
 
-*The launch sequence, and a wordmark (third pass).* The owner's note on the
-fire-and-stamp version: the tank should drive past and LEAVE the title
-behind it, and the title should be designed rather than set in a plain
-face. Both landed together.
+*The launch sequence, and a wordmark (third and fourth passes).* The
+owner's note on the fire-and-stamp version: the tank should drive past and
+LEAVE the title behind it, and the title should be designed rather than set
+in a plain face. Then, on the first cut of that: too fast, and drop 坦克大战.
 
-The intro is now one animatable value. The player's own tank — the
-right-facing player rig, composed from the same sprites the scene uses —
-drives across the title band from off the left; the wordmark is masked by
-a rectangle whose trailing edge is the tank's rear, so what shows is
-exactly what the tank has passed over, laid down over two dashed tracks
-the width of the word; the tank keeps going and exits the screen, and the
-subtitle and buttons rise once the title is fully out from under it.
-Because the tank's position and the mask's edge are derived from the same
-`progress`, the reveal cannot lead or trail the tank. ≈1.35 s, once per
-app start. Verified on video rather than by screenshots: a screen
-recording of the launch split into 10 fps frames shows S → Sp → Spa →
-Spark → SparkT… → SparkTread appearing behind the tank's rear edge, and
-the first cut of it caught a layout fault — the tracks were a
-GeometryReader and took the whole screen's width, which made the title
-screen (which measures the wordmark to drive the tank) run the tank across
-the screen instead of across the word. The tracks hang off the word as an
-overlay now, so they are as wide as the word and nothing else.
+The intro now: the player's own tank — the right-facing player rig,
+composed from the same sprites the scene uses — drives across the title
+band from off the left at one constant speed (170 pt/s); the wordmark is
+masked by a rectangle whose trailing edge is the tank's rear, so what shows
+is exactly what the tank has passed over, laid down over two dashed tracks
+the width of the word; the buttons rise the moment the rear clears the
+trailing edge, and the tank keeps rolling until it is off the screen. Once
+per app start. The subtitle is gone, the wordmark went up a size to carry
+the top of the screen alone, and the tracks got a little heavier since
+they now say "a tank was here" by themselves.
+
+Two faults were found and fixed by measuring, not by looking. First, the
+tracks were a GeometryReader and took the whole screen's width — and the
+title screen measures the wordmark to drive the tank, so the tank was being
+run across the screen instead of across the word; the tracks hang off the
+word as an overlay now. Second, and the real one: the tank's position and
+the reveal's edge were both derived from one animated `@State`, which
+LOOKS like they must agree, and they did not. SwiftUI does not re-run such
+closures per frame; it interpolates each modifier between its start and end
+values over the whole duration, and because the reveal is clamped to the
+word, its edge crawled across the word for the entire run while the
+unclamped tank moved at the declared speed. Timestamped screenshots put the
+edge at ≈112 pt/s against a declared 270, with the buttons — timed by a
+sleep that trusted the declaration — arriving at 80 % revealed. `TankReveal`
+is now an `Animatable` modifier whose `animatableData` is the progress, so
+SwiftUI interpolates the progress itself and re-evaluates mask and tank
+together every frame; the buttons are a completion of the first leg rather
+than a sleep. Re-measured: edge ≈180 pt/s, title complete before the
+buttons appear. (Screen recordings were tried first and rejected as a
+timing source: `simctl recordVideo` reported 4.8 s for 8 s of wall time.)
 
 The wordmark is two of the materials the game is made of: "Spark" in the
 fire yellow the menus accent with, graded down into orange, and "Tread" in
 the delivery's own polished fine steel graded down into its plate (sampled
 colours), on a hard extruded block — stepped copies, no blur, so it keeps
 the edges pixel art has — with a dark rim, and the tank's tracks under the
-baseline. `TitleWordmark` in `AppRootView.swift`.
+baseline. `TitleWordmark` and `TankReveal` in `AppRootView.swift`.
 
 *The back button, again.* Owner on the capsule: no border, too high, and
 not good looking. So no frame at all — a yellow chevron and the word,
