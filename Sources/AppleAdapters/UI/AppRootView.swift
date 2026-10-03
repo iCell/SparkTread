@@ -237,38 +237,32 @@ struct TitleScreen: View {
     var playsIntro = false
     var onIntroFinished: () -> Void = {}
 
-    /// The player's tank drives in, fires, and the shot becomes the spark
-    /// that runs under the logo as the logo lands; the rest arrives after.
-    ///
-    /// Every piece is the product's own: stamping is how the stage outro
-    /// puts its outcome title on screen, the spark is the name's own half,
-    /// and the tank is the one the player drives, drawn from the same rig
-    /// the scene uses. A tank watermark was tried on this screen and
-    /// dropped — standing still, seen from above, a tank is a rectangle.
-    /// Driving and firing, it is unmistakably a tank, which is why it works
-    /// here and did not there (owner 2026-10-03: 增加点 logo 的坦克元素).
-    @State private var tankIn = false
-    @State private var stamped = false
-    @State private var sparked = false
+    /// Launch: the player's tank drives across the title band and the
+    /// wordmark is what it leaves behind — revealed from the tank's rear
+    /// edge, over the tracks it lays — then the tank rolls off the far side
+    /// and the rest arrives (owner 2026-10-03: 坦克开过去，留下游戏标题).
+    /// One animatable value drives both the tank and the reveal, so the
+    /// reveal's edge IS the tank's rear and the two cannot drift apart.
+    @State private var progress: Double = 0
     @State private var settled = false
 
+    private static let tankHeight: CGFloat = 50
+    /// The right-facing sprite's length at that height (its body is wider
+    /// than tall), used to start the run off the leading edge.
+    private static let tankLength: CGFloat = 66
+    /// How far past the wordmark's trailing edge the tank keeps going, so it
+    /// leaves the SCREEN rather than parking beside the title. Sized for
+    /// iPhone landscape: at 956 pt the centred word leaves ≈313 pt of margin,
+    /// and 460 − 66 (the tank's length) clears it; iPad widths are a later
+    /// milestone and would want this measured from the screen instead.
+    private static let exitRun: CGFloat = 460
+
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 18) {
             Spacer()
-            Text("SparkTread")
-                .font(.system(size: 54, weight: .black, design: .rounded))
-                .foregroundStyle(Color.yellow)
-                .shadow(color: .black, radius: 0, x: 3, y: 3)
-                .scaleEffect(stamped ? 1 : 1.4)
-                .opacity(stamped ? 1 : 0)
-                .overlay(alignment: .bottomLeading) { spark }
-                .overlay(alignment: .bottomLeading) { tank }
-                // The shot and the tank get a band of their own: without it
-                // the line ran straight through 坦克大战, since the stack puts
-                // the subtitle 14 pt under the logo and overlays do not move
-                // it. Applied after the overlays, so their geometry is still
-                // measured against the logo itself.
-                .padding(.bottom, 24)
+            TitleWordmark()
+                .mask { reveal }
+                .overlay { tankPass }
             Text("坦克大战")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
@@ -303,46 +297,51 @@ struct TitleScreen: View {
         .task { await runIntro() }
     }
 
-    /// The shot: a hot leading edge dragging a yellow trail, fired along the
-    /// logo's baseline from where the tank stops.
-    private var spark: some View {
-        GeometryReader { proxy in
-            Capsule()
-                .fill(LinearGradient(colors: [.yellow.opacity(0), .yellow, .yellow.opacity(0.85)],
-                                     startPoint: .leading, endPoint: .trailing))
-                .frame(width: sparked ? proxy.size.width : 0, height: 4)
-                .opacity(settled ? 0.6 : 1)
-                .offset(y: proxy.size.height + 13)
-        }
-        .allowsHitTesting(false)
+    /// The tank's rear edge for the current progress, in the wordmark's own
+    /// space: it enters from beyond the leading edge and exits well past the
+    /// trailing one.
+    private func tankRear(width: CGFloat) -> CGFloat {
+        -Self.tankLength + (width + Self.tankLength + Self.exitRun) * progress
     }
 
-    /// The tank drives in from off the left and parks at the muzzle end of
-    /// the spark, where it stays as part of the title.
-    @ViewBuilder private var tank: some View {
+    /// Everything from the wordmark's leading edge to the tank's rear is
+    /// visible; the rest is still under the tank, or not yet reached.
+    private var reveal: some View {
+        GeometryReader { proxy in
+            Rectangle()
+                .frame(width: max(0, min(proxy.size.width, tankRear(width: proxy.size.width))))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder private var tankPass: some View {
         if let image = MenuArt.playerTank {
-            Image(decorative: image, scale: 1)
-                .interpolation(.none)
-                .resizable()
-                .scaledToFit()
-                .frame(height: 46)
-                .offset(x: tankIn ? -54 : -360, y: -8)
-                .allowsHitTesting(false)
+            GeometryReader { proxy in
+                Image(decorative: image, scale: 1)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: Self.tankHeight)
+                    // Riding on the tracks under the baseline, hull over the
+                    // bottom of the letters it has just left behind.
+                    .position(x: tankRear(width: proxy.size.width) + Self.tankLength / 2,
+                              y: proxy.size.height - 10)
+            }
+            .allowsHitTesting(false)
         }
     }
 
     private func runIntro() async {
-        guard playsIntro, !stamped else {
-            tankIn = true; stamped = true; sparked = true; settled = true
+        guard playsIntro, progress == 0 else {
+            progress = 1
+            settled = true
             return
         }
-        // Drive in, fire, and let the shot carry the logo down with it.
-        withAnimation(.easeOut(duration: 0.52)) { tankIn = true }
-        try? await Task.sleep(for: .milliseconds(480))
-        withAnimation(.easeOut(duration: 0.30)) { sparked = true }
-        withAnimation(.spring(response: 0.40, dampingFraction: 0.54).delay(0.06)) { stamped = true }
-        try? await Task.sleep(for: .milliseconds(420))
-        withAnimation(.easeOut(duration: 0.32)) { settled = true }
+        withAnimation(.easeInOut(duration: 1.35)) { progress = 1 }
+        // The subtitle and buttons come up once the title is fully out from
+        // under the tank, while it is still rolling off the far side.
+        try? await Task.sleep(for: .milliseconds(860))
+        withAnimation(.easeOut(duration: 0.34)) { settled = true }
         onIntroFinished()
     }
 
@@ -355,6 +354,88 @@ struct TitleScreen: View {
                 .padding(.vertical, 12)
                 .background(Capsule().fill(Color.white))
         }
+    }
+}
+
+
+/// The wordmark. Two materials the game is made of: "Spark" in the fire
+/// yellow the menus accent with, "Tread" in the arena's own steel; a hard
+/// extruded block under both — stepped copies, no blur, so it keeps the
+/// edges pixel art has — a dark rim, and under the baseline the two tracks
+/// the tank left when it drove through. Plain type was the owner's
+/// complaint (2026-10-03: 标题可以设计一下，而不是很单调的字体).
+struct TitleWordmark: View {
+    private static let font = Font.system(size: 58, weight: .black, design: .rounded)
+    private static let depth = 5
+    private static let rim: CGFloat = 1.3
+    private static let rimOffsets: [CGSize] = [
+        CGSize(width: -rim, height: 0), CGSize(width: rim, height: 0),
+        CGSize(width: 0, height: -rim), CGSize(width: 0, height: rim),
+        CGSize(width: -rim, height: -rim), CGSize(width: rim, height: -rim),
+        CGSize(width: -rim, height: rim), CGSize(width: rim, height: rim),
+    ]
+    // Faces: fire from the menus' yellow down into orange; steel from the
+    // delivery's polished fine steel down into its plate (sampled colours).
+    private static let sparkFace = LinearGradient(
+        colors: [Color(red: 1.00, green: 0.88, blue: 0.30), Color(red: 1.00, green: 0.62, blue: 0.08)],
+        startPoint: .top, endPoint: .bottom)
+    private static let treadFace = LinearGradient(
+        colors: [Color(red: 0.90, green: 0.93, blue: 0.95), Color(red: 0.50, green: 0.59, blue: 0.65)],
+        startPoint: .top, endPoint: .bottom)
+    private static let sparkSide = Color(red: 0.46, green: 0.22, blue: 0.02)
+    private static let treadSide = Color(red: 0.09, green: 0.13, blue: 0.16)
+
+    var body: some View {
+        ZStack {
+            // The block the letters stand on: the word stepped down and
+            // to the right, one point at a time.
+            ForEach(1...Self.depth, id: \.self) { step in
+                word(spark: Self.sparkSide, tread: Self.treadSide)
+                    .offset(x: CGFloat(step), y: CGFloat(step))
+            }
+            // The rim around the face.
+            ForEach(0..<Self.rimOffsets.count, id: \.self) { i in
+                word(spark: Color.black, tread: Color.black)
+                    .offset(x: Self.rimOffsets[i].width, y: Self.rimOffsets[i].height)
+            }
+            word(spark: Self.sparkFace, tread: Self.treadFace)
+        }
+        // The tracks hang off the word as an overlay, so they are exactly as
+        // wide as the word. As a stack sibling they were a GeometryReader,
+        // which took the whole screen's width — and since the title screen
+        // measures this view to drive the tank and the reveal, the tank was
+        // being run across the screen instead of across the word.
+        .overlay(alignment: .bottom) { tracks.offset(y: 20) }
+        .padding(.bottom, 22)      // the band the tracks and the tank use
+    }
+
+    private func word<S: ShapeStyle, T: ShapeStyle>(spark: S, tread: T) -> some View {
+        HStack(spacing: 0) {
+            Text("Spark").foregroundStyle(spark)
+            Text("Tread").foregroundStyle(tread)
+        }
+        .font(Self.font)
+        .kerning(-1.5)
+    }
+
+    /// Two dashed tracks the width of the word: what a tank leaves.
+    private var tracks: some View {
+        VStack(spacing: 5) {
+            track
+            track
+        }
+        .padding(.horizontal, 10)
+    }
+
+    private var track: some View {
+        GeometryReader { proxy in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 1.5))
+                path.addLine(to: CGPoint(x: proxy.size.width, y: 1.5))
+            }
+            .stroke(Color.black.opacity(0.6), style: StrokeStyle(lineWidth: 3, dash: [8, 6]))
+        }
+        .frame(height: 3)
     }
 }
 

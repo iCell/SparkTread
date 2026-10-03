@@ -1588,22 +1588,35 @@ each the line its map teaches.
 *The back button* moved off the title's line; its styling was revised again
 the same day (below).
 
-*The launch sequence.* The player's own tank drives in from off the left,
-stops at the logo and fires; the shot becomes a yellow spark running the
-width of the logo, which stamps in from 1.4× scale as the shot passes
-under it; the subtitle and buttons rise after. ≈1.3 s, once per app start —
-backing out of a menu onto the title does not replay it.
+*The launch sequence, and a wordmark (third pass).* The owner's note on the
+fire-and-stamp version: the tank should drive past and LEAVE the title
+behind it, and the title should be designed rather than set in a plain
+face. Both landed together.
 
-Every piece is the product's own. Stamping is how the stage outro puts its
-outcome title on screen, the spark is the name's own half, and the tank is
-the one the player drives, composed from the same rig the scene uses (the
-icon compositor gained a kind/weapon/facing entry point so it can produce
-a right-facing player tank; the results table's call is unchanged). It is
-also the answer to why a tank watermark failed on this screen twice
-earlier: standing still and seen from above a tank is a rectangle, so
-dimming it gave a smudge and stencilling its alpha gave a block — driving
-and firing, it is unmistakably a tank. The logo keeps a 24 pt band beneath
-it for the shot, because without one the line ran straight through 坦克大战.
+The intro is now one animatable value. The player's own tank — the
+right-facing player rig, composed from the same sprites the scene uses —
+drives across the title band from off the left; the wordmark is masked by
+a rectangle whose trailing edge is the tank's rear, so what shows is
+exactly what the tank has passed over, laid down over two dashed tracks
+the width of the word; the tank keeps going and exits the screen, and the
+subtitle and buttons rise once the title is fully out from under it.
+Because the tank's position and the mask's edge are derived from the same
+`progress`, the reveal cannot lead or trail the tank. ≈1.35 s, once per
+app start. Verified on video rather than by screenshots: a screen
+recording of the launch split into 10 fps frames shows S → Sp → Spa →
+Spark → SparkT… → SparkTread appearing behind the tank's rear edge, and
+the first cut of it caught a layout fault — the tracks were a
+GeometryReader and took the whole screen's width, which made the title
+screen (which measures the wordmark to drive the tank) run the tank across
+the screen instead of across the word. The tracks hang off the word as an
+overlay now, so they are as wide as the word and nothing else.
+
+The wordmark is two of the materials the game is made of: "Spark" in the
+fire yellow the menus accent with, graded down into orange, and "Tread" in
+the delivery's own polished fine steel graded down into its plate (sampled
+colours), on a hard extruded block — stepped copies, no blur, so it keeps
+the edges pixel art has — with a dark rim, and the tank's tracks under the
+baseline. `TitleWordmark` in `AppRootView.swift`.
 
 *The back button, again.* Owner on the capsule: no border, too high, and
 not good looking. So no frame at all — a yellow chevron and the word,
