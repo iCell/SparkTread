@@ -18,6 +18,19 @@ import SwiftUI
     }()
 
 
+    /// The player's own tank facing right, composed and cropped to its body
+    /// — the intro's own element. It works here where a watermark did not,
+    /// because it MOVES: a top-down tank is a rectangle standing still and a
+    /// tank once it drives.
+    static var playerTank: CGImage? {
+        if let cached = cache["tank"] { return cached }
+        guard let art, let image = try? PixelTankIcons.image(kind: "player", weapon: "normal",
+                                                             facing: "right", art: art)
+        else { return nil }
+        cache["tank"] = image
+        return image
+    }
+
     /// A sprite upscaled by a whole factor with no interpolation, so a
     /// 16 px plate tiles as 16 blocks and not as a blur.
     static func upscaled(_ id: String, by factor: Int) -> CGImage? {

@@ -1585,18 +1585,31 @@ fallback spelling of the id, so that check catches a stage that lost its
 name as well as one that never had one. Stages 4–12 gained Chinese names,
 each the line its map teaches.
 
-*The back button* is dressed like the rest of the product now — the dark
-translucent plate with a bright rim that the HUD pill and the touch
-controls already use, with the menus' yellow on the chevron — and sits at
-the screen's own top-left corner rather than on the title's line.
+*The back button* moved off the title's line; its styling was revised again
+the same day (below).
 
-*The launch sequence.* `SparkTread` stamps in from 1.4× scale, a yellow
-spark runs left to right under it, and the subtitle and buttons rise after.
-Stamping is the motion this product already uses — it is how the stage
-outro puts its outcome title on screen — and the spark is the name's own
-half, so the sequence belongs to the logo rather than being an effect
-played in front of it. ≈0.9 s, and it runs once per app start: backing out
-of a menu onto the title does not replay it.
+*The launch sequence.* The player's own tank drives in from off the left,
+stops at the logo and fires; the shot becomes a yellow spark running the
+width of the logo, which stamps in from 1.4× scale as the shot passes
+under it; the subtitle and buttons rise after. ≈1.3 s, once per app start —
+backing out of a menu onto the title does not replay it.
+
+Every piece is the product's own. Stamping is how the stage outro puts its
+outcome title on screen, the spark is the name's own half, and the tank is
+the one the player drives, composed from the same rig the scene uses (the
+icon compositor gained a kind/weapon/facing entry point so it can produce
+a right-facing player tank; the results table's call is unchanged). It is
+also the answer to why a tank watermark failed on this screen twice
+earlier: standing still and seen from above a tank is a rectangle, so
+dimming it gave a smudge and stencilling its alpha gave a block — driving
+and firing, it is unmistakably a tank. The logo keeps a 24 pt band beneath
+it for the shot, because without one the line ran straight through 坦克大战.
+
+*The back button, again.* Owner on the capsule: no border, too high, and
+not good looking. So no frame at all — a yellow chevron and the word,
+carried over the plate by a shadow rather than by a box, with the 44 pt
+target kept by padding rather than by anything drawn — and moved down off
+the screen's very edge.
 
 Verified by rendering the views themselves (`ImageRenderer`) rather than by
 driving the simulator, which needs an accessibility grant: the card layout,

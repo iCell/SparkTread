@@ -173,9 +173,18 @@ struct PixelManifest: Decodable {
 
     static func image(archetypeID: String, art: PixelArt) throws -> CGImage {
         let look = PixelTankNode.appearance(archetypeID: archetypeID, isPlayer: false)
-        guard let rig = art.manifest.rigs[look.kind + "_up"],
-              let turret = art.manifest.turrets[(look.weapon == "normal" ? "enemy_normal" : look.weapon) + "_up"]
-        else { throw PixelArtError.missing(archetypeID) }
+        return try image(kind: look.kind, weapon: look.weapon, facing: "up", art: art)
+    }
+
+    /// One tank, composed from the rig the scene draws and cropped to its
+    /// body. The results table wants enemies facing up; the title screen's
+    /// intro wants the player's own tank facing the way it drives.
+    static func image(kind: String, weapon: String, facing: String, art: PixelArt) throws -> CGImage {
+        let turretID = weapon == "normal" ? (kind == "player" ? "player_normal" : "enemy_normal") : weapon
+        guard let rig = art.manifest.rigs[kind + "_" + facing],
+              let turret = art.manifest.turrets[turretID + "_" + facing]
+        else { throw PixelArtError.missing(kind + "_" + facing) }
+        let archetypeID = kind
         let layers = try [rig.treads[0][0], rig.treads[1][0], rig.hull, turret.texture].map { try art.texture($0).cgImage() }
         let b = rig.bodyBounds // x0, y0, x1, y1 in canvas pixels, y down
         let width = Int(b[2] - b[0]), height = Int(b[3] - b[1])

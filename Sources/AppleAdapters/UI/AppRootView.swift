@@ -237,11 +237,17 @@ struct TitleScreen: View {
     var playsIntro = false
     var onIntroFinished: () -> Void = {}
 
-    /// The logo lands, a spark runs under it, then the rest arrives.
-    /// Stamping is the motion this product already uses — it is how the
-    /// stage outro puts its outcome title on screen — and the spark is the
-    /// name's own half, so the sequence belongs to the logo rather than
-    /// being an effect played in front of it.
+    /// The player's tank drives in, fires, and the shot becomes the spark
+    /// that runs under the logo as the logo lands; the rest arrives after.
+    ///
+    /// Every piece is the product's own: stamping is how the stage outro
+    /// puts its outcome title on screen, the spark is the name's own half,
+    /// and the tank is the one the player drives, drawn from the same rig
+    /// the scene uses. A tank watermark was tried on this screen and
+    /// dropped — standing still, seen from above, a tank is a rectangle.
+    /// Driving and firing, it is unmistakably a tank, which is why it works
+    /// here and did not there (owner 2026-10-03: 增加点 logo 的坦克元素).
+    @State private var tankIn = false
     @State private var stamped = false
     @State private var sparked = false
     @State private var settled = false
@@ -256,6 +262,13 @@ struct TitleScreen: View {
                 .scaleEffect(stamped ? 1 : 1.4)
                 .opacity(stamped ? 1 : 0)
                 .overlay(alignment: .bottomLeading) { spark }
+                .overlay(alignment: .bottomLeading) { tank }
+                // The shot and the tank get a band of their own: without it
+                // the line ran straight through 坦克大战, since the stack puts
+                // the subtitle 14 pt under the logo and overlays do not move
+                // it. Applied after the overlays, so their geometry is still
+                // measured against the logo itself.
+                .padding(.bottom, 24)
             Text("坦克大战")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
@@ -290,29 +303,45 @@ struct TitleScreen: View {
         .task { await runIntro() }
     }
 
-    /// A hot leading edge dragging a yellow trail, swept under the logo on
-    /// the beat the logo lands.
+    /// The shot: a hot leading edge dragging a yellow trail, fired along the
+    /// logo's baseline from where the tank stops.
     private var spark: some View {
         GeometryReader { proxy in
             Capsule()
-                .fill(LinearGradient(colors: [.yellow.opacity(0), .yellow, .white],
+                .fill(LinearGradient(colors: [.yellow.opacity(0), .yellow, .yellow.opacity(0.85)],
                                      startPoint: .leading, endPoint: .trailing))
                 .frame(width: sparked ? proxy.size.width : 0, height: 4)
-                .opacity(settled ? 0.45 : 1)
-                .offset(y: proxy.size.height - 2)
+                .opacity(settled ? 0.6 : 1)
+                .offset(y: proxy.size.height + 13)
         }
         .allowsHitTesting(false)
     }
 
+    /// The tank drives in from off the left and parks at the muzzle end of
+    /// the spark, where it stays as part of the title.
+    @ViewBuilder private var tank: some View {
+        if let image = MenuArt.playerTank {
+            Image(decorative: image, scale: 1)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 46)
+                .offset(x: tankIn ? -54 : -360, y: -8)
+                .allowsHitTesting(false)
+        }
+    }
+
     private func runIntro() async {
         guard playsIntro, !stamped else {
-            stamped = true; sparked = true; settled = true
+            tankIn = true; stamped = true; sparked = true; settled = true
             return
         }
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.56)) { stamped = true }
-        try? await Task.sleep(for: .milliseconds(340))
-        withAnimation(.easeOut(duration: 0.34)) { sparked = true }
-        try? await Task.sleep(for: .milliseconds(240))
+        // Drive in, fire, and let the shot carry the logo down with it.
+        withAnimation(.easeOut(duration: 0.52)) { tankIn = true }
+        try? await Task.sleep(for: .milliseconds(480))
+        withAnimation(.easeOut(duration: 0.30)) { sparked = true }
+        withAnimation(.spring(response: 0.40, dampingFraction: 0.54).delay(0.06)) { stamped = true }
+        try? await Task.sleep(for: .milliseconds(420))
         withAnimation(.easeOut(duration: 0.32)) { settled = true }
         onIntroFinished()
     }
@@ -391,26 +420,28 @@ struct CampaignSelectScreen: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Up at the screen's own top edge rather than on the title's line
-        // (owner 2026-10-03), and dressed like the rest of the product: the
-        // dark translucent plate with a bright rim that the HUD pill and the
-        // touch controls already use, with the menus' yellow on the chevron.
+        // Owner 2026-10-03, on the capsule that replaced the plain label:
+        // no border, not jammed against the top edge, and better looking.
+        // So no frame at all — a yellow chevron and the word, carried over
+        // the plate by a shadow instead of by a box, with the tap target
+        // kept at 44 pt by padding rather than by anything drawn.
         .overlay(alignment: .topLeading) {
             Button(action: onBack) {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .black))
+                HStack(spacing: 7) {
+                    Image(systemName: "chevron.backward")
+                        .font(.system(size: 19, weight: .heavy))
                         .foregroundStyle(Color.yellow)
                     Text("返回")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.92))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(Color.black.opacity(0.55)))
-                .overlay(Capsule().stroke(Color.white.opacity(0.45), lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.85), radius: 4, x: 0, y: 1)
+                .padding(.vertical, 10)
+                .padding(.trailing, 16)
+                .contentShape(Rectangle())
             }
-            .padding(.leading, 20)
+            .padding(.leading, 22)
+            .padding(.top, 18)
         }
         .background(MenuBackdrop())
     }
