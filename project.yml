@@ -37,7 +37,14 @@ targets:
     info:
       path: Sources/GoldenEagleApp/Info.plist
       properties:
-        UILaunchScreen: {}
+        # The launch image is MenuBackdrop.Field baked by
+        # `swift run launch-screen-renderer`; LaunchScreenTests holds the
+        # two together. (A launch storyboard was tried first and the iOS 26
+        # simulator never showed it.)
+        UILaunchScreen:
+          UIImageName: LaunchBackdrop
+          UIColorName: LaunchBase
+          UIImageRespectsSafeAreaInsets: false
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         UIRequiresFullScreen: true

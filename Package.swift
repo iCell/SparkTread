@@ -45,6 +45,13 @@ let package = Package(
             dependencies: ["ContentValidatorKit"],
             path: "Tools/ContentValidator/CLI"
         ),
+        // Bakes the menu backdrop into the app's launch image, so the page
+        // iOS shows before the app runs is the title's own backdrop.
+        .executableTarget(
+            name: "launch-screen-renderer",
+            dependencies: ["AppleAdapters"],
+            path: "Tools/LaunchScreenRenderer"
+        ),
         .testTarget(
             name: "GameCoreTests",
             dependencies: ["GameCore"],

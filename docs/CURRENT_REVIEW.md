@@ -1736,6 +1736,30 @@ the icon does. Verified on the simulator: the cloud behind the wheel over
 the tracks as "Spar" comes out. Knobs, should the owner want it denser or
 longer: `sparkSpacing` and `sparkLife` in `TankReveal`.
 
+*The launch page (2026-10-06, owner follow-up).* Between tapping the icon
+and the title there was a black card; the owner asked for a page that
+flows into the intro. A launch screen runs no code and (via Info.plist
+`UILaunchScreen`) shows one image centred at its intrinsic size over a
+colour, so the only way it and the live title can agree to the pixel is
+for both to be the same picture anchored at the same point: `MenuBackdrop`
+is now composed on a FIXED 1024×512 pt field centred on the screen (plate
+grid, top light, vignette all inside it; the base colour fills the rest),
+and the launch image is a render of that field — `MenuBackdrop.Field`
+through `LaunchImage.render`, written at 2× and 3× by the new
+`launch-screen-renderer` executable into the app's asset catalog, with
+`LaunchBase` as the colour. `LaunchScreenTests` re-renders the field and
+compares it with the committed PNG (≤ 3 levels per channel), so the
+backdrop cannot change without the launch image being re-baked. On the
+title the tank now fades in over its first 40 pt of travel
+(`arrivalTravel`) rather than popping onto the hand-off frame. A launch
+storyboard was tried first and dropped: the iOS 26 simulator never showed
+it, nor — it turned out — any launch screen at all: with the plist form it
+shows the system background (black in dark appearance, white in light),
+though `Assets.car` carries both `LaunchBackdrop` and `LaunchBase` and the
+plist carries the dictionary. The device is the judge; owner to confirm
+the hand-off on the phone. The field covers every iPhone (956×440 pt at
+most); iPad would need a larger one.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

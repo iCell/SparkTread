@@ -85,23 +85,63 @@ struct MenuBackdrop: View {
     // A tank watermark was tried and dropped (2026-10-03): a top-down tank
     // is a rectangle, so dimming it reads as a smudge and stencilling its
     // alpha reads as a block. The plate carries the screen on its own.
+
+    /// The backdrop is composed on a FIXED field centred on the screen, not
+    /// stretched to it, because the launch screen is a render of that same
+    /// field (owner 2026-10-06: the page before the title should flow into
+    /// the intro, not be a black card). iOS centres a launch image at its
+    /// intrinsic size and runs no code, so the only way the static page and
+    /// the live view can agree to the pixel — plate grid, light, vignette —
+    /// is for both to be the same picture anchored at the same point. The
+    /// field covers every iPhone (956×440 pt at most); iPad would need a
+    /// larger one.
+    static let fieldSize = CGSize(width: 1024, height: 512)
+    static let base = Color(red: 0.035, green: 0.042, blue: 0.05)
+
     var body: some View {
         ZStack {
-            Color(red: 0.035, green: 0.042, blue: 0.05)
-            if let plate = MenuArt.upscaled("px_steel_joint_15_15", by: 4) {
-                Image(decorative: plate, scale: 1)
-                    .resizable(resizingMode: .tile)
-                    .interpolation(.none)
-                    .opacity(0.3)
-                    .blendMode(.plusLighter)
-            }
-            // Lit from the top like the plates themselves, dark at the edges,
-            // so the yellow the menus accent with has somewhere to sit.
-            LinearGradient(colors: [.white.opacity(0.06), .clear, .black.opacity(0.35)],
-                           startPoint: .top, endPoint: .bottom)
-            RadialGradient(colors: [.clear, .black.opacity(0.55)],
-                           center: .center, startRadius: 180, endRadius: 620)
+            Self.base
+            Field()
         }
+        .clipped()
         .ignoresSafeArea()
+    }
+
+    /// The picture itself: what `launch-screen-renderer` bakes into the
+    /// launch image, and what the title shows once the app runs.
+    struct Field: View {
+        var body: some View {
+            ZStack {
+                MenuBackdrop.base
+                if let plate = MenuArt.upscaled("px_steel_joint_15_15", by: 4) {
+                    Image(decorative: plate, scale: 1)
+                        .resizable(resizingMode: .tile)
+                        .interpolation(.none)
+                        .opacity(0.3)
+                        .blendMode(.plusLighter)
+                }
+                // Lit from the top like the plates themselves, dark at the
+                // edges, so the yellow the menus accent with has somewhere
+                // to sit.
+                LinearGradient(colors: [.white.opacity(0.06), .clear, .black.opacity(0.35)],
+                               startPoint: .top, endPoint: .bottom)
+                RadialGradient(colors: [.clear, .black.opacity(0.55)],
+                               center: .center, startRadius: 180, endRadius: 620)
+            }
+            .frame(width: MenuBackdrop.fieldSize.width, height: MenuBackdrop.fieldSize.height)
+        }
+    }
+}
+
+/// The launch image: `MenuBackdrop.Field` rendered offscreen at a device
+/// scale. Shared by `launch-screen-renderer` (which writes it into the asset
+/// catalog) and `LaunchScreenTests` (which checks the committed file is
+/// still this), so neither can drift from the view.
+@MainActor public enum LaunchImage {
+    public static func render(scale: CGFloat) -> CGImage? {
+        let renderer = ImageRenderer(content: MenuBackdrop.Field())
+        renderer.scale = scale
+        renderer.isOpaque = true
+        return renderer.cgImage
     }
 }

@@ -476,6 +476,11 @@ struct TankReveal: ViewModifier, Animatable {
                             .scaledToFit()
                             .frame(height: tankHeight)
                             .position(x: rear(width) + tankLength / 2, y: tankY)
+                            // The launch screen is this backdrop without the
+                            // tank; the tank materialises over its first few
+                            // points of travel instead of popping in on the
+                            // hand-off from that static page.
+                            .opacity(min(1, Double((rear(width) + tankLength) / Self.arrivalTravel)))
                             .transaction { $0.animation = nil }
                     }
                     // Sparks off the tracks (owner 2026-10-06: the app icon's
@@ -548,6 +553,8 @@ struct TankReveal: ViewModifier, Animatable {
 
     /// Sparks are emitted every `sparkSpacing` points of travel and live
     /// for `sparkLife` points more; about a dozen are in the air at once.
+    /// Points of travel over which the tank fades in from the launch page.
+    private static let arrivalTravel: CGFloat = 40
     private static let sparkSpacing: CGFloat = 3
     private static let sparkLife: CGFloat = 54
 
