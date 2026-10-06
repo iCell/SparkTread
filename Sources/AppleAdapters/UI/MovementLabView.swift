@@ -917,12 +917,16 @@ public struct MovementLabView: View {
             controller.pause()
             paused = controller.isPaused
         } label: {
-            Image(systemName: "pause.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(10)
-                .background(Circle().fill(Color.black.opacity(0.45)))
+            if let glyph = MenuArt.sprite("px_ui_icon_pause") {
+                Image(decorative: glyph, scale: 1)
+                    .interpolation(.none)
+                    .resizable()
+                    .frame(width: 20, height: 20)
+            } else {
+                Image(systemName: "pause.fill").font(.system(size: 14, weight: .heavy))
+            }
         }
+        .buttonStyle(PlateButtonStyle(role: .secondary, size: .small))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.leading, 14)
         .padding(.top, 6)
@@ -932,32 +936,27 @@ public struct MovementLabView: View {
     private var pauseOverlay: some View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
-            VStack(spacing: 14) {
+            VStack(spacing: 16) {
                 Text("暂停")
-                    .font(.system(size: 30, weight: .heavy))
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.yellow)
-                menuButton("继续") { controller.resume(); paused = false }
-                if controller.stagePhase != nil {
-                    menuButton("重新开始本关") { controller.restart(); controller.resume(); paused = false }
+                PlateButton(title: "继续", icon: "play.fill", role: .primary, size: .large) {
+                    controller.resume(); paused = false
                 }
-                if let onExit {
-                    menuButton("返回标题") { controller.abandon(); onExit() }
+                HStack(spacing: 12) {
+                    if controller.stagePhase != nil {
+                        PlateButton(title: "重新开始本关", icon: "arrow.counterclockwise") {
+                            controller.restart(); controller.resume(); paused = false
+                        }
+                    }
+                    if let onExit {
+                        PlateButton(title: "返回标题", icon: "xmark") { controller.abandon(); onExit() }
+                    }
                 }
             }
-            .padding(28)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.95)))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(red: 0.93, green: 0.72, blue: 0.2), lineWidth: 3))
-        }
-    }
-
-    private func menuButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(minWidth: 200)
-                .padding(.vertical, 10)
-                .background(Capsule().fill(Color.white))
+            .padding(.horizontal, 34)
+            .padding(.vertical, 26)
+            .platePanel()
         }
     }
 
@@ -1210,31 +1209,29 @@ public struct MovementLabView: View {
                     Text("战役完成")
                         .font(.system(size: compact ? 15 : 17, weight: .heavy))
                         .foregroundStyle(Color.yellow)
-                    footerButton("再来一局", compact: compact) { controller.restartCampaign() }
-                    if let onExit { footerButton("返回标题", compact: compact) { controller.abandon(); onExit() } }
+                    PlateButton(title: "再来一局", icon: "arrow.counterclockwise", role: .primary,
+                                size: compact ? .small : .regular) { controller.restartCampaign() }
+                    if let onExit {
+                        PlateButton(title: "返回标题", icon: "xmark", size: compact ? .small : .regular) {
+                            controller.abandon(); onExit()
+                        }
+                    }
                 }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
-                    footerButton("重新开始", compact: compact) { controller.restart() }
-                    if let onExit { footerButton("返回标题", compact: compact) { controller.abandon(); onExit() } }
+                    PlateButton(title: "重新开始", icon: "arrow.counterclockwise", role: .primary,
+                                size: compact ? .small : .regular) { controller.restart() }
+                    if let onExit {
+                        PlateButton(title: "返回标题", icon: "xmark", size: compact ? .small : .regular) {
+                            controller.abandon(); onExit()
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, compact ? 6 : 10)
         }
         .frame(width: width)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.06, green: 0.05, blue: 0.03).opacity(0.94)))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.93, green: 0.72, blue: 0.2), lineWidth: 3))
-        .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
-    }
-
-    private func footerButton(_ title: String, compact: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: compact ? 15 : 17, weight: .bold))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 16).padding(.vertical, compact ? 6 : 8)
-                .background(Capsule().fill(Color.white))
-        }
+        .platePanel(radius: 12)
     }
 
     /// One category of a table row: the tank icon (or its label while the
@@ -1263,11 +1260,9 @@ public struct MovementLabView: View {
     /// and a reset. Collapsible; the list scrolls inside half the surface.
     private var weaponDebugPanel: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            Button(showWeaponPanel ? "训练面板 ▲" : "训练面板 ▼") { showWeaponPanel.toggle() }
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Capsule().fill(Color.black.opacity(0.55)))
+            PlateButton(title: "训练面板", icon: showWeaponPanel ? "chevron.up" : "chevron.down", size: .small) {
+                showWeaponPanel.toggle()
+            }
             if showWeaponPanel {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .trailing, spacing: 6) {
@@ -1337,13 +1332,8 @@ public struct MovementLabView: View {
     }
 
     private func panelButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: selected ? .bold : .regular))
-                .foregroundStyle(selected ? Color.yellow : Color.white)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Capsule().fill(Color.black.opacity(0.55)))
-        }
+        Button(title, action: action)
+            .buttonStyle(PlateButtonStyle(role: .secondary, size: .small, selected: selected))
     }
 
     /// One scene per view; surface changes are delivered explicitly through

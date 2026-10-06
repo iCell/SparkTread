@@ -1758,7 +1758,30 @@ shows the system background (black in dark appearance, white in light),
 though `Assets.car` carries both `LaunchBackdrop` and `LaunchBase` and the
 plist carries the dictionary. The device is the judge; owner to confirm
 the hand-off on the phone. The field covers every iPhone (956×440 pt at
-most); iPad would need a larger one.
+most); iPad would need a larger one. Confirmed by the owner on the phone:
+出现钢板背景.
+
+*One button language (2026-10-06, owner follow-up).* The owner: the
+buttons looked like stock controls, and "风格" meant arrangement as much as
+looks. `PlateButton.swift` now holds the language for every screen, taken
+from the wordmark: the two materials the game is made of — the fire yellow
+for THE action on a screen, the arena's steel for everything else — on a
+hard extruded base with a dark rim and a top sheen, squared corners rather
+than capsules (they are plates, like the walls), and a press that sinks the
+face onto its base. Three sizes (large / regular / small), a `selected`
+state that turns a steel toggle to fire, a `PlateSegments` row for the
+difficulty, and a `platePanel` for the overlays — dark steel with a rim
+and its own base — replacing the yellow-framed boxes with white pills.
+Arrangement rule, applied everywhere: one primary plate, large, alone on
+its row; the secondaries in one row under it. So the title shows the one
+thing to do by the player's state — 继续上次战斗 / 继续战役 / 开始战役 — and
+新的战役 and 训练场 under it; the pause overlay 继续 over 重新开始本关 and
+返回标题; the results footer 重新开始 (or 再来一局) in fire and 返回标题 in
+steel; the HUD pause button a small steel plate with the atlas's pixel
+pause glyph; the training panel's toggles small plates, the chosen one in
+fire. Labels stay native text with a symbol in front. Verified by an
+offscreen gallery render of every variant (including disabled) and
+simulator shots of the settled title and the arena HUD.
 
 ## Remaining gaps / follow-up review
 

@@ -332,28 +332,39 @@ struct TitleScreen: View {
                     Color.clear.onAppear { wordWidth = proxy.size.width }
                 } }
             Spacer()
-            Group {
-            if hasCampaign, canResume {
-                titleButton("继续上次战斗", action: onResume)
-            }
-            if hasCampaign, canContinue, !canResume {
-                titleButton("继续战役", action: onContinue)
-            }
-            if hasCampaign {
-                titleButton(canResume || canContinue ? "新的战役" : "开始战役", action: onStart)
-            }
-            titleButton("训练场", action: onTraining)
-            if let notice {
-                Text(notice)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.orange)
-                    .lineLimit(2)
-                    .padding(.horizontal, 30)
-            }
+            // One thing to do, large and alone; the other ways in, in one
+            // row under it (the plate language's arrangement rule). What the
+            // one thing is follows the player's state: a battle to go back
+            // to, a campaign to carry on, or a first start.
+            VStack(spacing: 14) {
+                if hasCampaign, canResume {
+                    PlateButton(title: "继续上次战斗", icon: "play.fill", role: .primary, size: .large, action: onResume)
+                } else if hasCampaign, canContinue {
+                    PlateButton(title: "继续战役", icon: "play.fill", role: .primary, size: .large, action: onContinue)
+                } else if hasCampaign {
+                    PlateButton(title: "开始战役", icon: "play.fill", role: .primary, size: .large, action: onStart)
+                } else {
+                    PlateButton(title: "训练场", icon: "scope", role: .primary, size: .large, action: onTraining)
+                }
+                HStack(spacing: 12) {
+                    if hasCampaign, canResume || canContinue {
+                        PlateButton(title: "新的战役", icon: "flag.fill", action: onStart)
+                    }
+                    if hasCampaign {
+                        PlateButton(title: "训练场", icon: "scope", action: onTraining)
+                    }
+                }
+                if let notice {
+                    Text(notice)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.orange)
+                        .lineLimit(2)
+                        .padding(.horizontal, 30)
+                }
             }
             .opacity(settled ? 1 : 0)
             .offset(y: settled ? 0 : 14)
-            Spacer().frame(height: 24)
+            Spacer().frame(height: 22)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MenuBackdrop())
@@ -401,16 +412,6 @@ struct TitleScreen: View {
         }
     }
 
-    private func titleButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.black)
-                .frame(minWidth: 220)
-                .padding(.vertical, 12)
-                .background(Capsule().fill(Color.white))
-        }
-    }
 }
 
 
@@ -715,19 +716,12 @@ struct CampaignSelectScreen: View {
                 .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Color.yellow)
                 .padding(.top, 2)
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Text("难度")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
-                ForEach(AppFlowModel.difficultyIDs, id: \.self) { id in
-                    Button { onDifficulty(id) } label: {
-                        Text(Self.difficultyLabel(id))
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(model.difficultyID == id ? Color.black : Color.white)
-                            .padding(.horizontal, 14).padding(.vertical, 6)
-                            .background(Capsule().fill(model.difficultyID == id ? Color.yellow : Color.white.opacity(0.15)))
-                    }
-                }
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                PlateSegments(options: AppFlowModel.difficultyIDs.map { ($0, Self.difficultyLabel($0)) },
+                              selection: model.difficultyID, onSelect: onDifficulty)
             }
             // Twelve cards are far wider than any phone: this row was a
             // plain HStack, so everything past the fifth stage was off the
