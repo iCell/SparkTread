@@ -1720,6 +1720,22 @@ simulator with timestamped screenshots: the first shell ahead of the tank
 as "S" comes out, the flash on the barrel tip pointing right as the second
 fires, both shells in flight over the unrevealed band.
 
+*Sparks off the tracks (2026-10-06, owner follow-up).* The owner, happy
+with the sequence, pointed at the app icon: its tank kicks up flecks behind
+its treads, and the intro's should too. The trail is a pure function of the
+same interpolated progress everything else moves on — one fleck per 3 pt of
+travel, each thrown back and up from where the rear of the tracks met the
+ground at that moment and dropping under a small gravity, living 54 pt of
+travel, so about eighteen are in the air at once; sizes 1, 2 or 3 of the
+tank's own pixels (the 3s are soft puffs at 55 %), colours the icon's cream
+and orange, every fleck's variation from an integer hash of its index so
+no RNG runs in a view body and a frame that shows the same moment shows
+the same cloud. The first cut trailed too far back and too thin (a line of
+dust specks); the second gathers the cloud right behind the rear wheel as
+the icon does. Verified on the simulator: the cloud behind the wheel over
+the tracks as "Spar" comes out. Knobs, should the owner want it denser or
+longer: `sparkSpacing` and `sparkLife` in `TankReveal`.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

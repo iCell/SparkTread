@@ -478,6 +478,26 @@ struct TankReveal: ViewModifier, Animatable {
                             .position(x: rear(width) + tankLength / 2, y: tankY)
                             .transaction { $0.animation = nil }
                     }
+                    // Sparks off the tracks (owner 2026-10-06: the app icon's
+                    // tank kicks up flecks behind its treads; the intro's
+                    // should too). A deterministic trail from the same
+                    // progress: one fleck per `sparkSpacing` of travel,
+                    // thrown back and up from the rear of the tracks and
+                    // falling as it fades, in the icon's cream and orange,
+                    // sized in the tank's own pixels so it stays pixel art.
+                    if let tank {
+                        let scale = tankHeight / CGFloat(tank.height)
+                        let travel = rear(width) + tankLength
+                        ForEach(sparkIndices(travel), id: \.self) { index in
+                            let fleck = spark(index, travel: travel, rear: rear(width), y: tankY, scale: scale)
+                            Rectangle()
+                                .fill(fleck.colour)
+                                .frame(width: fleck.size, height: fleck.size)
+                                .position(fleck.position)
+                                .opacity(fleck.alpha)
+                                .transaction { $0.animation = nil }
+                        }
+                    }
                     // The shells and the flash are the scene's own sprites at
                     // the scene's proportions to the tank (projectiles at 0.8
                     // of the art scale, the flash at 0.48), turned a quarter
@@ -524,6 +544,45 @@ struct TankReveal: ViewModifier, Animatable {
                 }
                 .allowsHitTesting(false)
             }
+    }
+
+    /// Sparks are emitted every `sparkSpacing` points of travel and live
+    /// for `sparkLife` points more; about a dozen are in the air at once.
+    private static let sparkSpacing: CGFloat = 3
+    private static let sparkLife: CGFloat = 54
+
+    private func sparkIndices(_ travel: CGFloat) -> [Int] {
+        let newest = Int((travel / Self.sparkSpacing).rounded(.down))
+        let oldest = max(0, Int(((travel - Self.sparkLife) / Self.sparkSpacing).rounded(.up)))
+        return newest >= oldest ? Array(oldest...newest) : []
+    }
+
+    /// One fleck, a pure function of its index and the tank's travel, so the
+    /// trail is the same on every frame that shows the same moment.
+    private func spark(_ index: Int, travel: CGFloat, rear: CGFloat, y: CGFloat,
+                       scale: CGFloat) -> (position: CGPoint, size: CGFloat, colour: Color, alpha: Double) {
+        // Three unit values from a cheap integer hash: no RNG in a view body.
+        func unit(_ salt: UInt32) -> CGFloat {
+            var h = UInt32(truncatingIfNeeded: index) &* 2_654_435_761 &+ salt &* 40_503
+            h ^= h >> 15; h &*= 2_246_822_519; h ^= h >> 13
+            return CGFloat(h % 1_000) / 1_000
+        }
+        let age = travel - CGFloat(index) * Self.sparkSpacing          // travel since emission
+        let life = age / Self.sparkLife
+        // Emitted where the rear of the tracks met the ground at that moment
+        // (the tank has moved `age` on since), thrown back and up, falling.
+        // Like the icon: a dense cloud right behind the rear wheel, flecks
+        // arcing up and dropping, a few larger soft puffs among them.
+        let origin = CGPoint(x: rear - age + 3 * scale, y: y + tankHeight / 2 - 4 * scale)
+        let back = (0.15 + 0.5 * unit(1)) * age
+        let up = (0.6 + 0.9 * unit(2)) * age - 0.022 * age * age
+        let kind = unit(3)
+        let puff = kind > 0.82
+        let size = (puff ? 3 : kind > 0.45 ? 2 : 1) * scale * (1 - 0.35 * life)
+        let colour = kind < 0.6 ? Color(red: 0.97, green: 0.88, blue: 0.66)
+                                : Color(red: 0.95, green: 0.64, blue: 0.30)
+        return (CGPoint(x: origin.x - back, y: origin.y - up), size, colour,
+                Double(1 - life) * (puff ? 0.55 : 1))
     }
 
     /// The gun's muzzle for a tank whose rear edge is `rear`: the icon is
