@@ -361,9 +361,10 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         #expect(!controller.input.isAcceptingInput)
     }
 
-    /// ADR-0013: a won stage continues into the next stage of the campaign
-    /// with the carried state; the last stage ends the run; a lost stage
-    /// retries from its checkpoint.
+    /// ADR-0013: a won stage hands over to the next stage of the campaign
+    /// with the carried state — on the player's 下一关, once its results have
+    /// settled (owner 2026-10-07); the last stage ends the run; a lost
+    /// stage retries from its checkpoint.
     @Test func theCampaignAdvancesCarriesStateAndRetriesFromTheCheckpoint() throws {
         let campaign = CampaignDefinition(id: "test", displayNameKey: "k", stageIDs: ["one", "two", "three"])
         // Stage worlds: "one" and "three" are won at once; "two" is lost at once (base down) unless retried
@@ -391,9 +392,22 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         #expect(controller.stageID == "one" && controller.campaignRun?.stageNumber == 1)
         var steps = 0
         func runToOutcome() { while controller.flow.outcome == nil, steps < 4000 { frame(controller, clock: clock); steps += 1 } }
-        func runToNextCard() { while controller.flow.phase != .card, steps < 6000 { frame(controller, clock: clock); steps += 1 } }
+        func runToNextCard() {
+            while controller.flow.phase != .finished, steps < 6000 { frame(controller, clock: clock); steps += 1 }
+            // The results hold: nothing moves on by itself.
+            frame(controller, clock: clock, count: 300)
+            #expect(controller.flow.phase == .finished && controller.nextStageAvailable)
+            controller.continueToNextStage()
+            #expect(controller.flow.phase == .card)
+        }
         runToOutcome()
         #expect(controller.flow.outcome == .won)
+        while controller.flow.phase != .finished, steps < 6000 { frame(controller, clock: clock); steps += 1 }
+        // Booked the moment the results settle, before any tap: the run has
+        // moved on and the completed stage is recorded, so a player who
+        // leaves the results page keeps the win.
+        #expect(controller.campaignRun?.completedStageIDs == ["one"] && controller.campaignRun?.stageNumber == 2)
+        #expect(controller.flow.phase == .finished && controller.session.recording.stageID == "one") // not BUILT until asked for
         runToNextCard()
         #expect(controller.stageID == "two" && controller.campaignRun?.stageNumber == 2)
         #expect(requests.last?.1.score == 530) // stage one's exit state built stage two
@@ -418,8 +432,10 @@ private func frame(_ controller: MovementLabController, clock: FakeClock, count:
         runToOutcome()
         #expect(controller.flow.outcome == .won && controller.campaignRun?.isLastStage == true)
         while controller.flow.phase != .finished, steps < 12000 { frame(controller, clock: clock); steps += 1 }
-        frame(controller, clock: clock, count: 5) // the automatic continue fires once and stops
+        frame(controller, clock: clock, count: 5) // the last win is booked at once; nothing to continue into
         #expect(controller.campaignComplete && controller.campaignRun?.isComplete == true)
+        #expect(!controller.nextStageAvailable)
+        controller.continueToNextStage() // a no-op after the last stage
         #expect(controller.flow.phase == .finished && controller.stageID == "three")
         #expect(controller.campaignRecordings.count == 3)
         #expect(controller.campaignRecordings.map(\.stageID) == ["one", "two", "three"])

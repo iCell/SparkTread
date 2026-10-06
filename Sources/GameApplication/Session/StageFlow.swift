@@ -268,7 +268,10 @@ public struct StageFlow: Equatable, Sendable {
 
     /// A won stage moves on by itself when its timeline ends; a lost one
     /// keeps the panel up until the player restarts.
-    public var wantsAutomaticContinue: Bool { phase == .finished && outcome == .won }
+    /// A won stage's results have settled and hold for the player: the
+    /// hand-off to the next stage is theirs to take (owner 2026-10-07:
+    /// 在一关结束的总结页面让用户点击再进入下一关), never the timeline's.
+    public var awaitsContinue: Bool { phase == .finished && outcome == .won }
 }
 
 /// Enemies destroyed this stage — by archetype in first-kill order, and by

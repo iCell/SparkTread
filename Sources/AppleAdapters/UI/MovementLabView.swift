@@ -94,9 +94,18 @@ public final class MovementLabController {
     /// Recordings of the stages completed in this run, in order — the
     /// chained campaign replay (plan §16.3).
     public private(set) var campaignRecordings: [ReplayRecording] = []
-    /// Set when the last stage's results have settled: the run is over and
-    /// the automatic continue stops.
+    /// Set when the last stage's results have settled: the run is over.
     public private(set) var campaignComplete = false
+    /// A won campaign stage is BOOKED the moment its results settle — run
+    /// advanced, progress persisted — and the next stage is only BUILT when
+    /// the player asks for it (owner 2026-10-07). Booking first means the
+    /// win is on disk while the results sit there, however long they sit.
+    private var wonStageBooked = false
+    /// The results of a won stage are up and the next stage is waiting for
+    /// the player's 下一关.
+    public var nextStageAvailable: Bool {
+        campaignRun != nil && wonStageBooked && !campaignComplete && flow.awaitsContinue
+    }
 
     public static let bundledCampaignID = "campaign_v1"
 
@@ -229,6 +238,7 @@ public final class MovementLabController {
     /// Swaps in a built stage and the theme it is drawn with.
     private func adopt(_ made: (session: MovementLabSession, themeID: String)) {
         themeID = made.themeID
+        wonStageBooked = false
         replaceSession(made.session)
     }
 
@@ -254,10 +264,13 @@ public final class MovementLabController {
         }
     }
 
-    /// A won stage's automatic continue: the next stage from the carried
-    /// state, or the end of the campaign (the results stay up).
-    private func continueCampaign() {
-        guard var run = campaignRun, let stages else { restart(); return }
+    /// A won campaign stage's results have settled: book the win — the run
+    /// moves on from the carried state and the progress document is written
+    /// now, not when the player taps — and either hold for 下一关 or, after
+    /// the last stage, end the run (the results stay up).
+    private func bookWonStage() {
+        guard var run = campaignRun, !wonStageBooked else { return }
+        wonStageBooked = true
         campaignRecordings.append(session.recording)
         lastCompletedRecording = session.recording
         let exit = SessionState.carried(from: session.world) ?? run.checkpoint
@@ -271,12 +284,17 @@ public final class MovementLabController {
                 campaignID: run.campaign.id, completedStageIDs: run.completedStageIDs,
                 checkpoint: hasNext ? run : nil, bestScore: bestScore))
         }
-        if hasNext {
-            adopt(Self.makeStage(for: run, stages: stages))
-        } else {
+        if !hasNext {
             campaignComplete = true
             syncInputAdmission()
         }
+    }
+
+    /// The player's 下一关 on a won stage's results: build the booked next
+    /// stage. Nothing happens unless the results are up and the win booked.
+    public func continueToNextStage() {
+        guard nextStageAvailable, let run = campaignRun, let stages else { return }
+        adopt(Self.makeStage(for: run, stages: stages))
     }
 
     /// Starts the campaign over from its first stage and the campaign
@@ -534,8 +552,11 @@ public final class MovementLabController {
         let wasPlaying = flow.allowsSimulation
         for cue in flow.advance() { play(cue) }
         if flow.allowsSimulation != wasPlaying { syncInputAdmission() }
-        if flow.wantsAutomaticContinue {
-            if !campaignComplete { continueCampaign() } // a won stage moves the campaign on
+        if flow.awaitsContinue {
+            // A campaign stage books its win and holds for the player; the
+            // lab and an injected world have no next stage and no page to
+            // tap, so they roll straight into the same stage again.
+            if campaignRun != nil { bookWonStage() } else { restart() }
             return
         }
         guard flow.allowsSimulation else { return }
@@ -1217,6 +1238,10 @@ public struct MovementLabView: View {
                         }
                     }
                 }
+                if controller.nextStageAvailable {
+                    PlateButton(title: "下一关", icon: "chevron.right", role: .primary,
+                                size: compact ? .small : .regular) { controller.continueToNextStage() }
+                }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
                     PlateButton(title: "重新开始", icon: "arrow.counterclockwise", role: .primary,
                                 size: compact ? .small : .regular) { controller.restart() }
@@ -1368,7 +1393,8 @@ private extension View {
 /// the touch controls are hidden from the fade on, so the overlay may take
 /// touches whenever the results panel is presented — for EITHER outcome,
 /// so a large tally can be scrolled and read. Restart stays a finished
-/// loss's affordance; a win continues by itself.
+/// loss's affordance; a won campaign stage holds for the player's 下一关
+/// (`MovementLabController.nextStageAvailable`).
 enum StageFlowPresentationPolicy {
     static func resultsInteractive(phase: StageFlow.Phase) -> Bool {
         phase == .panelIn || phase == .panelHold || phase == .finished

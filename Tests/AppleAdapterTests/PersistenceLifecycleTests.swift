@@ -66,10 +66,16 @@ private func play(_ controller: MovementLabController, ticks: Int = 0) {
         var steps = 0
         while controller.flow.outcome == nil, steps < 600 { controller.stepOneTick(); steps += 1 }
         #expect(controller.flow.outcome == .won && store.suspended == nil && store.suspendedClears == 1)
-        while controller.flow.phase != .card, steps < 3000 { controller.stepOneTick(); steps += 1 }
+        while controller.flow.phase != .finished, steps < 3000 { controller.stepOneTick(); steps += 1 }
+        // The win is on disk the moment the results settle — before the
+        // player's 下一关 (owner 2026-10-07) — so leaving the results page
+        // cannot lose it.
         let progress = try #require(store.progress)
         #expect(progress.completedStageIDs == ["a_01_x"] && progress.bestScore == 530)
         #expect(progress.checkpoint?.stageID == "a_02_y" && progress.checkpoint?.checkpoint.score == 530)
+        #expect(controller.nextStageAvailable)
+        controller.continueToNextStage()
+        #expect(controller.flow.phase == .card && controller.stageID == "a_02_y")
         // Abandoning the run (返回标题) clears any snapshot.
         play(controller, ticks: 30)
         controller.applicationDidBecomeInactive()

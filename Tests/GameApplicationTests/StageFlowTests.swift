@@ -54,7 +54,7 @@ import Testing
         #expect(cues.prefix(2) == [.outcomeText, .fade])
         // No tally rows: the panel still lists its total line.
         #expect(cues.filter { if case .panelRow = $0 { return true }; return false }.count == 1)
-        #expect(flow.wantsAutomaticContinue && flow.showsPanel && flow.panelRowsVisible == 1)
+        #expect(flow.awaitsContinue && flow.showsPanel && flow.panelRowsVisible == 1)
         // A decided flow stays decided.
         flow.beginOutro(won: false)
         #expect(flow.outcome == .won)
@@ -65,7 +65,7 @@ import Testing
         flow.beginOutro(won: false)
         for _ in 0..<600 { flow.advance() }
         #expect(flow.phase == .finished && flow.outcome == .lost)
-        #expect(!flow.wantsAutomaticContinue && flow.showsPanel && flow.showsOutcomeText)
+        #expect(!flow.awaitsContinue && flow.showsPanel && flow.showsOutcomeText)
     }
 
     @Test func panelRowsAppearOnTheTallyCadence() {

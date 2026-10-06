@@ -658,3 +658,17 @@ at its root, under the launch screen, so the voice pools warm once rather
 than at the first game start; the title plays the cue through it and every
 controller is handed the same instance. The set is 25 cues: 18 synthesized,
 6 excerpts, and the owner's stage card.
+
+## Amendment 2026-10-07 (seventh): the results hold for the player
+
+Decision §4 had a won stage continue by itself into the next (first the
+same stage again, then, with the campaign, the next one). The owner asked
+for the results page to wait for a tap before the next stage, and for the
+transition between stages to be longer. A won campaign stage now holds on
+its results (`StageFlow.awaitsContinue`) until the player taps 下一关
+(`MovementLabController.continueToNextStage`); the win is booked — run
+advanced, progress persisted — the moment the results settle, so the hold
+can be indefinite without risking the win. The lab and injected worlds
+still roll on by themselves: they have no next stage and no page to tap.
+§11.4's "约 3 秒内进入结果界面，点击可快进但不跳过计分" is unchanged; the
+card durations are unchanged.

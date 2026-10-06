@@ -1783,6 +1783,30 @@ fire. Labels stay native text with a symbol in front. Verified by an
 offscreen gallery render of every variant (including disabled) and
 simulator shots of the settled title and the arena HUD.
 
+*The results page waits for the player (2026-10-07, owner follow-up).*
+Owner: longer transitions between stages, and the results page should
+wait for a tap before the next stage. A won campaign stage no longer rolls
+into the next one by itself: the flow's `wantsAutomaticContinue` became
+`awaitsContinue` (results settled, hold for the player), the footer shows
+下一关 in fire, and `continueToNextStage()` builds the next stage. The order
+of bookkeeping changed with it, deliberately: the win is BOOKED the moment
+the results settle — run advanced, recordings appended, progress document
+written with the completed stage and the next checkpoint — and only the
+BUILD of the next stage waits for the tap. Booking first is what makes an
+indefinite hold safe: a player who leaves the results page, or whose app
+is killed there, keeps the win; under the old order nothing was on disk
+until the automatic continue ran. The lab and injected worlds, which have
+no next stage and no page to tap, still roll into the same stage again.
+Two tests waited on the automatic continue with unbounded loops and hung
+(`PersistenceLifecycleTests`' `play`, the campaign-advance integration
+test); both now tap 下一关 explicitly and additionally assert the booking
+before the tap. GAME_RULES §11.4 is untouched (it fixes the ~3 s to the
+results, not what follows); ADR-0011 §4 recorded the automatic continue
+and carries the amendment. Not changed: the next stage's card hold (138
+ticks, the reference's own 2.3 s) — the transition is now as long as the
+player wants it, which is what "长一些" was taken to mean; lengthening the
+card itself is the owner's call.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
