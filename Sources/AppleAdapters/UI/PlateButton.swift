@@ -65,6 +65,8 @@ struct PlateButtonStyle: ButtonStyle {
         let pressed = configuration.isPressed
         configuration.label
             .font(size.font)
+            .lineLimit(1)
+            .fixedSize()                 // a plate grows to its label; a label never wraps
             .foregroundStyle(face.ink)
             .padding(.horizontal, size.horizontalPadding)
             .frame(minWidth: size.minWidth, minHeight: size.height)

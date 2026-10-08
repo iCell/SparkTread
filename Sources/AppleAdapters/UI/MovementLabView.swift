@@ -1217,7 +1217,10 @@ public struct MovementLabView: View {
             }
             .padding(.horizontal, 14)
             .padding(.top, compact ? 4 : 6)
-            HStack {
+            // The numbers on one line, the actions on their own line under
+            // them: sharing a row squeezed the plates into two-line labels
+            // and wrapped the statistics (owner 2026-10-08: 按钮排版有问题).
+            HStack(spacing: 14) {
                 Text(verbatim: "得分 \(String(controller.hud.score))")
                     .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
@@ -1225,11 +1228,19 @@ public struct MovementLabView: View {
                 Text(verbatim: "MaxHits \(String(controller.stats.maxHits))  MaxCombos \(String(controller.stats.maxCombos))")
                     .font(.system(size: compact ? 12 : 14, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
+                    .lineLimit(1)
+                    .fixedSize()
                 Spacer()
                 if controller.campaignComplete {
                     Text("战役完成")
                         .font(.system(size: compact ? 15 : 17, weight: .heavy))
                         .foregroundStyle(Color.yellow)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, compact ? 6 : 10)
+            HStack(spacing: 12) {
+                if controller.campaignComplete {
                     PlateButton(title: "再来一局", icon: "arrow.counterclockwise", role: .primary,
                                 size: compact ? .small : .regular) { controller.restartCampaign() }
                     if let onExit {
@@ -1252,8 +1263,10 @@ public struct MovementLabView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 14)
-            .padding(.vertical, compact ? 6 : 10)
+            .padding(.top, compact ? 4 : 6)
+            .padding(.bottom, compact ? 8 : 12)
         }
         .frame(width: width)
         .platePanel(radius: 12)

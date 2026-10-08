@@ -1807,6 +1807,14 @@ ticks, the reference's own 2.3 s) — the transition is now as long as the
 player wants it, which is what "长一些" was taken to mean; lengthening the
 card itself is the owner's call.
 
+*The results footer (2026-10-08, owner screenshot).* The plates had been
+dropped into the statistics row: 重新开始 wrapped to two lines and
+MaxHits/MaxCombos wrapped beside it. The footer is now two rows — the
+numbers (得分, MaxHits, MaxCombos, 战役完成) on one, the actions centred on
+their own under it — and `PlateButtonStyle` fixes every label to one line
+(`lineLimit(1).fixedSize()`), so a plate grows to its label and never
+folds it.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
