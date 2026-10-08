@@ -66,6 +66,52 @@ import UIKit
     }
 }
 
+/// A brass shell in vectors for the normal fire button (see
+/// `TouchControlsUIView.normalShell`).
+@MainActor private final class NormalShellGlyph {
+    private let rim = CAShapeLayer()
+    private let body = CAShapeLayer()
+    private let band = CAShapeLayer()
+    private let highlight = CAShapeLayer()
+
+    init() {
+        rim.fillColor = UIColor(red: 0.16, green: 0.10, blue: 0.03, alpha: 1).cgColor
+        body.fillColor = UIColor(red: 0.93, green: 0.70, blue: 0.22, alpha: 1).cgColor
+        band.fillColor = UIColor(red: 0.62, green: 0.40, blue: 0.10, alpha: 1).cgColor
+        highlight.fillColor = UIColor(red: 1.0, green: 0.93, blue: 0.65, alpha: 0.9).cgColor
+    }
+
+    func add(to parent: CALayer) { for l in [rim, body, band, highlight] { parent.addSublayer(l) } }
+
+    /// A shell `height` tall: a round tip over a straight body, a darker
+    /// band at the base, a light stripe up the left; the rim is the same
+    /// shape grown by 2 pt.
+    func layout(center: CGPoint, height: CGFloat) {
+        let width = height * 0.46
+        let box = CGRect(x: center.x - width / 2, y: center.y - height / 2, width: width, height: height)
+        func shell(_ r: CGRect) -> CGPath {
+            // An ogive: the sides sweep into a point over the top 45 %.
+            let path = UIBezierPath()
+            let shoulder = r.minY + r.height * 0.45
+            path.move(to: CGPoint(x: r.minX, y: r.maxY))
+            path.addLine(to: CGPoint(x: r.minX, y: shoulder))
+            path.addQuadCurve(to: CGPoint(x: r.midX, y: r.minY),
+                              controlPoint: CGPoint(x: r.minX, y: r.minY + r.height * 0.12))
+            path.addQuadCurve(to: CGPoint(x: r.maxX, y: shoulder),
+                              controlPoint: CGPoint(x: r.maxX, y: r.minY + r.height * 0.12))
+            path.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            path.close()
+            return path.cgPath
+        }
+        rim.path = shell(box.insetBy(dx: -2, dy: -2))
+        body.path = shell(box)
+        band.path = UIBezierPath(rect: CGRect(x: box.minX, y: box.maxY - height * 0.2, width: width, height: height * 0.2)).cgPath
+        highlight.path = UIBezierPath(roundedRect: CGRect(x: box.minX + width * 0.18, y: box.minY + height * 0.22,
+                                                          width: width * 0.16, height: height * 0.5),
+                                      cornerRadius: width * 0.08).cgPath
+    }
+}
+
 final class TouchControlsUIView: UIView {
     weak var store: HeldDirectionStore?
     var onNormalFire: ((Bool) -> Void)?
@@ -96,6 +142,11 @@ final class TouchControlsUIView: UIView {
     private let specialLabel = UILabel()
     private let normalIcon = UIImageView()
     private let specialIcon = UIImageView()
+    /// The normal gun's face is drawn, not sampled: its projectile art is
+    /// 3×8 px and blurred into blocks at button size (owner 2026-10-08), so
+    /// the button shows a brass shell in vectors — tip, body, base band,
+    /// a highlight — in the round's own gold, with a dark rim like a plate.
+    private let normalShell = NormalShellGlyph()
     /// Weapon icons (GAME_RULES §15.2): the normal round and the current
     /// special weapon's projectile art replace text placeholders.
     var iconProvider: ((String) -> CGImage?)?
@@ -134,6 +185,8 @@ final class TouchControlsUIView: UIView {
             icon.layer.magnificationFilter = .nearest
             addSubview(icon)
         }
+        normalShell.add(to: layer)
+        normalLabel.isHidden = true
     }
 
     @available(*, unavailable)
@@ -162,10 +215,6 @@ final class TouchControlsUIView: UIView {
             }
         }
         guard let iconProvider else { return }
-        if normalIcon.image == nil, let image = iconProvider("normal") {
-            normalIcon.image = UIImage(cgImage: image)
-            normalLabel.isHidden = true
-        }
         guard shownSpecialWeapon != specialWeaponID, let image = iconProvider(specialWeaponID) else { return }
         shownSpecialWeapon = specialWeaponID
         specialIcon.image = UIImage(cgImage: image)
@@ -180,6 +229,7 @@ final class TouchControlsUIView: UIView {
         specialCenter = CGPoint(x: normalCenter.x, y: normalCenter.y - buttonRadius * 2 - buttonGap)
         normalDisc.layout(center: normalCenter, radius: buttonRadius)
         specialDisc.layout(center: specialCenter, radius: buttonRadius)
+        normalShell.layout(center: normalCenter, height: 34)
         for (label, icon, center) in [(normalLabel, normalIcon, normalCenter),
                                       (specialLabel, specialIcon, specialCenter)] {
             label.frame = CGRect(x: center.x - buttonRadius, y: center.y - buttonRadius,

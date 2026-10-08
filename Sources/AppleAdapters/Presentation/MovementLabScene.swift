@@ -876,8 +876,14 @@ final class MovementLabScene: SKScene {
             if let existing = projectileNodes[p.entityID] {
                 node = existing
             } else {
-                // Revised art carries the per-weapon sizing; uniform scale.
-                guard let created = try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * 0.8)
+                // Revised art carries the per-weapon sizing; uniform scale —
+                // except the AP round, whose flight sprite is a 4 px dart
+                // while its pickup draws a 10 px shell; the owner wanted the
+                // round in flight to look like that shell (2026-10-08), so it
+                // flies as the pickup's shell, cropped to the art, at a
+                // weight between the dart and the icon.
+                guard let created = p.weaponID == "ap" ? Self.heavyShellNode(artScale: artScale)
+                        : try? art.sprite("px_projectile_" + p.weaponID, scale: artScale * 0.8)
                 else { continue }
                 created.zPosition = 650
                 created.zRotation = -CGFloat(p.direction.rawValue) * .pi / 2
@@ -1002,6 +1008,19 @@ final class MovementLabScene: SKScene {
         addChild(overlay)
         overlay.run(.sequence([.fadeOut(withDuration: 0.3), .removeFromParent()]))
         baseFlash = overlay
+    }
+
+    /// The AP round's flight sprite: the AP pickup's own shell, cropped to
+    /// its drawn content (10×24 px) and scaled to about half a cell wide —
+    /// clearly heavier than the normal round's 3×8 px, lighter than the
+    /// item on the ground.
+    private static func heavyShellNode(artScale: CGFloat) -> SKSpriteNode? {
+        guard let image = MenuArt.glyph("px_pickup_ap_weapon") else { return nil }
+        let texture = SKTexture(cgImage: image)
+        texture.filteringMode = .nearest
+        let scale = artScale * 0.7
+        return SKSpriteNode(texture: texture, size: CGSize(width: CGFloat(image.width) * scale,
+                                                           height: CGFloat(image.height) * scale))
     }
 
     /// Muzzle position for a `weaponFired` event, anchored to the EVENT's

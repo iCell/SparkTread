@@ -1902,6 +1902,19 @@ script's first retry caught the hand-off mid-fade. A timing margin, not a
 rendering defect; if it recurs, the script should wait for two consecutive
 playfield classifications rather than accept the first.
 
+*The AP round's weight, and the normal fire button (2026-10-08, owner).*
+The AP round in flight is a 4×22 px dart while its pickup draws a 10×24 px
+shell, and the owner wanted the round to look like that shell; it now
+flies as the pickup's shell, cropped to its art and scaled to about half
+a cell wide (`MovementLabScene.heavyShellNode`, 0.7 of the art scale) —
+heavier than the normal round's 3×8 px, lighter than the item on the
+ground; the trail is unchanged. The normal fire button sampled that 3×8 px
+projectile at button size and blurred into blocks, so its face is drawn
+in vectors instead (`NormalShellGlyph`): an ogive shell in the round's
+own brass with a base band, a highlight and a dark rim, crisp at any
+scale. The special button keeps its weapon pickup's icon, which has the
+pixels for it. No new art.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
