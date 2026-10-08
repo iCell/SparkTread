@@ -28,7 +28,12 @@ import GameCore
         let progress = CampaignProgress(campaignID: "c", completedStageIDs: ["a_01_x"], checkpoint: checkpoint, bestScore: 5)
         var model = AppFlowModel(campaign: campaign, progress: progress)
         #expect(model.completedStageIDs == ["a_01_x"] && model.checkpoint == checkpoint && model.suggestedStageIndex == 1)
-        #expect(model.run(forStageIndex: 1) == checkpoint)            // the checkpoint run
+        // A card is always a FRESH run on its stage — even the checkpoint's
+        // own stage: the select screen is 新的战役, and the checkpoint is
+        // 继续战役's alone (owner 2026-10-09: a new game started with the old
+        // run's lives).
+        #expect(model.run(forStageIndex: 1) == CampaignRun(campaign: campaign, stageIndex: 1))
+        #expect(model.run(forStageIndex: 1)?.checkpoint == .campaignStart)
         #expect(model.run(forStageIndex: 0) == CampaignRun(campaign: campaign)) // a fresh run on stage 1
         #expect(model.run(forStageIndex: 2) == nil)                    // locked
         // Progress of another campaign is ignored.
@@ -54,7 +59,7 @@ import GameCore
         let checkpoint = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["a_01_x"], difficultyID: "casual")
         var model = AppFlowModel(campaign: campaign, progress: CampaignProgress(campaignID: "c", completedStageIDs: ["a_01_x"], checkpoint: checkpoint))
         #expect(model.difficultyID == "casual") // follows the checkpoint
-        #expect(model.run(forStageIndex: 1) == checkpoint)
+        #expect(model.run(forStageIndex: 1)?.difficultyID == "casual" && model.run(forStageIndex: 1)?.checkpoint == .campaignStart)
         model.difficultyID = "veteran"
         #expect(model.run(forStageIndex: 1)?.difficultyID == "veteran") // a new run on that stage, not the casual checkpoint
         #expect(model.run(forStageIndex: 0)?.difficultyID == "veteran")

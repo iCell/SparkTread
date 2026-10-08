@@ -43,11 +43,14 @@ public struct AppFlowModel: Equatable, Sendable {
         else if autostart, campaign != nil { screen = .playing(stageIndex: 0) }
     }
 
-    /// The run a stage card starts: the checkpoint when it is that stage,
-    /// else the campaign-start state on that stage.
+    /// The run a stage card starts: ALWAYS a fresh run from the
+    /// campaign-start state on that stage (lives 3, score 0, the starting
+    /// kit). The select screen is reached by 开始战役 / 新的战役; the
+    /// checkpoint belongs to 继续战役 on the title alone. Until 2026-10-09
+    /// a card on the checkpoint's own stage handed back the checkpoint, so
+    /// a "new game" started with the old run's lives and score (owner).
     public func run(forStageIndex index: Int) -> CampaignRun? {
         guard let campaign, isUnlocked(stageIndex: index) else { return nil }
-        if let checkpoint, checkpoint.stageIndex == index, checkpoint.difficultyID == difficultyID { return checkpoint }
         return CampaignRun(campaign: campaign, stageIndex: index, difficultyID: difficultyID)
     }
 

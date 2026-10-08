@@ -1995,6 +1995,14 @@ non-Chinese languages now say Start Game / Continue / New Game and
 이어하기 / 처음부터, Jugar / Continuar / Nueva partida); the Chinese 战役 /
 戰役 is the owner's own word and stays.
 
+*A new game carried the old lives (2026-10-09, owner).* 新的战役 → select
+→ the suggested stage started with the previous run's lives and score.
+`AppFlowModel.run(forStageIndex:)` handed back the CHECKPOINT run whenever
+the card was the checkpoint's own stage, whichever button had led there.
+A card is now always a fresh run from the campaign-start state on its
+stage (lives 3, score 0, the starting kit, the chosen difficulty); the
+checkpoint belongs to 继续战役 on the title alone. `AppFlowTests` pins it.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
