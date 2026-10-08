@@ -12,6 +12,7 @@ public struct AppFlowModel: Equatable, Sendable {
     public enum Screen: Equatable, Sendable {
         case title
         case campaignSelect
+        case settings
         /// The game screen; `stageIndex` is nil for the lab.
         case playing(stageIndex: Int?)
     }
@@ -60,6 +61,7 @@ public struct AppFlowModel: Equatable, Sendable {
     public mutating func discardSuspended() { suspended = nil }
 
     public mutating func openCampaignSelect() { screen = .campaignSelect }
+    public mutating func openSettings() { screen = .settings }
     public mutating func startTraining() { screen = .playing(stageIndex: nil) }
     public mutating func backToTitle() { screen = .title }
 
@@ -93,7 +95,11 @@ public struct AppFlowModel: Equatable, Sendable {
 public struct AppRootView: View {
     @State private var model: AppFlowModel
     @State private var controller: MovementLabController?
-    @State private var storeNotice: String?
+    /// A notice as a key and its detail, so it re-reads in a new language.
+    @State private var storeNotice: (key: String, detail: String)?
+    /// The player's settings — language, sound, haptics, controls,
+    /// accessibility — one store for the app, persisted as it changes.
+    @State private var settings = SettingsStore()
     /// The launch sequence is for the launch: backing out of a menu onto
     /// the title again should not replay it.
     @State private var introPlayed = false
@@ -133,17 +139,17 @@ public struct AppRootView: View {
         // The save store: an unusable store or an unreadable document is a
         // notice on the title, never a crash (the file stays for inspection).
         var store: CampaignPersistence?
-        var notice: String?
+        var notice: (key: String, detail: String)?
         var progress: CampaignProgress?
         var suspended: SuspendedSession?
         if !lab, env["SPARKTREAD_NO_SAVE"] == nil {
             do {
                 let file = try FileSaveStore.standard()
                 store = file
-                do { progress = try file.loadProgress() } catch { notice = "进度存档无法读取：\(error)" }
-                do { suspended = try file.loadSuspended() } catch { notice = "上次战斗存档无法读取：\(error)" }
+                do { progress = try file.loadProgress() } catch { notice = ("notice.progressUnreadable", "\(error)") }
+                do { suspended = try file.loadSuspended() } catch { notice = ("notice.suspendedUnreadable", "\(error)") }
             } catch {
-                notice = "存档目录不可用：\(error)"
+                notice = ("notice.storeUnavailable", "\(error)")
             }
         }
         self.store = store
@@ -165,6 +171,7 @@ public struct AppRootView: View {
     }
 
     public var body: some View {
+        let strings = settings.strings
         ZStack {
             Color.black.ignoresSafeArea()
             switch model.screen {
@@ -172,14 +179,18 @@ public struct AppRootView: View {
                 TitleScreen(hasCampaign: campaign != nil,
                             canResume: model.suspended != nil,
                             canContinue: model.checkpoint != nil,
-                            notice: storeNotice,
+                            notice: storeNotice.map { strings($0.key, $0.detail) },
                             onResume: resumeSuspended,
                             onContinue: { if let run = model.checkpoint { start(run) } },
                             onStart: { discardSuspended(); model.openCampaignSelect() },
                             onTraining: { discardSuspended(); startTraining() },
-                            playsIntro: !introPlayed,
+                            onSettings: { model.openSettings() },
+                            // Reduce motion: no launch drive; the title is simply there.
+                            playsIntro: !introPlayed && !settings.reduceMotion,
                             onIntroFinished: { introPlayed = true },
                             audio: audio)
+            case .settings:
+                SettingsScreen(onBack: { model.backToTitle() })
             case .campaignSelect:
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model, stageMaps: stageMaps,
@@ -195,6 +206,11 @@ public struct AppRootView: View {
             }
         }
         .persistentSystemOverlays(.hidden)
+        .environment(\.strings, strings)
+        .environment(settings)
+        // Sound and haptics follow the settings the moment they change.
+        .onChange(of: settings.soundEnabled, initial: true) { _, on in audio.isEnabled = on }
+        .onChange(of: settings.soundVolume, initial: true) { _, volume in audio.masterVolume = Float(volume) }
     }
 
     private func start(_ run: CampaignRun) {
@@ -221,7 +237,7 @@ public struct AppRootView: View {
 
     private func leaveGame(_ controller: MovementLabController) {
         model.recordCompleted(stageIDs: controller.campaignRun?.completedStageIDs ?? [])
-        if let failure = controller.persistenceFailure { storeNotice = "存档失败：\(failure)" }
+        if let failure = controller.persistenceFailure { storeNotice = ("notice.saveFailed", failure) }
         self.controller = nil
         model.discardSuspended()
         model.backToTitle()
@@ -239,6 +255,8 @@ struct TitleScreen: View {
     var onContinue: () -> Void = {}
     let onStart: () -> Void
     let onTraining: () -> Void
+    var onSettings: () -> Void = {}
+    @Environment(\.strings) private var strings
     /// The launch sequence runs once per app start, not every time the
     /// player backs out of a menu onto the title again.
     var playsIntro = false
@@ -338,21 +356,22 @@ struct TitleScreen: View {
             // to, a campaign to carry on, or a first start.
             VStack(spacing: 14) {
                 if hasCampaign, canResume {
-                    PlateButton(title: "继续上次战斗", icon: "play.fill", role: .primary, size: .large, action: onResume)
+                    PlateButton(title: strings("title.resume"), icon: "play.fill", role: .primary, size: .large, action: onResume)
                 } else if hasCampaign, canContinue {
-                    PlateButton(title: "继续战役", icon: "play.fill", role: .primary, size: .large, action: onContinue)
+                    PlateButton(title: strings("title.continue"), icon: "play.fill", role: .primary, size: .large, action: onContinue)
                 } else if hasCampaign {
-                    PlateButton(title: "开始战役", icon: "play.fill", role: .primary, size: .large, action: onStart)
+                    PlateButton(title: strings("title.start"), icon: "play.fill", role: .primary, size: .large, action: onStart)
                 } else {
-                    PlateButton(title: "训练场", icon: "scope", role: .primary, size: .large, action: onTraining)
+                    PlateButton(title: strings("title.training"), icon: "scope", role: .primary, size: .large, action: onTraining)
                 }
                 HStack(spacing: 12) {
                     if hasCampaign, canResume || canContinue {
-                        PlateButton(title: "新的战役", icon: "flag.fill", action: onStart)
+                        PlateButton(title: strings("title.new"), icon: "flag.fill", action: onStart)
                     }
                     if hasCampaign {
-                        PlateButton(title: "训练场", icon: "scope", action: onTraining)
+                        PlateButton(title: strings("title.training"), icon: "scope", action: onTraining)
                     }
+                    PlateButton(title: strings("title.settings"), icon: "gearshape.fill", action: onSettings)
                 }
                 if let notice {
                     Text(notice)
@@ -701,26 +720,23 @@ struct CampaignSelectScreen: View {
     var onDifficulty: (String) -> Void = { _ in }
     let onBack: () -> Void
 
-    static func difficultyLabel(_ id: String) -> String {
-        switch id {
-        case "casual": "休闲"
-        case "standard": "标准"
-        case "veteran": "老兵"
-        default: id
-        }
+    @Environment(\.strings) private var strings
+
+    static func difficultyLabel(_ id: String, _ s: Strings) -> String {
+        ["casual", "standard", "veteran"].contains(id) ? s("difficulty.\(id)") : id
     }
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("选择关卡")
+            Text(strings("select.title"))
                 .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Color.yellow)
                 .padding(.top, 2)
             HStack(spacing: 12) {
-                Text("难度")
+                Text(strings("select.difficulty"))
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
-                PlateSegments(options: AppFlowModel.difficultyIDs.map { ($0, Self.difficultyLabel($0)) },
+                PlateSegments(options: AppFlowModel.difficultyIDs.map { ($0, Self.difficultyLabel($0, strings)) },
                               selection: model.difficultyID, onSelect: onDifficulty)
             }
             // Twelve cards are far wider than any phone: this row was a
@@ -757,7 +773,7 @@ struct CampaignSelectScreen: View {
                     Image(systemName: "chevron.backward")
                         .font(.system(size: 19, weight: .heavy))
                         .foregroundStyle(Color.yellow)
-                    Text("返回")
+                    Text(strings("common.back"))
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(.white.opacity(0.92))
                 }
@@ -784,11 +800,12 @@ struct StageCard: View {
     let completed: Bool
     let suggested: Bool
     let onSelect: (Int) -> Void
+    @Environment(\.strings) private var strings
 
     private static let size = CGSize(width: 184, height: 132)
 
     var body: some View {
-        let card = HUDLabels.stageCard(stageID)
+        let card = HUDLabels.stageCard(stageID, strings)
         Button { onSelect(index) } label: {
             // The text is the view that sizes the card; the map goes in
             // `.background`, which is laid out to the view's bounds instead of
@@ -805,7 +822,7 @@ struct StageCard: View {
                     .font(.system(size: 13, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                Text(completed ? "已通关" : unlocked ? "可进入" : "未解锁")
+                Text(strings(completed ? "card.completed" : unlocked ? "card.unlocked" : "card.locked"))
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(completed ? Color.green : unlocked ? Color.yellow : Color.gray)
             }

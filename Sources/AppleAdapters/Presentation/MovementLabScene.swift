@@ -550,7 +550,8 @@ final class MovementLabScene: SKScene {
         label.fontSize = 10
         label.fontColor = SKColor(white: 1, alpha: 0.8)
         label.horizontalAlignmentMode = .left
-        label.position = CGPoint(x: (layout?.origin.x ?? 0) + 8, y: size.height - 16)
+        // Bottom edge: the top-left now holds the pause plate (2026-10-08).
+        label.position = CGPoint(x: (layout?.origin.x ?? 0) + 8, y: 6)
         label.zPosition = 9000
         addChild(label)
         debugLabel = label

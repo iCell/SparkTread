@@ -14,7 +14,7 @@ When documents conflict, confirm with the owner first.
 
 ## Project state
 
-M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (campaign progression, screen flow, checkpoint save, difficulty profiles and director phases, the deferred mechanics), plus the Training Arena. On 2026-09-15 the gameplay rules were consolidated into `GAME_RULES.md` R5 (ADR-0018) and the code moved onto them; R5.10 (2026-10-08, ADR-0023) added brick drops (§10.5). The twelve-stage content of GAME_RULES §14.1 landed on 2026-10-03 (four themes, all 20 enemy types introduced by stage 10) and the campaign plays end to end in a scripted chained replay. Still open: settings/accessibility/controller support, the external playtest build, and a PLAYED golden — the chained replay is instant wins, not a played run. `docs/CURRENT_REVIEW.md` is the running review log; `docs/agent_handoffs/` holds handoffs.
+M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (campaign progression, screen flow, checkpoint save, difficulty profiles and director phases, the deferred mechanics), plus the Training Arena. On 2026-09-15 the gameplay rules were consolidated into `GAME_RULES.md` R5 (ADR-0018) and the code moved onto them; R5.10 (2026-10-08, ADR-0023) added brick drops (§10.5). The twelve-stage content of GAME_RULES §14.1 landed on 2026-10-03 (four themes, all 20 enemy types introduced by stage 10) and the campaign plays end to end in a scripted chained replay. Settings, accessibility and six-language localization landed on 2026-10-08 (`SettingsStore`, `Resources/Localizable.xcstrings`, `Strings` through the environment; the phone's language by default, changeable in Settings). Still open: controller support (deferred by the owner), the external playtest build, and a PLAYED golden — the chained replay is instant wins, not a played run. `docs/CURRENT_REVIEW.md` is the running review log; `docs/agent_handoffs/` holds handoffs.
 
 `GAME_RULES.md` (R5) is the **single gameplay rulebook** and wins every gameplay conflict (ADR-0018); `PRODUCT_IMPLEMENTATION_PLAN.md` keeps architecture, formats and process. A rule change means editing `GAME_RULES.md` together with an ADR. Its §17 balance watch items go to the owner after playtests; never retune them silently.
 
@@ -60,5 +60,6 @@ A second reviewer — the Astra agent (Codex, gpt-6-astra) — runs in a Herdr p
 - Changing a fixed decision (plan §4) requires an ADR in `docs/decisions/ADR-NNNN-short-name.md` — never silently reinterpret one.
 - V1 is single-player only: no networking abstractions, no dormant multiplayer sockets or UI.
 - Gameplay rules never live in HUD/animation/audio/scene code.
+- Every user-facing string is a key in `Sources/AppleAdapters/Resources/Localizable.xcstrings` (en, zh-Hans, zh-Hant, ja, ko, es), read through `@Environment(\.strings)`; never a literal in a view. `LocalizationTests` fails when a language lacks a key.
 - Comments explain constraints and intent, not line-by-line paraphrase.
 - Keep the tree green: run the gate before committing, and report failures with their output instead of describing them.

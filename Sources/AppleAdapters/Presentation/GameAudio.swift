@@ -114,6 +114,14 @@ public final class GameAudio {
     public var isEnabled = true {
         didSet { if !isEnabled { stopAllVoices() } }
     }
+    /// The settings' volume, 0…1, over every cue's own level; a running
+    /// loop takes it at once.
+    public var masterVolume: Float = 1 {
+        didSet {
+            masterVolume = max(0, min(1, masterVolume))
+            for (name, entry) in loops { entry.voice?.volume = entry.volume * masterVolume; loops[name] = entry }
+        }
+    }
 
     public init(backend: AudioBackend = AVAudioBackend(),
                 clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
@@ -184,7 +192,7 @@ public final class GameAudio {
         if active {
             var entry = loops[name] ?? (nil, volume)
             entry.volume = volume
-            entry.voice?.volume = volume
+            entry.voice?.volume = volume * masterVolume
             if let voice = entry.voice, !voice.isPlaying { entry.voice = nil }
             loops[name] = entry
             if entry.voice == nil, !isSuspended, isEnabled { startLoop(name, volume: volume) }
@@ -201,7 +209,7 @@ public final class GameAudio {
             return
         }
         voice.numberOfLoops = -1
-        voice.volume = volume
+        voice.volume = volume * masterVolume
         guard voice.play(), voice.isPlaying else {
             loopRetryNotBefore[name] = now + 1
             return
@@ -224,7 +232,7 @@ public final class GameAudio {
     public func play(_ name: String, volume: Float = 1.0) -> Bool {
         guard isEnabled, !isSuspended, let pool = pools[name],
               let chosen = pool.first(where: { !$0.isPlaying }) else { return false }
-        chosen.volume = volume
+        chosen.volume = volume * masterVolume
         chosen.currentTime = 0
         return chosen.play()
     }

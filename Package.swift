@@ -5,6 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "GoldenEagleKit",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
@@ -31,7 +32,7 @@ let package = Package(
             name: "AppleAdapters",
             dependencies: ["GameApplication", "GameCore"],
             path: "Sources/AppleAdapters",
-            resources: [.copy("Resources/Audio")]
+            resources: [.copy("Resources/Audio"), .process("Resources/Localizable.xcstrings")]
         ),
         // Content tooling: may import Foundation and application/core code;
         // production core code must not import tools (§14.1).

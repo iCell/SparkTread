@@ -74,8 +74,9 @@ import GameApplication
     @Test func everyStageResolvesANumberAndAChineseName() throws {
         let root = contentRoot()
         let campaign = try CampaignLoader.load(at: root.appendingPathComponent("Content/campaigns/campaign_v1.json"))
+        let zh = Strings(language: .simplifiedChinese)
         for (index, id) in campaign.stageIDs.enumerated() {
-            let card = HUDLabels.stageCard(id)
+            let card = HUDLabels.stageCard(id, zh)
             #expect(card.title == String(format: "STAGE %02d", index + 1), "\(id) titled '\(card.title)'")
             #expect(!card.subtitle.isEmpty, "\(id) has no subtitle")
             // A fallback subtitle is the id spelled out in Latin letters;

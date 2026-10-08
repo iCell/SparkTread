@@ -82,6 +82,8 @@ final class TouchControlsUIView: UIView {
     weak var store: HeldDirectionStore?
     var onNormalFire: ((Bool) -> Void)?
     var onSpecialFire: ((Bool) -> Void)?
+    /// Settings: stick on the right, fire buttons on the left (§15.2).
+    var mirrored = false { didSet { if mirrored != oldValue { setNeedsLayout() } } }
 
     private var stickTouch: UITouch?
     private var stickOrigin: CGPoint = .zero
@@ -166,9 +168,15 @@ final class TouchControlsUIView: UIView {
         // out on the diagonal — not stacked. Centres 98 pt across and 58 pt
         // up, 114 pt apart, so the 90 pt hit circles still never overlap
         // (§15.2 wants ≥ 96).
-        specialCenter = CGPoint(x: bounds.width - inset.right - 24 - buttonRadius,
-                                y: bounds.height - inset.bottom - 16 - buttonRadius - 58)
-        normalCenter = CGPoint(x: specialCenter.x - 98, y: specialCenter.y + 58)
+        if mirrored {
+            specialCenter = CGPoint(x: inset.left + 24 + buttonRadius,
+                                    y: bounds.height - inset.bottom - 16 - buttonRadius - 58)
+            normalCenter = CGPoint(x: specialCenter.x + 98, y: specialCenter.y + 58)
+        } else {
+            specialCenter = CGPoint(x: bounds.width - inset.right - 24 - buttonRadius,
+                                    y: bounds.height - inset.bottom - 16 - buttonRadius - 58)
+            normalCenter = CGPoint(x: specialCenter.x - 98, y: specialCenter.y + 58)
+        }
         normalDisc.layout(center: normalCenter, radius: buttonRadius)
         specialDisc.layout(center: specialCenter, radius: buttonRadius)
     }
@@ -190,7 +198,7 @@ final class TouchControlsUIView: UIView {
                 specialTouch = touch
                 specialDisc.setPressed(true)
                 onSpecialFire?(true)
-            } else if stickTouch == nil, point.x < bounds.width * 0.62 {
+            } else if stickTouch == nil, mirrored ? point.x > bounds.width * 0.38 : point.x < bounds.width * 0.62 {
                 stickTouch = touch
                 stickOrigin = point
                 updateStickVisual(offset: .zero)
@@ -273,6 +281,7 @@ struct TouchControlsView: UIViewRepresentable {
     let controller: MovementLabController
     var art: PixelArt?
     var specialWeaponID: String = "rapid"
+    var mirrored = false
 
     func makeUIView(context: Context) -> TouchControlsUIView {
         let view = TouchControlsUIView(frame: .zero)
@@ -299,6 +308,7 @@ struct TouchControlsView: UIViewRepresentable {
             }
         }
         uiView.updateWeapons(specialWeaponID: specialWeaponID)
+        uiView.mirrored = mirrored
     }
 }
 #endif

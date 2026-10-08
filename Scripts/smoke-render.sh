@@ -73,8 +73,11 @@ check() { # name, env-var-or-empty, settle-seconds
         || { echo "smoke-render: FAILED — $name did not launch"; return 1; }
     fi
     sleep "$settle"
-    attempt=0; verdict=""
-    while [ $attempt -lt 6 ]; do
+    # Two consecutive playfield readings: the first frame after the launch
+    # image hands off is a cross-fade, and one of them classified at 21.9 %
+    # on 2026-10-08 — over the floor by luck, not by rendering.
+    attempt=0; verdict=""; streak=0
+    while [ $attempt -lt 8 ]; do
         shot="$out/$name-$attempt.png"
         rm -f "$shot"
         $SIMCTL io "$device" screenshot "$shot" > /dev/null 2>&1 \
@@ -82,7 +85,9 @@ check() { # name, env-var-or-empty, settle-seconds
         [ -s "$shot" ] || { echo "smoke-render: FAILED — $name screenshot $attempt is empty"; return 1; }
         verdict=$(classify "$shot") || { echo "smoke-render: FAILED — $name classifier error: $verdict"; return 1; }
         case "$verdict" in
-            playfield*) echo "smoke-render: $name renders ($verdict)"; rm -f "$shot"; return 0 ;;
+            playfield*) streak=$((streak + 1))
+                        if [ $streak -ge 2 ]; then echo "smoke-render: $name renders ($verdict)"; rm -f "$shot"; return 0; fi ;;
+            *) streak=0 ;;
         esac
         attempt=$((attempt + 1)); sleep 1.5
     done

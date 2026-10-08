@@ -670,43 +670,39 @@ public final class MovementLabController {
 /// Human-readable HUD labels (Chinese UI, §12.2): the HUD never shows raw
 /// internal IDs.
 enum HUDLabels {
-    static func weapon(_ id: String) -> String {
-        switch id {
-        case "rapid": "快弹"
-        case "fire": "燃烧"
-        case "ap": "穿甲"
-        case "explosion": "爆破"
-        default: id
-        }
+    /// Every label is a key into the string catalog, resolved through the
+    /// `Strings` of the language in force (owner 2026-10-08: six languages,
+    /// the phone's by default, changeable in Settings). The tables that
+    /// used to hold Chinese here now hold keys; the words live in
+    /// `Resources/Localizable.xcstrings`.
+    static func weapon(_ id: String, _ s: Strings) -> String {
+        ["normal", "rapid", "fire", "ap", "explosion"].contains(id) ? s("weapon.\(id)") : id
     }
 
-    static func equipment(_ id: String?) -> String {
-        switch id {
-        case "amphi_tank": "两栖"
-        case "anti_skid": "防滑"
-        default: "无"
-        }
+    static func equipment(_ id: String?, _ s: Strings) -> String {
+        guard let id, ["amphi_tank", "anti_skid"].contains(id) else { return s("equipment.none") }
+        return s("equipment.\(id)")
     }
 
     /// Results-table categories (GAME_RULES §13): ×1 Normal A/B | C/D,
     /// ×2 Rapid A/B | C/D, ×3 Explosion | Fire, ×4 AP A/B | C/D.
-    static func rewardCategory(_ category: Int) -> String {
-        switch category {
-        case 0: "普通Ⅰ"
-        case 1: "普通Ⅱ"
-        case 2: "快弹Ⅰ"
-        case 3: "快弹Ⅱ"
-        case 4: "爆破"
-        case 5: "燃烧"
-        case 6: "穿甲Ⅰ"
-        case 7: "穿甲Ⅱ"
-        default: "类别\(category)"
-        }
+    static func rewardCategory(_ category: Int, _ s: Strings) -> String {
+        (0...7).contains(category) ? s("reward.category.\(category)") : s("reward.category.other", category)
     }
+
+    /// The stage content's name keys, by the name part of the stage id
+    /// (`<theme>_<NN>_<name>`); the same keys the stage JSON declares as
+    /// `displayNameKey`.
+    private static let stageNameKeys: [String: String] = [
+        "first_defense": "stage.vs01.name", "hidden_in_grass": "stage.vs02.name", "desert_stairs": "stage.vs03.name",
+        "amphibious_crossing": "stage.s04.name", "slick_lane": "stage.s05.name", "white_bulwark": "stage.s06.name",
+        "supply_run": "stage.s07.name", "fine_steel_gates": "stage.s08.name", "firebreaks": "stage.s09.name",
+        "double_tempo": "stage.s10.name", "siege_rotation": "stage.s11.name", "all_arms": "stage.s12.name",
+    ]
 
     /// Intro card title/subtitle from the stage content id
     /// (`<theme>_<number>_<name>`), e.g. "STAGE 01" / "首战防御".
-    static func stageCard(_ stageID: String?) -> (title: String, subtitle: String) {
+    static func stageCard(_ stageID: String?, _ s: Strings) -> (title: String, subtitle: String) {
         guard let stageID else { return ("STAGE", "") }
         // The id is <theme>_<NN>_<name>, and the theme is not always one
         // word: `iron_citadel_08_fine_steel_gates` broke a parser that read
@@ -716,107 +712,64 @@ enum HUDLabels {
         let parts = stageID.split(separator: "_")
         let numberIndex = parts.firstIndex { Int($0) != nil }
         let number = numberIndex.map { Int(parts[$0])! }
-        let title = number.map { String(format: "STAGE %02d", $0) } ?? "STAGE"
+        let title = number.map { s("stage.title", $0) } ?? "STAGE"
         let name = numberIndex.map { parts[(parts.index(after: $0))...].joined(separator: "_") } ?? ""
-        let subtitle: String = switch name {
-        case "first_defense": "首战防御"
-        case "hidden_in_grass": "隐于草丛"
-        case "desert_stairs": "沙漠阶梯"
-        // Stages 4-12 (GAME_RULES §14.1): each name is the line its map
-        // teaches, so the select screen reads as a syllabus.
-        case "amphibious_crossing": "水路侧袭"
-        case "slick_lane": "长冰滑道"
-        case "white_bulwark": "白墙壁垒"
-        case "supply_run": "补给争夺"
-        case "fine_steel_gates": "精钢关隘"
-        case "firebreaks": "火线隔断"
-        case "double_tempo": "双速交锋"
-        case "siege_rotation": "围城轮转"
-        case "all_arms": "全军集结"
-        default: name.replacingOccurrences(of: "_", with: " ").capitalized
-        }
+        let subtitle = stageNameKeys[name].map { s($0) } ?? name.replacingOccurrences(of: "_", with: " ").capitalized
         return (title, subtitle)
     }
 
     /// Outcome text: truthful per loss reason (R15-05) — the base fell, the
     /// player ran out of lives, or an unnamed failure.
-    static func outcomeTitle(won: Bool, lossReason: String?) -> String {
-        guard !won else { return "任务完成" }
+    static func outcomeTitle(won: Bool, lossReason: String?, _ s: Strings) -> String {
+        guard !won else { return s("outcome.won") }
         return switch lossReason {
-        case "base_destroyed": "基地失守"
-        case "player_eliminated": "全军覆没"
-        default: "任务失败"
+        case "base_destroyed": s("outcome.base_destroyed")
+        case "player_eliminated": s("outcome.player_eliminated")
+        default: s("outcome.failed")
         }
     }
 
     /// Enemy family names for the training panel.
-    static func enemyFamily(_ family: String) -> String {
-        family == "normal" ? "普通" : weapon(family)
-    }
+    static func enemyFamily(_ family: String, _ s: Strings) -> String { weapon(family, s) }
 
     /// Training roster label: family, tier and resistance, e.g. "普通A 1".
-    static func rosterEntry(_ entry: TrainingArenaFixture.RosterEntry) -> String {
-        let family: String = switch entry.family {
-        case "normal": "普通"
-        default: weapon(entry.family)
-        }
-        return "\(family)\(entry.tier) \(entry.resistance)"
+    static func rosterEntry(_ entry: TrainingArenaFixture.RosterEntry, _ s: Strings) -> String {
+        "\(weapon(entry.family, s))\(entry.tier) \(entry.resistance)"
     }
 
-    /// Pickup names for the training panel (§12.2 Chinese UI).
-    static func pickup(_ id: String) -> String {
+    /// Pickup names for the training panel; the score pickups are their
+    /// numbers in every language.
+    static func pickup(_ id: String, _ s: Strings) -> String {
         switch id {
-        case "speed_up": "加速"
-        case "armor_up": "护甲"
-        case "power_up": "火力"
-        case "level_up": "升级"
-        case "max_speed_power": "满速火"
-        case "max_armor_ammo": "满甲弹"
-        case "ammo_crate": "弹药箱"
-        case "rapid_weapon": "快弹枪"
-        case "fire_weapon": "火焰枪"
-        case "ap_weapon": "穿甲枪"
-        case "explosion_weapon": "爆破枪"
-        case "amphi_tank": "两栖"
-        case "anti_skid": "防滑"
-        case "invincibility": "无敌"
-        case "base_shield": "基地盾"
-        case "freeze_enemy": "冻结"
-        case "bomb": "炸弹"
-        case "extra_life": "1UP"
         case "score_200": "+200"
         case "score_500": "+500"
         case "score_1000": "+1000"
         case "score_2000": "+2000"
+        case "speed_up", "armor_up", "power_up", "level_up", "max_speed_power", "max_armor_ammo", "ammo_crate",
+             "rapid_weapon", "fire_weapon", "ap_weapon", "explosion_weapon", "amphi_tank", "anti_skid",
+             "invincibility", "base_shield", "freeze_enemy", "bomb", "extra_life": s("pickup.\(id)")
         default: id
         }
     }
 
     /// One line under the stamped outcome title: why the stage ended.
-    static func outcomeSubtitle(won: Bool, lossReason: String?) -> String {
-        guard !won else { return "敌军全部歼灭" }
+    static func outcomeSubtitle(won: Bool, lossReason: String?, _ s: Strings) -> String {
+        guard !won else { return s("outcome.detail.won") }
         return switch lossReason {
-        case "base_destroyed": "基地被摧毁"
-        case "player_eliminated": "所有坦克损失"
+        case "base_destroyed": s("outcome.detail.base_destroyed")
+        case "player_eliminated": s("outcome.detail.player_eliminated")
         default: ""
         }
     }
 
     /// Results-panel row label for an enemy archetype id.
-    static func archetype(_ id: String) -> String {
+    static func archetype(_ id: String, _ s: Strings) -> String {
         let family = id.split(separator: "_").first.map(String.init) ?? id
-        let base: String = switch family {
-        case "light": "轻型"
-        case "fast": "快速"
-        case "power": "火力"
-        case "armor", "heavy": "重装"
-        case "rapid": "速射"
-        case "ap": "穿甲"
-        case "explosion": "爆破"
-        case "fire": "喷火"
-        default: family
+        switch family {
+        case "light", "fast", "power", "rapid", "ap", "explosion", "fire": return s("enemy.family.\(family)")
+        case "armor", "heavy": return s("enemy.family.armor")
+        default: return s("enemy.family.other", family)
         }
-        return base + "坦克"
     }
 }
 
@@ -827,6 +780,8 @@ public struct MovementLabView: View {
     @State private var controller: MovementLabController
     @State private var scene: MovementLabScene?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.strings) private var strings
+    @Environment(SettingsStore.self) private var settings
     /// Leave the game screen (pause overlay "返回标题", results "返回标题").
     private let onExit: (() -> Void)?
 
@@ -881,7 +836,8 @@ public struct MovementLabView: View {
                 // the simulation does not step there either (ADR-0011).
                 if !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase), !paused {
                     TouchControlsView(controller: controller, art: scene?.loadedArt,
-                                      specialWeaponID: controller.hud.weaponID)
+                                      specialWeaponID: controller.hud.weaponID,
+                                      mirrored: settings.mirrorControls)
                         .ignoresSafeArea()
                 }
                 #endif
@@ -919,6 +875,7 @@ public struct MovementLabView: View {
             scene?.isPaused = phase != .active || controller.isPaused // parks SKActions
         }
         .onReceive(hudTimer) { _ in hudTick &+= 1 }
+        .onChange(of: settings.hapticsEnabled, initial: true) { _, on in controller.haptics.isEnabled = on }
     }
 
     /// Mirrors `controller.isPaused` into view state (SwiftUI does not
@@ -958,20 +915,20 @@ public struct MovementLabView: View {
         ZStack {
             Color.black.opacity(0.7).ignoresSafeArea()
             VStack(spacing: 16) {
-                Text("暂停")
+                Text(strings("pause.title"))
                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.yellow)
-                PlateButton(title: "继续", icon: "play.fill", role: .primary, size: .large) {
+                PlateButton(title: strings("pause.resume"), icon: "play.fill", role: .primary, size: .large) {
                     controller.resume(); paused = false
                 }
                 HStack(spacing: 12) {
                     if controller.stagePhase != nil {
-                        PlateButton(title: "重新开始本关", icon: "arrow.counterclockwise") {
+                        PlateButton(title: strings("pause.restart"), icon: "arrow.counterclockwise") {
                             controller.restart(); controller.resume(); paused = false
                         }
                     }
                     if let onExit {
-                        PlateButton(title: "返回标题", icon: "xmark") { controller.abandon(); onExit() }
+                        PlateButton(title: strings("pause.exit"), icon: "xmark") { controller.abandon(); onExit() }
                     }
                 }
             }
@@ -987,11 +944,11 @@ public struct MovementLabView: View {
     /// two compact rows so nothing is clipped on the 390-point floor.
     @ViewBuilder private var stageHUD: some View {
         if controller.stagePhase != nil, !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase) {
-            StageHUDBar(hud: controller.hud)
+            StageHUDBar(hud: controller.hud, scale: settings.largeHUD ? 1.3 : 1)
             .id(hudTick)
             .font(.system(size: 12, weight: .bold, design: .monospaced))
             .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.55)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(settings.highContrastHUD ? 0.92 : 0.55)))
             // The full-screen arena (ADR-0022) leaves the HUD nowhere off the
             // playfield, and it sits on the top edge — which §9 makes the
             // spawn lane, so an arriving enemy is exactly under it. §15.1
@@ -1008,8 +965,9 @@ public struct MovementLabView: View {
             // spends real time thinned out, and it still has to be readable
             // at a glance while it is. Enough to see a tank through, enough
             // to read the armour and the ammo.
-            .opacity(hudObstructed ? 0.4 : 1)
-            .animation(.easeInOut(duration: 0.18), value: hudObstructed)
+            // High contrast: an opaque pill that never thins out.
+            .opacity(hudObstructed && !settings.highContrastHUD ? 0.4 : 1)
+            .animation(settings.reduceMotion ? nil : .easeInOut(duration: 0.18), value: hudObstructed)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, 4)
         }
@@ -1047,7 +1005,7 @@ public struct MovementLabView: View {
             outcomeFlash = controller.flow.outcome == .won ? 0.55 : 0.7
             withAnimation(.easeOut(duration: 0.45)) { outcomeFlash = 0 }
             if controller.flow.outcome != .won {
-                withAnimation(.easeOut(duration: 0.5)) { outcomeShake += 1 }
+                if !settings.reduceMotion { withAnimation(.easeOut(duration: 0.5)) { outcomeShake += 1 } }
             }
         }
         if Self.isDimmed(phase), tankIcons.isEmpty, let art = scene?.loadedArt {
@@ -1061,7 +1019,7 @@ public struct MovementLabView: View {
 
     /// Intro card, playfield reveal title, outcome text, fade, results.
     @ViewBuilder private func stageFlowOverlay(size: CGSize) -> some View {
-        let card = HUDLabels.stageCard(controller.stageID)
+        let card = HUDLabels.stageCard(controller.stageID, strings)
         ZStack {
             if flowPhase == .card {
                 Color.black.ignoresSafeArea()
@@ -1096,13 +1054,13 @@ public struct MovementLabView: View {
                 let won = controller.flow.outcome == .won
                 let centred = flowPhase == .outroText || flowPhase == .outroHold
                 VStack(spacing: 6) {
-                    Text(HUDLabels.outcomeTitle(won: won, lossReason: controller.flow.lossReason))
+                    Text(HUDLabels.outcomeTitle(won: won, lossReason: controller.flow.lossReason, strings))
                         .font(.system(size: 52, weight: .black))
                         .foregroundStyle(won ? Color.yellow : Color.red)
                         .shadow(color: .black, radius: 0, x: 3, y: 3)
                         .shadow(color: (won ? Color.yellow : Color.red).opacity(centred ? 0.6 : 0), radius: 18)
                     if centred {
-                        Text(HUDLabels.outcomeSubtitle(won: won, lossReason: controller.flow.lossReason))
+                        Text(HUDLabels.outcomeSubtitle(won: won, lossReason: controller.flow.lossReason, strings))
                             .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(.white)
                             .shadow(color: .black, radius: 0, x: 2, y: 2)
@@ -1145,7 +1103,7 @@ public struct MovementLabView: View {
             // table does not shift when it lands. It used to sit in a ZStack
             // over the title and printed across it (owner 2026-10-08).
             VStack(spacing: 0) {
-                Text("战斗成绩")
+                Text(strings("results.title"))
                     .font(.system(size: compact ? 22 : 26, weight: .heavy))
                     .foregroundStyle(Color(red: 0.86, green: 0.42, blue: 0.96))
                     .shadow(color: .black, radius: 0, x: 1, y: 1)
@@ -1153,7 +1111,7 @@ public struct MovementLabView: View {
                     .padding(.top, compact ? 6 : 9)
                     .padding(.bottom, controller.flow.hasRewardLine ? 2 : (compact ? 6 : 9))
                 if controller.flow.hasRewardLine {
-                    Text(verbatim: "Reward +\(String(controller.clearBonus.reward))")
+                    Text(verbatim: strings("results.reward", String(controller.clearBonus.reward)))
                         .font(.system(size: compact ? 16 : 18, weight: .heavy, design: .monospaced))
                         .foregroundStyle(Color.yellow)
                         .shadow(color: .black, radius: 0, x: 1, y: 1)
@@ -1188,7 +1146,7 @@ public struct MovementLabView: View {
             Rectangle().fill(Color(red: 0.95, green: 0.5, blue: 0.1)).frame(height: 3)
                 .padding(.horizontal, 10)
             HStack(alignment: .firstTextBaseline) {
-                Text("总计")
+                Text(strings("results.total"))
                     .font(.system(size: compact ? 18 : 21, weight: .heavy))
                     .foregroundStyle(Color(red: 0.93, green: 0.72, blue: 0.2))
                 Spacer()
@@ -1203,18 +1161,18 @@ public struct MovementLabView: View {
             // them: sharing a row squeezed the plates into two-line labels
             // and wrapped the statistics (owner 2026-10-08: 按钮排版有问题).
             HStack(spacing: 14) {
-                Text(verbatim: "得分 \(String(controller.hud.score))")
+                Text(verbatim: strings("results.score", String(controller.hud.score)))
                     .font(.system(size: compact ? 14 : 16, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                 // GAME_RULES §13 statistics.
-                Text(verbatim: "MaxHits \(String(controller.stats.maxHits))  MaxCombos \(String(controller.stats.maxCombos))")
+                Text(verbatim: strings("results.stats", String(controller.stats.maxHits), String(controller.stats.maxCombos)))
                     .font(.system(size: compact ? 12 : 14, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
                     .lineLimit(1)
                     .fixedSize()
                 Spacer()
                 if controller.campaignComplete {
-                    Text("战役完成")
+                    Text(strings("results.campaignComplete"))
                         .font(.system(size: compact ? 15 : 17, weight: .heavy))
                         .foregroundStyle(Color.yellow)
                 }
@@ -1223,23 +1181,23 @@ public struct MovementLabView: View {
             .padding(.top, compact ? 6 : 10)
             HStack(spacing: 12) {
                 if controller.campaignComplete {
-                    PlateButton(title: "再来一局", icon: "arrow.counterclockwise", role: .primary,
+                    PlateButton(title: strings("results.playAgain"), icon: "arrow.counterclockwise", role: .primary,
                                 size: compact ? .small : .regular) { controller.restartCampaign() }
                     if let onExit {
-                        PlateButton(title: "返回标题", icon: "xmark", size: compact ? .small : .regular) {
+                        PlateButton(title: strings("results.exit"), icon: "xmark", size: compact ? .small : .regular) {
                             controller.abandon(); onExit()
                         }
                     }
                 }
                 if controller.nextStageAvailable {
-                    PlateButton(title: "下一关", icon: "chevron.right", role: .primary,
+                    PlateButton(title: strings("results.next"), icon: "chevron.right", role: .primary,
                                 size: compact ? .small : .regular) { controller.continueToNextStage() }
                 }
                 if StageFlowPresentationPolicy.restartAvailable(phase: flowPhase, outcome: controller.flow.outcome) {
-                    PlateButton(title: "重新开始", icon: "arrow.counterclockwise", role: .primary,
+                    PlateButton(title: strings("results.restart"), icon: "arrow.counterclockwise", role: .primary,
                                 size: compact ? .small : .regular) { controller.restart() }
                     if let onExit {
-                        PlateButton(title: "返回标题", icon: "xmark", size: compact ? .small : .regular) {
+                        PlateButton(title: strings("results.exit"), icon: "xmark", size: compact ? .small : .regular) {
                             controller.abandon(); onExit()
                         }
                     }
@@ -1264,7 +1222,7 @@ public struct MovementLabView: View {
                     .interpolation(.none)
                     .frame(width: CGFloat(icon.width) * scale, height: CGFloat(icon.height) * scale)
             } else {
-                Text(HUDLabels.rewardCategory(category)).foregroundStyle(.white)
+                Text(HUDLabels.rewardCategory(category, strings)).foregroundStyle(.white)
             }
             Text(verbatim: visible ? String(count) : "")
                 .foregroundStyle(Color(red: 0.3, green: 0.85, blue: 1.0))
@@ -1280,22 +1238,22 @@ public struct MovementLabView: View {
     /// and a reset. Collapsible; the list scrolls inside half the surface.
     private var weaponDebugPanel: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            PlateButton(title: "训练面板", icon: showWeaponPanel ? "chevron.up" : "chevron.down", size: .small) {
+            PlateButton(title: strings("lab.panel"), icon: showWeaponPanel ? "chevron.up" : "chevron.down", size: .small) {
                 showWeaponPanel.toggle()
             }
             if showWeaponPanel {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text("武器").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        Text(strings("lab.weapon")).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
                         HStack(spacing: 4) {
                             ForEach(controller.specialWeaponIDs, id: \.self) { id in
-                                panelButton(HUDLabels.weapon(id), selected: selectedWeapon == id) {
+                                panelButton(HUDLabels.weapon(id, strings), selected: selectedWeapon == id) {
                                     selectedWeapon = id
                                     controller.selectWeapon(id)
                                 }
                             }
                         }
-                        Text("火力").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        Text(strings("lab.power")).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
                         HStack(spacing: 4) {
                             ForEach(0..<4, id: \.self) { level in
                                 panelButton("P\(level)", selected: powerLevel == level) {
@@ -1304,43 +1262,43 @@ public struct MovementLabView: View {
                                 }
                             }
                         }
-                        Text("敌人（选类型，再选火力和装备）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        Text(strings("lab.enemies")).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
                         HStack(spacing: 4) {
                             ForEach(controller.enemyFamilies, id: \.self) { family in
-                                panelButton(HUDLabels.enemyFamily(family), selected: enemyFamily == family) { enemyFamily = family }
+                                panelButton(HUDLabels.enemyFamily(family, strings), selected: enemyFamily == family) { enemyFamily = family }
                             }
                         }
                         if let family = enemyFamily {
                             HStack(spacing: 4) {
-                                Text("火力").font(.system(size: 11)).foregroundStyle(.white)
+                                Text(strings("lab.power")).font(.system(size: 11)).foregroundStyle(.white)
                                 ForEach(0..<4, id: \.self) { level in
                                     panelButton("P\(level)", selected: enemyPower == level) { enemyPower = level }
                                 }
                             }
                             HStack(spacing: 4) {
-                                Text("装备").font(.system(size: 11)).foregroundStyle(.white)
-                                panelButton("无", selected: enemyEquipment == nil) { enemyEquipment = nil }
+                                Text(strings("lab.equipment")).font(.system(size: 11)).foregroundStyle(.white)
+                                panelButton(strings("lab.none"), selected: enemyEquipment == nil) { enemyEquipment = nil }
                                 ForEach(controller.enemyEquipmentIDs, id: \.self) { id in
-                                    panelButton(HUDLabels.equipment(id), selected: enemyEquipment == id) { enemyEquipment = id }
+                                    panelButton(HUDLabels.equipment(id, strings), selected: enemyEquipment == id) { enemyEquipment = id }
                                 }
                             }
                             HStack(spacing: 4) {
-                                panelButton("添加 \(HUDLabels.enemyFamily(family)) P\(enemyPower) \(HUDLabels.equipment(enemyEquipment))", selected: true) {
+                                panelButton(strings("lab.add", HUDLabels.enemyFamily(family, strings), enemyPower, HUDLabels.equipment(enemyEquipment, strings)), selected: true) {
                                     controller.spawnEnemy(family: family, powerLevel: enemyPower, equipmentID: enemyEquipment)
                                 }
                             }
                         }
-                        panelButton("清空敌人", selected: false) { controller.clearEnemies() }
-                        Text("掉落（出现在车前）").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
+                        panelButton(strings("lab.clearEnemies"), selected: false) { controller.clearEnemies() }
+                        Text(strings("lab.drops")).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.yellow)
                         let ids = controller.pickupIDs
                         ForEach(Array(stride(from: 0, to: ids.count, by: 3)), id: \.self) { start in
                             HStack(spacing: 4) {
                                 ForEach(ids[start..<min(start + 3, ids.count)], id: \.self) { id in
-                                    panelButton(HUDLabels.pickup(id), selected: false) { controller.spawnPickup(id) }
+                                    panelButton(HUDLabels.pickup(id, strings), selected: false) { controller.spawnPickup(id) }
                                 }
                             }
                         }
-                        panelButton("重置训练场", selected: false) { controller.restart() }
+                        panelButton(strings("lab.reset"), selected: false) { controller.restart() }
                     }
                 }
                 .frame(maxWidth: 340, maxHeight: 260)

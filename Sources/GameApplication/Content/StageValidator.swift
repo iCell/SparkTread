@@ -215,6 +215,19 @@ public enum StageValidator {
         for cell in def.fortTemplate ?? [] where !inBounds(cell) {
             issues.append("fort template cell \(cell) malformed or out of bounds")
         }
+        // A base shield hardens the template (§11.2): a stage without one
+        // has a shield pickup that does nothing — the Training Arena shipped
+        // that way until 2026-10-08 — and a template cell that is not brick
+        // in the authored map hardens air.
+        if (def.fortTemplate ?? []).isEmpty {
+            issues.append("fortTemplate is empty: the base shield would harden nothing")
+        }
+        for cell in def.fortTemplate ?? [] where inBounds(cell) {
+            let kind = authoredCell(def, at: cell).kind
+            if !kind.isBrickFamily {
+                issues.append("fort template cell \(cell) is \(kind), not brick")
+            }
+        }
         for fire in def.environmentFires ?? [] {
             if !inBounds(fire.cell) { issues.append("environment fire \(fire.cell) malformed or out of bounds") }
             if fire.lifetimeTicks < 1 || fire.lifetimeTicks > WorldInvariants.maxTicks {

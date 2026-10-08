@@ -1931,6 +1931,59 @@ inward under the thumb, the special up and out — centres 98 pt across and
 58 pt up, 114 pt apart, so the 90 pt hit circles still never overlap
 (§15.2's ≥ 96). Verified on the simulator.
 
+*Settings, accessibility, six languages (2026-10-08, owner).* Owner:
+settings and accessibility next, with localization — English, Simplified
+and Traditional Chinese, Japanese, Korean, Spanish — the phone's language
+by default but changeable; controller support deferred; the loose ends
+with it.
+
+Localization: every user-facing string became a key in
+`Resources/Localizable.xcstrings` (124 keys; `defaultLocalization: en`,
+processed by SwiftPM into `.lproj` tables in the module bundle). Views
+read `@Environment(\.strings)`, a `Strings` built for the language in
+force and re-built when the player changes it, so the choice applies at
+once without a relaunch — which is why views do not use `Text("key")`'s
+own lookup, which follows the process locale. One platform fact learned
+the hard way: `Bundle.url(forResource: "ja", withExtension: "lproj")`
+returns nil on iOS — CFBundle does not hand out localization folders as
+resources — so the first `Strings` passed under `swift test` on macOS and
+failed every key under the Xcode simulator run; it now asks for the
+compiled `Localizable.strings` with its `localization` and reads the
+table as a plist, which both platforms honour. `AppLanguage.matching`
+resolves the phone's preferred languages by script for Chinese (Hant /
+TW / HK / MO → Traditional) and by language otherwise, English when
+nothing matches. The label tables in `HUDLabels` now hold keys and take
+the `Strings`; the stage names use the keys the stage JSON already
+declared as `displayNameKey`. Simplified Chinese and English were written
+here; Traditional Chinese, Japanese, Korean and Spanish were produced by
+an Opus subagent from the finished key table and reviewed line by line
+(Taiwanese wording — 設定, 戰車, 輔助使用; ステージ / 스테이지 / NIVEL for the
+stage title; AP as 徹甲 / 철갑 / Perforante; MaxHits / MaxCombos kept
+Latin everywhere). `LocalizationTests` fails when any language lacks any
+key, pins the language resolution, the formatted strings and the
+settings round trip. Verified in the app: the title in Japanese, a stage
+card in Korean on the simulator.
+
+Settings: `SettingsStore` (@Observable, `UserDefaults`-backed, one per
+app at the root, handed down the environment) — language (nil = phone),
+sound on/off and a quarter-step volume (`GameAudio.masterVolume` over
+every cue's own level), haptics, mirrored controls (stick on the right,
+buttons on the left; the stick region flips with it), and three
+accessibility options: reduce motion (no launch drive, no loss shake, no
+HUD fades), high-contrast HUD (an opaque pill that never thins out),
+large HUD (1.3×). `SettingsScreen` in the plate language: labelled rows
+of small plates, the chosen one in fire; the language row shows each
+language's own name, never translated, so the wrong language can be
+undone. Reached from a new 设置 plate on the title's secondary row.
+Nothing here reaches the simulation or a recording.
+
+Loose ends: the validator now rejects a stage whose `fortTemplate` is
+empty or not brick in the authored map; the smoke script requires two
+consecutive playfield readings; the HUD's ammo count wears the weapon's
+`WeaponPalette` colour; the arena's debug line moved to the bottom edge,
+off the pause plate. Controller support stays deferred by the owner's
+word.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

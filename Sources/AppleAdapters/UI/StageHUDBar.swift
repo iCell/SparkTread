@@ -11,6 +11,9 @@ import SwiftUI
 /// label. Numbers stay native monospaced text.
 struct StageHUDBar: View {
     let hud: MovementLabController.HUDSnapshot
+    /// Accessibility: 1.3 for the large HUD.
+    var scale: CGFloat = 1
+    @Environment(\.strings) private var strings
 
     private static let fire = Color(red: 1.0, green: 0.80, blue: 0.25)
     private static let empty = Color.white.opacity(0.22)
@@ -45,16 +48,19 @@ struct StageHUDBar: View {
             }
             HStack(spacing: 16) {
                 if hud.lifeState == .eliminated {
-                    Text("已阵亡").foregroundStyle(.red)
+                    Text(strings("hud.eliminated")).foregroundStyle(.red)
                 } else if hud.lifeState == .awaitingRespawn {
-                    Text("重生中…").foregroundStyle(.cyan)
+                    Text(strings("hud.respawning")).foregroundStyle(.cyan)
                 } else {
                     chip(MenuArt.glyph("px_pickup_armor_up"), height: 14) {
                         pips(hud.armor, of: hud.maxArmor, colour: hud.armor > 1 ? Color(red: 0.35, green: 0.85, blue: 1.0) : .red)
                     }
                     // The special channel: its pickup icon and the rounds left.
+                    // The rounds left, in the weapon's own colour (WeaponPalette).
                     chip(MenuArt.glyph("px_pickup_\(hud.weaponID)_weapon"), height: 14) {
-                        Text(verbatim: "\(hud.ammo)/\(hud.maxAmmo)").foregroundStyle(.orange)
+                        let tint = WeaponPalette.tint(for: hud.weaponID).base
+                        Text(verbatim: "\(hud.ammo)/\(hud.maxAmmo)")
+                            .foregroundStyle(Color(red: tint.r, green: tint.g, blue: tint.b))
                     }
                     chip(MenuArt.glyph("px_pickup_power_up"), height: 14) {
                         pips(hud.powerLevel, of: 3, colour: .orange)
@@ -75,8 +81,9 @@ struct StageHUDBar: View {
                 }
             }
         }
-        .font(.system(size: 12, weight: .bold, design: .monospaced))
+        .font(.system(size: 12 * scale, weight: .bold, design: .monospaced))
         .foregroundStyle(.white)
+        .scaleEffect(scale, anchor: .top)   // icons and pips grow with the text
     }
 
     private var baseSprite: String {
