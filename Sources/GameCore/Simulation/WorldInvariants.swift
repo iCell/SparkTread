@@ -254,6 +254,10 @@ public enum WorldInvariants {
             }
             if stage.spawnQueue.count > maxCount { issues.append("spawn queue out of domain") }
             if stage.dropChancePercent < 0 || stage.dropChancePercent > 100 { issues.append("drop chance out of domain") }
+            if stage.brickDropChancePermille < 0 || stage.brickDropChancePermille > 1000 { issues.append("brick drop chance out of domain") }
+            if stage.brickDropCap < 0 || stage.brickDropsGranted < 0 || stage.brickDropsGranted > stage.brickDropCap {
+                issues.append("brick drop cap/count out of domain")
+            }
             ticks(stage.spawnCooldownTicks, "spawn cooldown")
             if stage.pendingPickups.count > maxCount || stage.nextPickupRequestID < 1 || stage.nextPickupRequestID > maxCounter {
                 issues.append("pending pickups out of domain")

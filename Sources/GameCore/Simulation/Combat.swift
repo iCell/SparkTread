@@ -425,7 +425,8 @@ enum Combat {
             let kind = world.terrain[qx / 2, qy / 2].kind
             if weapon.level(weapon.stripDepthQuadrants, projectile.powerLevel) > 0 {
                 applyStrip(&world, contact: (qx, qy), direction: direction, center: candidate.position,
-                           power: projectile.powerLevel, weapon: weapon, events: &events)
+                           power: projectile.powerLevel, weapon: weapon, owner: projectile.ownerPlayerID,
+                           events: &events)
             }
             let rect = Rect(minX: qx * quadrant, minY: qy * quadrant, maxX: (qx + 1) * quadrant, maxY: (qy + 1) * quadrant)
             terminate(&world, projectileID: projectileID, weapon: weapon, impact: kind.isSteelFamily ? .steel : .brick,
@@ -673,7 +674,7 @@ enum Combat {
     /// stops the column. Empty quadrants spend depth.
     private static func applyStrip(
         _ world: inout WorldState, contact: (qx: Int, qy: Int), direction: Direction, center: Vec2i,
-        power: Int, weapon: WeaponDefinition, events: inout [DomainEvent]
+        power: Int, weapon: WeaponDefinition, owner: PlayerID?, events: inout [DomainEvent]
     ) {
         let depth = max(weapon.stripDepth(for: .brick, power: power), weapon.level(weapon.stripDepthQuadrants, power))
         let quadrant = SpatialUnits.subunitsPerQuadrant
@@ -697,12 +698,29 @@ enum Combat {
                 if step >= weapon.stripDepth(for: kind, power: power) { break }
                 material = kind
                 guard weapon.damages(kind) else { break }
-                if damageQuadrant(&world, cellX: qx / 2, cellY: qy / 2, bit: (qy % 2) * 2 + (qx % 2)) != .none {
-                    changed.insert((qy / 2) * world.arena.cellsWide + qx / 2)
+                let cellX = qx / 2, cellY = qy / 2
+                if damageQuadrant(&world, cellX: cellX, cellY: cellY, bit: (qy % 2) * 2 + (qx % 2)) != .none {
+                    changed.insert(cellY * world.arena.cellsWide + cellX)
+                    // §10.5: a brick cell the PLAYER's round has just emptied
+                    // is a drop candidate for step 7 — unless it belongs to the
+                    // fort (nobody is paid for shooting their own walls) or
+                    // covers a hidden pickup (which reveals on its own).
+                    if kind.isBrickFamily, owner != nil, !world.terrain[cellX, cellY].kind.isWall {
+                        noteClearedBrick(&world, Vec2i(x: cellX, y: cellY))
+                    }
                 }
             }
         }
         emitTerrainChanges(&world, changed, events: &events)
+    }
+
+    private static func noteClearedBrick(_ world: inout WorldState, _ cell: Vec2i) {
+        guard var stage = world.stage else { return }
+        if stage.fortTemplate.contains(cell) { return }
+        if stage.hiddenPickups.contains(where: { cell.x >= $0.cell.x && cell.x <= $0.cell.x + 1
+                                                && cell.y >= $0.cell.y && cell.y <= $0.cell.y + 1 }) { return }
+        stage.clearedBrickCells.append(cell)
+        world.stage = stage
     }
 
     static func emitTerrainChanges(_ world: inout WorldState, _ changed: Set<Int>, events: inout [DomainEvent]) {

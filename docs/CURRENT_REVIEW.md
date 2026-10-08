@@ -1845,6 +1845,33 @@ test pins the template to those eight brick cells around the base at
 must be non-empty and brick — worth one if a thirteenth stage is ever
 authored without it.
 
+*Brick drops — GAME_RULES R5.10, ADR-0023 (2026-10-08, owner).* The owner
+asked that breaking brick can randomly drop equipment, chose 3 % per cell
+and no difficulty tiers, and left the rest to the proposal: a drop rolls
+only when a brick cell's four quadrants are emptied by the PLAYER's round
+(quadrant hits, cracks and enemy rounds roll nothing); fort-template
+cells and cells over a hidden pickup never roll; a stage cap of 2 after
+which nothing rolls; the stage's own drop table minus `extra_life`; and
+placement at the legal 2×2 area nearest the cleared cell, spending no
+draw. §10.5 is the rule, §12 step 7 names the moment (after the deaths'
+drops, cleared cells in (y, x) order, one `drop` draw per cell and a
+second only on a hit), §17 item 5 watches for wall farming. Code:
+`Combat.applyStrip` notes the cleared cell with the shooter known,
+`Stage.rollBrickDrops` rolls, `placePendingPickups` honours
+`PendingPickup.preferredCell`; `StageState` carries the chance, cap,
+granted count and the tick's cleared cells, all in the checksum and the
+invariants; stage JSON takes optional `brickDropChancePermille` /
+`brickDropCap` (defaults 30 / 2, so the twelve stages are unchanged),
+validated. `ReplayRecording.currentFormatVersion` 12 → 13. The M1
+movement golden's checksums did NOT move — the lab fixture has no stage,
+and every new checksum field sits under the stage branch — so no golden
+was regenerated; the version pin in `ReplayRecordingTests` moved to 13.
+`BrickDropTests` (7): full chance drops near the cell, the cap stops
+drops and rolls, zero chance still rolls once per cell, an enemy round
+drops nothing, fort and hidden cells never roll, an extra life is never a
+brick drop, and two seeds agree. Owner-facing: the expected yield per
+stage (2–4 hits of which at most 2 land) is in §17 for the playtest.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

@@ -78,7 +78,7 @@ private let vs01URL = repoRoot
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(5)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        for old in [6, 7, 8, 9, 10, 11] { // 7 precedes GAME_RULES R5 (ADR-0018); 8 the brick strip field (ADR-0020); 9 the shell strength rule (ADR-0021); 10 the AP C speed (R5.8); 11 the AI stall fix (2026-09-16)
+        for old in [6, 7, 8, 9, 10, 11, 12] { // 7 precedes GAME_RULES R5 (ADR-0018); 8 the brick strip field (ADR-0020); 9 the shell strength rule (ADR-0021); 10 the AP C speed (R5.8); 11 the AI stall fix (2026-09-16); 12 precedes brick drops (R5.10, ADR-0023)
             json["formatVersion"] = old
             #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(old)) {
                 try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
@@ -86,11 +86,11 @@ private let vs01URL = repoRoot
         }
         // The same old shape with a current version number is a plain
         // schema error — the format number is the boundary, not the shape.
-        json["formatVersion"] = 12
+        json["formatVersion"] = 13
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        #expect(ReplayRecording.currentFormatVersion == 12)
+        #expect(ReplayRecording.currentFormatVersion == 13)
     }
 
     @Test func debugMutationsRebaseTheRecording() {

@@ -138,10 +138,15 @@ extension WorldState {
             c.mix(stage.hiddenPickups.count)
             for h in stage.hiddenPickups { c.mix(h.cell.x); c.mix(h.cell.y); c.mix(h.pickupID); c.mix(h.critical) }
             c.mix(stage.pendingPickups.count)
-            for p in stage.pendingPickups { c.mix(p.requestID); c.mix(p.requestTick); c.mix(p.pickupID); c.mix(p.critical) }
+            for p in stage.pendingPickups {
+                c.mix(p.requestID); c.mix(p.requestTick); c.mix(p.pickupID); c.mix(p.critical)
+                c.mix(p.preferredCell?.x ?? -1); c.mix(p.preferredCell?.y ?? -1)
+            }
             c.mix(stage.nextPickupRequestID)
             c.mix(stage.fortTemplate.count)
             for f in stage.fortTemplate { c.mix(f.x); c.mix(f.y) }
+            c.mix(stage.brickDropChancePermille); c.mix(stage.brickDropCap); c.mix(stage.brickDropsGranted)
+            c.mix(stage.clearedBrickCells.count)
         } else {
             c.mix(-1)
         }

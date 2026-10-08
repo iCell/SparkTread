@@ -81,10 +81,14 @@ public struct PendingPickup: Codable, Equatable, Sendable {
     public let requestTick: Int
     public let pickupID: String
     public let critical: Bool
-    public init(requestID: Int, requestTick: Int, pickupID: String, critical: Bool) {
+    /// §10.5: a brick drop wants the legal area nearest the cell that was
+    /// cleared; nil places at random like every other drop.
+    public var preferredCell: Vec2i?
+    public init(requestID: Int, requestTick: Int, pickupID: String, critical: Bool, preferredCell: Vec2i? = nil) {
         self.requestID = requestID
         self.requestTick = requestTick
         self.pickupID = pickupID
+        self.preferredCell = preferredCell
         self.critical = critical
     }
 }
@@ -116,6 +120,14 @@ public struct StageState: Codable, Equatable, Sendable {
     public var nextPickupRequestID: Int
     /// Flag On Guard wall cells (§11.2); empty = no temporary walls.
     public var fortTemplate: [Vec2i]
+    /// §10.5 brick drops (owner 2026-10-08): permille chance per brick cell
+    /// the PLAYER clears, the stage's cap, how many have been granted, and
+    /// the cells cleared this tick awaiting the step-7 roll — always empty
+    /// at a tick's end.
+    public var brickDropChancePermille: Int
+    public var brickDropCap: Int
+    public var brickDropsGranted: Int
+    public var clearedBrickCells: [Vec2i]
     /// Stage-clear bonuses (ADR-0012).
     public var clearBonus: ScoreRules.ClearBonus
     /// Difficulty-shaped enemy behaviour (ADR-0015).
@@ -131,6 +143,7 @@ public struct StageState: Codable, Equatable, Sendable {
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 20,
                 carriedPickupQueue: [CarriedPickup?] = [], hiddenPickups: [HiddenPickup] = [],
                 fortTemplate: [Vec2i] = [],
+                brickDropChancePermille: Int = 30, brickDropCap: Int = 2,
                 clearBonus: ScoreRules.ClearBonus = .none,
                 enemyBehavior: EnemyBehaviorProfile = .standard,
                 directorPhases: [DirectorPhase] = []) {
@@ -151,6 +164,10 @@ public struct StageState: Codable, Equatable, Sendable {
         self.pendingPickups = []
         self.nextPickupRequestID = 1
         self.fortTemplate = fortTemplate
+        self.brickDropChancePermille = brickDropChancePermille
+        self.brickDropCap = brickDropCap
+        self.brickDropsGranted = 0
+        self.clearedBrickCells = []
         self.clearBonus = clearBonus
         self.enemyBehavior = enemyBehavior
         self.directorPhases = directorPhases

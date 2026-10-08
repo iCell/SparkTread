@@ -238,6 +238,12 @@ public enum StageValidator {
         if def.dropChancePercent < 0 || def.dropChancePercent > 100 {
             issues.append("drop_chance_percent \(def.dropChancePercent) outside 0…100")
         }
+        if let permille = def.brickDropChancePermille, permille < 0 || permille > 1000 {
+            issues.append("brickDropChancePermille \(permille) outside 0…1000")
+        }
+        if let cap = def.brickDropCap, cap < 0 {
+            issues.append("brickDropCap \(cap) negative")
+        }
 
         // Reachability (§15.3, §11.2): an enemy must be able to reach the
         // base region — either standing next to it or reaching brick that

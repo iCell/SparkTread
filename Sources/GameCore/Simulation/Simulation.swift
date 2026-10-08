@@ -53,8 +53,10 @@ public enum Simulation {
         // 6. Ground fire: spread, damage, burn-out.
         Fire.resolve(&world, weapons: weapons, events: &events)
 
-        // 7. Deaths, score, drops; hidden pickups whose walls are gone.
+        // 7. Deaths, score, drops; brick drops (§10.5); hidden pickups whose
+        //    walls are gone.
         Stage.processDeaths(&world, events: &events)
+        Stage.rollBrickDrops(&world)
         Stage.revealHiddenPickups(&world, rules: pickups, events: &events)
 
         // 8. Pickups (Bomb deaths settle here), then pending placements.

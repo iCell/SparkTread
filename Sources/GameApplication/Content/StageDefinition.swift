@@ -28,6 +28,10 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public var pickupSpawns: [PickupSpawn]
     public var dropTable: [String]
     public var dropChancePercent: Int
+    /// §10.5 brick drops: permille per brick cell the player clears (absent
+    /// = 30) and the stage's cap (absent = 2).
+    public var brickDropChancePermille: Int?
+    public var brickDropCap: Int?
     /// Carrier drops: the enemy at `queueIndex` in the interleaved spawn
     /// queue carries `pickup` and drops it on death (GAME_RULES §10.2).
     public var carriedDrops: [CarriedDrop]?
