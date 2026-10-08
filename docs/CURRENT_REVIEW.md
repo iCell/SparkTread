@@ -2003,6 +2003,18 @@ A card is now always a fresh run from the campaign-start state on its
 stage (lives 3, score 0, the starting kit, the chosen difficulty); the
 checkpoint belongs to 继续战役 on the title alone. `AppFlowTests` pins it.
 
+*A death costs the tank's growth — GAME_RULES R5.11, ADR-0024 (2026-10-09,
+owner).* 如果死亡重生的时候，坦克的加成应该都没了才是. §11.3 had the
+replacement keep speed, power and equipment; it now spawns with speed
+level 1, power level 0 and no equipment (`LifecycleRules.respawnSpeedLevel`
+/ `respawnPowerLevel`, written into `PlayerState.retained*` at death so a
+snapshot during the countdown resumes the same way). The special weapon
+and its ammunition stay — inventory, not growth, on Claude's reading of
+加成, offered to the owner to extend. Stage hand-over and the retry
+checkpoint are unchanged. Replay format 13 → 14; no golden moved (none
+has a player death). `RespawnTests` re-pinned; §17 item 6 watches whether
+the later stages turn punishing.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

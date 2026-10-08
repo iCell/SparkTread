@@ -14,7 +14,7 @@ When documents conflict, confirm with the owner first.
 
 ## Project state
 
-M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (campaign progression, screen flow, checkpoint save, difficulty profiles and director phases, the deferred mechanics), plus the Training Arena. On 2026-09-15 the gameplay rules were consolidated into `GAME_RULES.md` R5 (ADR-0018) and the code moved onto them; R5.10 (2026-10-08, ADR-0023) added brick drops (§10.5). The twelve-stage content of GAME_RULES §14.1 landed on 2026-10-03 (four themes, all 20 enemy types introduced by stage 10) and the campaign plays end to end in a scripted chained replay. Settings, accessibility and six-language localization landed on 2026-10-08 (`SettingsStore`, `Resources/Localizable.xcstrings`, `Strings` through the environment; the phone's language by default, changeable in Settings). Still open: controller support (deferred by the owner), the external playtest build, and a PLAYED golden — the chained replay is instant wins, not a played run. `docs/CURRENT_REVIEW.md` is the running review log; `docs/agent_handoffs/` holds handoffs.
+M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (campaign progression, screen flow, checkpoint save, difficulty profiles and director phases, the deferred mechanics), plus the Training Arena. On 2026-09-15 the gameplay rules were consolidated into `GAME_RULES.md` R5 (ADR-0018) and the code moved onto them; R5.10 (2026-10-08, ADR-0023) added brick drops (§10.5); R5.11 (2026-10-09, ADR-0024) makes a death cost the tank's growth (§11.3). The twelve-stage content of GAME_RULES §14.1 landed on 2026-10-03 (four themes, all 20 enemy types introduced by stage 10) and the campaign plays end to end in a scripted chained replay. Settings, accessibility and six-language localization landed on 2026-10-08 (`SettingsStore`, `Resources/Localizable.xcstrings`, `Strings` through the environment; the phone's language by default, changeable in Settings). Still open: controller support (deferred by the owner), the external playtest build, and a PLAYED golden — the chained replay is instant wins, not a played run. `docs/CURRENT_REVIEW.md` is the running review log; `docs/agent_handoffs/` holds handoffs.
 
 `GAME_RULES.md` (R5) is the **single gameplay rulebook** and wins every gameplay conflict (ADR-0018); `PRODUCT_IMPLEMENTATION_PLAN.md` keeps architecture, formats and process. A rule change means editing `GAME_RULES.md` together with an ADR. Its §17 balance watch items go to the owner after playtests; never retune them silently.
 
@@ -26,7 +26,7 @@ M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (cam
 - Simulation: 60 Hz fixed tick, ordered tick pipeline (`GAME_RULES.md` §12), named RNG streams `ai`/`spawn`/`drop`, arena 56×27 cells (ADR-0009), 1024 subunits per cell (speeds in milli-subunits), origin top-left, tanks 2×2 cells.
 - Entity processing order is explicit (ascending entity id); never rely on Dictionary/Set iteration order.
 - `SKAction`, `Timer`, and callbacks are presentation tools, never simulation clocks.
-- Stage/campaign/difficulty content is JSON under `Content/`, validated by `content-validator`; replays are versioned (format 13, doubling as the simulation version) with checksum goldens.
+- Stage/campaign/difficulty content is JSON under `Content/`, validated by `content-validator`; replays are versioned (format 14, doubling as the simulation version) with checksum goldens.
 
 ## Art and audio assets
 

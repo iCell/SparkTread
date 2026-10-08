@@ -641,9 +641,13 @@ enum Stage {
         for tank in dead {
             if let ownerID = tank.ownerPlayerID {
                 world.withPlayer(ownerID) { player in
-                    player.retainedSpeedLevel = tank.speedLevel
-                    player.retainedPowerLevel = tank.powerLevel
-                    player.retainedEquipmentID = tank.equipmentID
+                    // R5.11 (owner 2026-10-09): a death costs the tank's
+                    // growth — the replacement comes with the starting speed
+                    // and power and no equipment. The special weapon and its
+                    // ammunition are inventory, not growth, and stay.
+                    player.retainedSpeedLevel = LifecycleRules.respawnSpeedLevel
+                    player.retainedPowerLevel = LifecycleRules.respawnPowerLevel
+                    player.retainedEquipmentID = nil
                     player.retainedSpecialWeaponID = tank.specialWeaponID
                     if player.lives > 0 {
                         player.lives -= 1

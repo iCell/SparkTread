@@ -298,7 +298,9 @@ private func tick(_ world: inout WorldState, _ n: Int,
 }
 
 @Suite struct RespawnTests {
-    @Test func playerRespawnsWithRetainedUpgrades() {
+    /// R5.11 (ADR-0024): a death costs the tank's growth — speed 1, power
+    /// 0, no equipment — while the special weapon and its ammo stay.
+    @Test func playerRespawnsAsARookieWithItsWeaponAndAmmo() {
         var world = makeStageWorld(enemies: ["normal_a"], startDelay: 999_999)
         guard let tankID = world.player(.one)?.tankEntityID else { return }
         world.withTank(entityID: tankID) {
@@ -317,9 +319,9 @@ private func tick(_ world: inout WorldState, _ n: Int,
               let tank = world.tank(entityID: newTankID) else {
             Issue.record("player did not respawn"); return
         }
-        #expect(tank.speedLevel == 2 && tank.powerLevel == 1) // retained (§6.5)
-        #expect(tank.equipmentID == "anti_skid")
-        #expect(tank.specialWeaponID == "ap")
+        #expect(tank.speedLevel == 1 && tank.powerLevel == 0) // growth lost (R5.11)
+        #expect(tank.equipmentID == nil)
+        #expect(tank.specialWeaponID == "ap")                 // inventory kept
         #expect(world.player(.one)?.specialAmmoByWeapon["ap"] == 7) // stored ammo kept
         #expect(tank.armor == 3) // reset
         #expect(tank.spawnProtectionTicks > 0)

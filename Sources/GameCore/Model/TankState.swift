@@ -18,6 +18,10 @@ public enum LifecycleRules {
     public static let playerRespawnDelayTicks = 60
     public static let playerSpawnProtectionTicks = 120
     public static let playerRespawnArmor = 3
+    /// R5.11 (ADR-0024): what a replacement tank starts with — the
+    /// campaign-start levels, not the dead tank's (GAME_RULES §11.3).
+    public static let respawnSpeedLevel = 1
+    public static let respawnPowerLevel = 0
     public static let enemySpawnProtectionTicks = 45
     public static let spawnProcessTicks = 45
     public static let spawnBlockedSwitchTicks = 120
