@@ -1165,20 +1165,27 @@ public struct MovementLabView: View {
         let rowFont = Font.system(size: compact ? 15 : 17, weight: .bold, design: .monospaced)
         let iconScale: CGFloat = compact ? 1.0 : 1.25
         return VStack(spacing: 0) {
-            ZStack(alignment: .top) {
+            // The title, and under it the reward line of a won stage with a
+            // clear bonus — its own line, reserved from the start so the
+            // table does not shift when it lands. It used to sit in a ZStack
+            // over the title and printed across it (owner 2026-10-08).
+            VStack(spacing: 0) {
                 Text("战斗成绩")
                     .font(.system(size: compact ? 22 : 26, weight: .heavy))
                     .foregroundStyle(Color(red: 0.86, green: 0.42, blue: 0.96))
                     .shadow(color: .black, radius: 0, x: 1, y: 1)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, compact ? 6 : 9)
-                if controller.flow.showsReward {
+                    .padding(.top, compact ? 6 : 9)
+                    .padding(.bottom, controller.flow.hasRewardLine ? 2 : (compact ? 6 : 9))
+                if controller.flow.hasRewardLine {
                     Text(verbatim: "Reward +\(String(controller.clearBonus.reward))")
-                        .font(.system(size: compact ? 18 : 21, weight: .heavy, design: .monospaced))
+                        .font(.system(size: compact ? 16 : 18, weight: .heavy, design: .monospaced))
                         .foregroundStyle(Color.yellow)
                         .shadow(color: .black, radius: 0, x: 1, y: 1)
-                        .padding(.top, compact ? 4 : 7)
-                        .transition(.offset(y: 60).combined(with: .opacity)) // rises from the table
+                        .padding(.bottom, compact ? 5 : 7)
+                        .opacity(controller.flow.showsReward ? 1 : 0)
+                        .offset(y: controller.flow.showsReward ? 0 : 14) // rises into its line
+                        .animation(.easeOut(duration: 0.3), value: controller.flow.showsReward)
                 }
             }
             .background(Color.black.opacity(0.35))

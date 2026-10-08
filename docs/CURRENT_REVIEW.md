@@ -1815,6 +1815,24 @@ their own under it — and `PlateButtonStyle` fixes every label to one line
 (`lineLimit(1).fixedSize()`), so a plate grows to its label and never
 folds it.
 
+*Three from one screenshot (2026-10-08, owner).* (1) The reward line
+("Reward +330") printed across the 战斗成绩 title: it was a ZStack over the
+title; it is now its own line under the title, reserved from the start
+when the stage has a clear bonus so the table does not shift, rising into
+place when the flow reaches it. (2) The Training Arena's base sat one row
+above the bottom border (rows 23–24 over the steel at 26) where every
+stage's is flush (24–25); `TrainingArenaFixture` moves it and its brick U
+down a row. The M1 `MovementLabFixture` is untouched. (3) The extra-life
+pickup has its own voice: `sfx_life_up`, 400 ms, native 8363 Hz — an
+original three-step rise G5-D6-G6 (a fifth then a fourth), the top held
+with a slow vibrato, a triangle an octave under it for body, levelled at
+−18.5 dBFS under the reference's pickup jingle. The owner's reference was
+Mario's 1-up chirp; its FUNCTION is taken (a quick rise that lands and
+rings), its six-note sequence is not — the standing rule. `GameAudio` maps
+`pickupCollected` with `pickupID == "extra_life"` to it and every other
+pickup to the reference jingle as before (test added). The set is 26
+cues: 19 synthesized, 6 excerpts, the owner's card.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

@@ -15,6 +15,14 @@ private let origin = Vec2i(x: 0, y: 0)
         }
     }
 
+    /// The extra-life pickup has its own voice; every other pickup keeps the
+    /// reference's jingle (owner 2026-10-08).
+    @Test func anExtraLifeHasItsOwnVoice() {
+        func names(_ events: [DomainEvent]) -> [String] { GameAudio.soundNames(for: events) }
+        #expect(names([.pickupCollected(entityID: 1, pickupID: "extra_life", byTank: 2, position: origin)]) == ["sfx_life_up"])
+        #expect(names([.pickupCollected(entityID: 1, pickupID: "shield", byTank: 2, position: origin)]) == ["sfx_pickup_collect"])
+    }
+
     @Test func eventMappingCoversCoreMoments() {
         func names(_ events: [DomainEvent]) -> [String] { GameAudio.soundNames(for: events) }
         #expect(names([.weaponFired(entityID: 1, ownerPlayerID: .one, weaponID: "normal", channel: .normal,

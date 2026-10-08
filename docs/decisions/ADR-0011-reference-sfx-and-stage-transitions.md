@@ -672,3 +672,13 @@ can be indefinite without risking the win. The lab and injected worlds
 still roll on by themselves: they have no next stage and no page to tap.
 §11.4's "约 3 秒内进入结果界面，点击可快进但不跳过计分" is unchanged; the
 card durations are unchanged.
+
+## Amendment 2026-10-08 (eighth): an extra life has its own voice
+
+The owner asked that collecting the heart (extra life) sound different
+from the other pickups, with Mario's 1-up chirp as the reference for the
+function. `sfx_life_up` is an original rise — G5, D6, G6, the top held
+with vibrato — in the native pipeline; the Nintendo sequence is not
+reproduced (take a reference's function, never its tune). Every other
+pickup keeps the reference recording's jingle. The set is 26 cues: 19
+synthesized, 6 excerpts, the owner's stage card.

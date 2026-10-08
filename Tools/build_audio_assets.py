@@ -54,6 +54,7 @@ MANIFEST = os.environ.get("SPARKTREAD_AUDIO_MANIFEST") or COMMITTED_MANIFEST
 # Per-cue manifest note, in the same "note" field the excerpt entries carry:
 # how a voice was built, where that is not obvious from its attribution.
 NOTES = {
+    "sfx_life_up": "an extra life collected (the extra_life pickup), added 2026-10-08 at the owner's request that the 1UP sound differ from the other pickups and serve the function of Mario's 1-up chirp. The FUNCTION only: a quick rising figure that lands and rings. The notes are an original three-step rise, G5-D6-G6 (a fifth then a fourth), with the top note held and given a slow vibrato — not the Nintendo six-note arpeggio, whose sequence is deliberately not reproduced (standing rule: take a reference's function, never its tune; ADR-0011). 25 % square for the chirp with a triangle an octave under the held note for body, native 8363 Hz. Levelled under the reference's pickup jingle so a life reads as a prize, not an alarm.",
     "sfx_title_tread": "the launch sequence's sound, added 2026-10-03 at the owner's request (配合背景音乐，可以是履带碾过的声音): the tank that drives through the title, heard on its tracks — two tracks of jittered link slaps (clack, ping, ground thud), a rolling noise bed high-passed at 140 Hz so its weight sits where a phone speaker carries it, a metal-on-metal hiss following the slaps, a pitch factor that turns over as the tank passes, and from 2.565 s (its rear clearing the wordmark at 170 pt/s) a recession of −34 dB with the top closing to 500 Hz, silent at 5.3 s when the drive ends. Stereo — the only stereo cue in the set — panned by the tank's place on the screen: from 218 pt left of centre, through the middle at 1.28 s, to full right as it leaves (constant-power law referenced so the centre equals a mono cue on both speakers). No reference: 决战坦克 has no tread sound, and the game itself still has none (owner 2026-09-10) — this plays only under the launch, which is the one place a tank is heard moving. Steady part levelled to the two music cues' −20.8 dBFS RMS.",
     "sfx_fire_rapid": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
     "sfx_stage_card": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased — standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured ≈0.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E♭4 — the key taken from this excerpt's own faint harmonic stabs — over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first — SHAPE in the generator selects",
@@ -61,6 +62,7 @@ NOTES = {
 
 ATTRIBUTION = {
     "sfx_title_tread": "invented",
+    "sfx_life_up": "invented",
     "sfx_stage_card": "derived",
     "sfx_base_destroyed": "derived", "sfx_pickup_spawn": "derived", "sfx_deflect": "derived",
     "sfx_hit_brick": "derived", "sfx_tally_tick": "derived",
@@ -855,6 +857,19 @@ def build():
                              ([0.0] * samples(115) + apply(bandpass(noise(tick, 9000, 0x2E), 2800, 1.0),
                                                            env_decay(tick, 1, 3.0)), 1.8)),
                          -16.4)
+
+        # An extra life collected (owner 2026-10-08: the heart pickup should
+        # sound different, with the function of a 1-up chirp). Function, not
+        # tune: an original three-step rise — G5, D6, G6, a fifth then a
+        # fourth — the top held and given a slow vibrato so it rings. The
+        # other pickups keep the reference's own jingle.
+        step, hold = samples(70), samples(260)
+        vib = [1568.0 * (1 + 0.006 * math.sin(2 * math.pi * 5.5 * i / RATE)) for i in range(hold)]
+        chirp = concat(apply(square(flat(784, step), 0.25), env_hold(step, 2, 0.15)),
+                       apply(square(flat(1175, step), 0.25), env_hold(step, 2, 0.15)),
+                       apply(square(vib, 0.25), env_db(hold, [(0, 0), (120, -2), (260, -30)])))
+        body = [0.0] * (2 * step) + apply(triangle(flat(784, hold)), env_db(hold, [(0, -6), (260, -34)]))
+        write_native_rms("sfx_life_up", mix((chirp, 1.0), (body, 0.5)), -18.5)
 
         # The launch sequence (AppRootView.TitleScreen): the player's tank
         # drives through the title at 170 pt/s and its rear clears the 370 pt

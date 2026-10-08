@@ -116,8 +116,10 @@ public enum TrainingArenaFixture {
         // Bottom-right: a mixed fortress.
         fill(.steel, 44, 16, 45, 22); fill(.brick, 46, 16, 51, 17); fill(.brick, 50, 18, 51, 22)
         fill(.water, 47, 19, 48, 21)
-        // Base with its brick U.
-        fill(.brick, 26, 22, 29, 22); fill(.brick, 26, 23, 26, 24); fill(.brick, 29, 23, 29, 24)
+        // Base with its brick U, flush against the bottom border like every
+        // stage's (rows 24–25 over the steel at 26; the owner noticed the
+        // arena's sat one row up, 2026-10-08).
+        fill(.brick, 26, 23, 29, 23); fill(.brick, 26, 24, 26, 25); fill(.brick, 29, 24, 29, 25)
 
         var world = WorldState(terrain: terrain, seed: seed)
         var player = PlayerState(playerID: .one)
@@ -126,7 +128,7 @@ public enum TrainingArenaFixture {
         let cell = SpatialUnits.subunitsPerCell
         world.spawnTank(teamID: 1, ownerPlayerID: .one, archetypeID: "player",
                         positionSubunits: Vec2i(x: playerSpawnCell.x * cell, y: playerSpawnCell.y * cell), facing: .up)
-        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 23 * cell),
+        world.base = BaseState(teamID: 1, topLeftSubunits: Vec2i(x: 27 * cell, y: 24 * cell),
                                durability: baseDurability, maxDurability: baseDurability)
         world.stage = StageState(spawnQueue: [], maxAliveEnemies: 40, enemyStartDelayTicks: 0,
                                  spawnPointsCells: enemySpawnCells, telegraphTicks: 45,

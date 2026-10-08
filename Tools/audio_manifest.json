@@ -100,6 +100,12 @@
       "milliseconds": 130,
       "sha256": "8cbbc3e756254eb007545bd53b59eda20e0fda8730a4a618397c1eed646f9080"
     },
+    "sfx_life_up.wav": {
+      "attribution": "invented",
+      "milliseconds": 400,
+      "note": "an extra life collected (the extra_life pickup), added 2026-10-08 at the owner's request that the 1UP sound differ from the other pickups and serve the function of Mario's 1-up chirp. The FUNCTION only: a quick rising figure that lands and rings. The notes are an original three-step rise, G5-D6-G6 (a fifth then a fourth), with the top note held and given a slow vibrato \u2014 not the Nintendo six-note arpeggio, whose sequence is deliberately not reproduced (standing rule: take a reference's function, never its tune; ADR-0011). 25 % square for the chirp with a triangle an octave under the held note for body, native 8363 Hz. Levelled under the reference's pickup jingle so a life reads as a prize, not an alarm.",
+      "sha256": "d9634820754c26b3ae364cb0cfdd41f5448a22fafcc6ed9064b28da133d40f4f"
+    },
     "sfx_pickup_collect.wav": {
       "attribution": "excerpt",
       "milliseconds": 740,
@@ -181,7 +187,7 @@
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "f9dfafe56347a6a2eaf0e10675cce790afdb9b2a393b86b97523acafb2c78980",
+  "generator_sha256": "8584bddc9ec94d071fce3161db4988952e0895e38213908b1612e401df26211d",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
   "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",

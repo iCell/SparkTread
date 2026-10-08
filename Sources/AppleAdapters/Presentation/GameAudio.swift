@@ -66,7 +66,7 @@ public final class GameAudio {
         "sfx_pickup_spawn", "sfx_pickup_collect",
         "sfx_spawn_warp", "sfx_stage_win",
         "sfx_tally_tick", "sfx_stage_card",
-        "sfx_title_tread",
+        "sfx_title_tread", "sfx_life_up",
     ]
 
 
@@ -308,8 +308,10 @@ public final class GameAudio {
                 if active { add("sfx_base_shield_on") }
             case .pickupSpawned:
                 add("sfx_pickup_spawn")
-            case .pickupCollected:
-                add("sfx_pickup_collect")
+            case .pickupCollected(_, let pickupID, _, _):
+                // An extra life has its own voice (owner 2026-10-08): the
+                // one pickup whose prize is not on the field.
+                add(pickupID == "extra_life" ? "sfx_life_up" : "sfx_pickup_collect")
             case .enemyWaveStarted:
                 add("sfx_spawn_warp")
             case .directorPhaseStarted:

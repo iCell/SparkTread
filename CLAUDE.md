@@ -32,7 +32,7 @@ M0–M3 are complete at the owner's acceptance level; M4 items 1–5 landed (cam
 
 Use the `Vendor/SparkTreadPixel` submodule exclusively: its `.atlas` folders plus `Metadata/pixel_assets.json`; the runtime adapters live in `Sources/AppleAdapters/Presentation/Pixel/`. Integration steps: `docs/pixel/SPRITEKIT_USAGE_ZH.md`. Do not bundle `Current/`, `Tools/`, `Previews/`, or QA JSON into the app. Do not generate new assets without an explicit request.
 
-Audio is tied to `Tools/audio_manifest.json` and checked by `Scripts/check-audio.sh`; the set is 25 cues: 6 excerpts of the reference recording, 1 supplied by the owner (`sfx_stage_card`), 18 synthesized by `Tools/build_audio_assets.py` (ADR-0011).
+Audio is tied to `Tools/audio_manifest.json` and checked by `Scripts/check-audio.sh`; the set is 26 cues: 6 excerpts of the reference recording, 1 supplied by the owner (`sfx_stage_card`), 19 synthesized by `Tools/build_audio_assets.py` (ADR-0011).
 
 ## Standing owner rules
 
