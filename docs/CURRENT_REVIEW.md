@@ -1915,6 +1915,22 @@ own brass with a base band, a highlight and a dark rim, crisp at any
 scale. The special button keeps its weapon pickup's icon, which has the
 pixels for it. No new art.
 
+*Every round its own colour; the arcade pair (2026-10-08, owner).* The
+owner settled the fire buttons: each round has a colour and the button
+is designed in it, and the two buttons sit as the reference shot's
+diagonal pair, not stacked. `WeaponPalette` holds one tint per weapon,
+taken from each round's own art — brass, lime, flame red, AP violet,
+demolition orange — and the button IS that colour: tinted glass the
+field reads through (the colour at 30 %), a ring in the colour at full
+strength, a top sheen, and a press that deepens the glass to 62 %. A
+vector glyph of the round was drawn first and the owner struck it (不要有
+中间这个纯色的子弹 logo): nothing sits in the middle, as in the reference's
+own buttons. The special button re-skins when the weapon changes; the
+pickup icons and labels are gone from the pad. Layout: the main button low and
+inward under the thumb, the special up and out — centres 98 pt across and
+58 pt up, 114 pt apart, so the 90 pt hit circles still never overlap
+(§15.2's ≥ 96). Verified on the simulator.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
