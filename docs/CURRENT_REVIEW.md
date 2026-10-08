@@ -1833,6 +1833,18 @@ rings), its six-note sequence is not — the standing rule. `GameAudio` maps
 pickup to the reference jingle as before (test added). The set is 26
 cues: 19 synthesized, 6 excerpts, the owner's card.
 
+*The arena's base shield hardened nothing (2026-10-08, owner).* A base
+shield hardens the stage's `fortTemplate` (GAME_RULES §11.2,
+`Stage.activateFort`), and the Training Arena's `StageState` carried none
+— the default empty list — so the pickup set the shield timer and
+converted no brick. Every one of the twelve stages carries a template (8
+cells, the brick U; stage 11's larger fort 24), so the campaign is
+unaffected. `TrainingArenaFixture.fortTemplate` is now its brick U, and a
+test pins the template to those eight brick cells around the base at
+(27, 24). Not added: a content-validator rule that a stage's template
+must be non-empty and brick — worth one if a thirteenth stage is ever
+authored without it.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

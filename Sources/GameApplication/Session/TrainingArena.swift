@@ -14,6 +14,12 @@ public enum TrainingArenaFixture {
     public static let playerLives = 999
     public static let baseDurability = 999
     public static let playerSpawnCell = Vec2i(x: 23, y: 24)
+    /// The brick U around the base — what a base shield hardens (GAME_RULES
+    /// §11.2). The arena had no template, so its shield pickup hardened
+    /// nothing (owner 2026-10-08); every stage carries one.
+    public static let fortTemplate = [Vec2i(x: 26, y: 23), Vec2i(x: 27, y: 23), Vec2i(x: 28, y: 23), Vec2i(x: 29, y: 23),
+                                      Vec2i(x: 26, y: 24), Vec2i(x: 29, y: 24),
+                                      Vec2i(x: 26, y: 25), Vec2i(x: 29, y: 25)]
 
     /// Enemy (re)spawn cells, used round-robin by the respawn rule.
     public static let enemySpawnCells: [Vec2i] = [
@@ -132,7 +138,8 @@ public enum TrainingArenaFixture {
                                durability: baseDurability, maxDurability: baseDurability)
         world.stage = StageState(spawnQueue: [], maxAliveEnemies: 40, enemyStartDelayTicks: 0,
                                  spawnPointsCells: enemySpawnCells, telegraphTicks: 45,
-                                 playerRespawnCell: playerSpawnCell, dropTable: [], dropChancePercent: 0)
+                                 playerRespawnCell: playerSpawnCell, dropTable: [], dropChancePercent: 0,
+                                 fortTemplate: fortTemplate)
         // No enemies until the training panel adds them.
         world.withTanksInEntityOrder { $0.spawnProtectionTicks = 0 }
         return world

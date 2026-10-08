@@ -155,4 +155,22 @@ import GameCore
             #expect(WorldInvariants.violations(in: session.world).isEmpty, "\(WorldInvariants.violations(in: session.world))")
         }
     }
+
+    /// GAME_RULES §11.2: a base shield hardens the fort template around the
+    /// base. The arena's template must be exactly its brick U, or the
+    /// shield pickup does nothing here while it works in every stage
+    /// (owner 2026-10-08).
+    @Test func theArenasFortTemplateIsItsBrickU() {
+        let world = TrainingArenaFixture.makeWorld()
+        let template = world.stage?.fortTemplate ?? []
+        #expect(template.count == 8)
+        for cell in template {
+            #expect(world.terrain[cell.x, cell.y].kind == .brick, "\(cell) is not brick")
+        }
+        // The U rings the 2×2 base at (27, 24): the row above and the two columns beside it.
+        let base = world.base?.topLeftSubunits ?? Vec2i(x: 0, y: 0)
+        let cellSize = SpatialUnits.subunitsPerCell
+        #expect(base == Vec2i(x: 27 * cellSize, y: 24 * cellSize))
+        #expect(Set(template.map { "\($0.x),\($0.y)" }) == ["26,23", "27,23", "28,23", "29,23", "26,24", "29,24", "26,25", "29,25"])
+    }
 }
