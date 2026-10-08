@@ -61,6 +61,42 @@ import SwiftUI
                          y: spec.anchorTopLeft[1] / spec.pixelSize[1])
     }
 
+    /// A sprite cropped to its drawn content (the manifest's contentBounds),
+    /// for the HUD: a pickup is 22 px of art on a 32 px canvas, and an
+    /// icon row set by canvas would be mostly padding.
+    static func glyph(_ id: String) -> CGImage? {
+        let key = "glyph:" + id
+        if let cached = cache[key] { return cached }
+        guard let full = sprite(id) else { return nil }
+        guard let b = art?.manifest.sprites[id]?.contentBounds, b.count == 4,
+              let cropped = full.cropping(to: CGRect(x: b[0], y: b[1], width: b[2] - b[0], height: b[3] - b[1]))
+        else { return full }
+        cache[key] = cropped
+        return cropped
+    }
+
+    /// A tank composed from its rig, cropped to its body — the HUD's lives
+    /// and enemy counters wear the same tanks the field does.
+    static func tankIcon(kind: String, weapon: String = "normal", facing: String = "up") -> CGImage? {
+        let key = "tank:\(kind):\(weapon):\(facing)"
+        if let cached = cache[key] { return cached }
+        guard let art, let image = try? PixelTankIcons.image(kind: kind, weapon: weapon, facing: facing, art: art)
+        else { return nil }
+        cache[key] = image
+        return image
+    }
+
+    /// An enemy archetype's tank, through the same appearance mapping the
+    /// field and the results table use (rigs are keyed by kind, not by
+    /// archetype).
+    static func tankIcon(archetypeID: String) -> CGImage? {
+        let key = "tank:archetype:" + archetypeID
+        if let cached = cache[key] { return cached }
+        guard let art, let image = try? PixelTankIcons.image(archetypeID: archetypeID, art: art) else { return nil }
+        cache[key] = image
+        return image
+    }
+
     /// A sprite upscaled by a whole factor with no interpolation, so a
     /// 16 px plate tiles as 16 blocks and not as a blur.
     static func upscaled(_ id: String, by factor: Int) -> CGImage? {

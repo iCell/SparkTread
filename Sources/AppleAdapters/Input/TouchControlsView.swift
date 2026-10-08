@@ -8,72 +8,61 @@ import UIKit
 /// One floating stick on the left region plus two fire buttons; every touch
 /// is tracked individually so stick + fire work simultaneously, and
 /// `touchesCancelled` always releases state — no stuck directions.
-/// A translucent glass disc, drawn rather than blurred.
-///
-/// `UIVisualEffectView` cannot sample the playfield behind it — SpriteKit
-/// renders through Metal, and the material came out an opaque grey that hid
-/// the bricks under the pad entirely (tried and rejected 2026-10-01). So the
-/// glass is painted: a low-alpha channel tint the arena reads straight
-/// through, a top-lit sheen over it, a bright rim, and one specular
-/// highlight. Deterministic, and it looks the same over anything.
-@MainActor private final class GlassDisc {
-    private let tintLayer = CAShapeLayer()
+/// A control disc in the menus' plate language (owner 2026-10-06/08: the
+/// stick and the fire buttons were ugly): a ring of the arena's steel —
+/// fire yellow for the special channel — around dark glass the field
+/// still shows through, a top sheen inside the ring, and a press that
+/// fills the glass with the channel's colour. Painted in layers, not
+/// blurred: `UIVisualEffectView` cannot sample SpriteKit's Metal surface
+/// (tried and rejected 2026-10-01).
+@MainActor private final class ControlDisc {
+    private let glass = CAShapeLayer()
     private let sheen = CAGradientLayer()
-    private let rim = CAShapeLayer()
-    private let gloss = CAShapeLayer()
-    private let tint: UIColor
-    private let restAlpha: CGFloat, pressedAlpha: CGFloat, restRim: CGFloat
+    private let ring = CAShapeLayer()
+    private let innerLine = CAShapeLayer()
+    private let ringColour: UIColor, pressedFill: UIColor
+    private let restGlass: CGFloat, ringWidth: CGFloat
 
-    init(tint: UIColor, restAlpha: CGFloat, pressedAlpha: CGFloat, rim restRim: CGFloat) {
-        self.tint = tint
-        self.restAlpha = restAlpha
-        self.pressedAlpha = pressedAlpha
-        self.restRim = restRim
-        tintLayer.fillColor = tint.withAlphaComponent(restAlpha).cgColor
-        // Lit from the top, like a glass cap: strongest at the crown and
-        // gone by the middle, so the lower half stays clear.
-        sheen.colors = [UIColor.white.withAlphaComponent(0.30).cgColor,
-                        UIColor.white.withAlphaComponent(0.05).cgColor,
+    init(ring ringColour: UIColor, pressedFill: UIColor, glassAlpha: CGFloat = 0.32, ringWidth: CGFloat = 3) {
+        self.ringColour = ringColour
+        self.pressedFill = pressedFill
+        self.restGlass = glassAlpha
+        self.ringWidth = ringWidth
+        glass.fillColor = UIColor.black.withAlphaComponent(glassAlpha).cgColor
+        sheen.colors = [UIColor.white.withAlphaComponent(0.22).cgColor,
+                        UIColor.white.withAlphaComponent(0.04).cgColor,
                         UIColor.clear.cgColor]
-        sheen.locations = [0, 0.42, 1]
-        rim.fillColor = UIColor.clear.cgColor
-        rim.lineWidth = 1.5
-        rim.strokeColor = UIColor.white.withAlphaComponent(restRim).cgColor
-        gloss.fillColor = UIColor.white.withAlphaComponent(0.28).cgColor
-        gloss.strokeColor = UIColor.clear.cgColor
+        sheen.locations = [0, 0.45, 1]
+        ring.fillColor = UIColor.clear.cgColor
+        ring.lineWidth = ringWidth
+        ring.strokeColor = ringColour.cgColor
+        innerLine.fillColor = UIColor.clear.cgColor
+        innerLine.lineWidth = 1
+        innerLine.strokeColor = UIColor.black.withAlphaComponent(0.55).cgColor
     }
 
     var isHidden: Bool = false {
         didSet { for l in layers { l.isHidden = isHidden } }
     }
 
-    private var layers: [CALayer] { [tintLayer, sheen, rim, gloss] }
+    private var layers: [CALayer] { [glass, sheen, innerLine, ring] }
 
     func add(to parent: CALayer) { for l in layers { parent.addSublayer(l) } }
 
-    func bringToFront(of parent: CALayer) { for l in layers { parent.addSublayer(l) } }
-
     func layout(center: CGPoint, radius: CGFloat) {
-        let box = CGRect(x: center.x - radius, y: center.y - radius,
-                         width: radius * 2, height: radius * 2)
-        let circle = UIBezierPath(ovalIn: box).cgPath
-        tintLayer.path = circle
-        rim.path = circle
+        let box = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+        glass.path = UIBezierPath(ovalIn: box).cgPath
+        ring.path = UIBezierPath(ovalIn: box.insetBy(dx: ringWidth / 2, dy: ringWidth / 2)).cgPath
+        innerLine.path = UIBezierPath(ovalIn: box.insetBy(dx: ringWidth + 0.5, dy: ringWidth + 0.5)).cgPath
         sheen.frame = box
         let mask = CAShapeLayer()
-        mask.path = UIBezierPath(ovalIn: CGRect(origin: .zero, size: box.size)).cgPath
+        mask.path = UIBezierPath(ovalIn: CGRect(origin: .zero, size: box.size).insetBy(dx: ringWidth, dy: ringWidth)).cgPath
         sheen.mask = mask
-        // The specular sits in the upper left, inset from the rim.
-        gloss.path = UIBezierPath(ovalIn: CGRect(x: box.minX + radius * 0.30,
-                                                 y: box.minY + radius * 0.20,
-                                                 width: radius * 0.72,
-                                                 height: radius * 0.40)).cgPath
     }
 
     func setPressed(_ pressed: Bool) {
-        tintLayer.fillColor = tint.withAlphaComponent(pressed ? pressedAlpha : restAlpha).cgColor
-        rim.strokeColor = UIColor.white.withAlphaComponent(pressed ? 0.85 : restRim).cgColor
-        gloss.fillColor = UIColor.white.withAlphaComponent(pressed ? 0.42 : 0.28).cgColor
+        glass.fillColor = pressed ? pressedFill.cgColor : UIColor.black.withAlphaComponent(restGlass).cgColor
+        ring.strokeColor = pressed ? UIColor.white.cgColor : ringColour.cgColor
     }
 }
 
@@ -87,15 +76,22 @@ final class TouchControlsUIView: UIView {
     private var normalTouch: UITouch?
     private var specialTouch: UITouch?
 
-    /// Glass controls (owner 2026-10-01: 操控面板还是用透明的有玻璃效果的
-    /// 背景). The delivery's opaque `PixelUI` discs were wired up earlier the
-    /// same day and covered the arena under the pad; these let it through.
-    /// The channel tints — cyan for the normal gun, orange for the special —
-    /// match the HUD's own colour coding.
-    private let stickBase = GlassDisc(tint: .white, restAlpha: 0.10, pressedAlpha: 0.10, rim: 0.30)
-    private let stickKnob = GlassDisc(tint: .white, restAlpha: 0.26, pressedAlpha: 0.26, rim: 0.62)
-    private let normalDisc = GlassDisc(tint: .systemCyan, restAlpha: 0.18, pressedAlpha: 0.40, rim: 0.48)
-    private let specialDisc = GlassDisc(tint: .systemOrange, restAlpha: 0.18, pressedAlpha: 0.40, rim: 0.48)
+    /// Plate-language controls over glass (owner 2026-10-01: the pad must
+    /// stay see-through; 2026-10-08: the glass alone looked ugly). Steel for
+    /// the stick and the normal gun, fire yellow for the special channel —
+    /// the same two materials as every plate in the menus.
+    private static let steel = UIColor(red: 0.62, green: 0.68, blue: 0.73, alpha: 0.95)
+    private static let fire = UIColor(red: 1.0, green: 0.80, blue: 0.25, alpha: 0.95)
+    private let stickBase = ControlDisc(ring: TouchControlsUIView.steel.withAlphaComponent(0.7),
+                                        pressedFill: .clear, glassAlpha: 0.22, ringWidth: 2.5)
+    private let stickKnob = ControlDisc(ring: TouchControlsUIView.steel, pressedFill: .clear, glassAlpha: 0.45, ringWidth: 2)
+    private let normalDisc = ControlDisc(ring: TouchControlsUIView.steel,
+                                         pressedFill: UIColor.white.withAlphaComponent(0.38))
+    private let specialDisc = ControlDisc(ring: TouchControlsUIView.fire,
+                                          pressedFill: TouchControlsUIView.fire.withAlphaComponent(0.45))
+    /// The four arrow glyphs on the stick's base; the held direction lights.
+    private let arrowLayers: [Direction: CALayer] = [.up: CALayer(), .right: CALayer(), .down: CALayer(), .left: CALayer()]
+    var arrowProvider: ((Direction) -> CGImage?)?
     private let normalLabel = UILabel()
     private let specialLabel = UILabel()
     private let normalIcon = UIImageView()
@@ -118,10 +114,18 @@ final class TouchControlsUIView: UIView {
         isMultipleTouchEnabled = true
         backgroundColor = .clear
 
-        for disc in [normalDisc, specialDisc, stickBase, stickKnob] { disc.add(to: layer) }
+        stickBase.add(to: layer)
+        for direction in Direction.allCases {
+            let arrow = arrowLayers[direction]!
+            arrow.magnificationFilter = .nearest
+            arrow.contentsGravity = .resizeAspect
+            arrow.opacity = 0.55
+            arrow.isHidden = true
+            layer.addSublayer(arrow)
+        }
+        for disc in [stickKnob, normalDisc, specialDisc] { disc.add(to: layer) }
         // The floating stick stays hidden until it is touched.
-        stickBase.isHidden = true
-        stickKnob.isHidden = true
+        setStickHidden(true)
 
         configureCaption(normalLabel, text: "普")
         configureCaption(specialLabel, text: "特")
@@ -143,9 +147,20 @@ final class TouchControlsUIView: UIView {
         addSubview(label)
     }
 
+    private func setStickHidden(_ hidden: Bool) {
+        stickBase.isHidden = hidden
+        stickKnob.isHidden = hidden
+        for arrow in arrowLayers.values { arrow.isHidden = hidden }
+    }
+
     /// Shows the weapon icons; the text labels remain only as a fallback
     /// when the art is not loaded yet.
     func updateIcons(specialWeaponID: String) {
+        if let arrowProvider {
+            for direction in Direction.allCases where arrowLayers[direction]?.contents == nil {
+                if let image = arrowProvider(direction) { arrowLayers[direction]?.contents = image }
+            }
+        }
         guard let iconProvider else { return }
         if normalIcon.image == nil, let image = iconProvider("normal") {
             normalIcon.image = UIImage(cgImage: image)
@@ -169,7 +184,7 @@ final class TouchControlsUIView: UIView {
                                       (specialLabel, specialIcon, specialCenter)] {
             label.frame = CGRect(x: center.x - buttonRadius, y: center.y - buttonRadius,
                                  width: buttonRadius * 2, height: buttonRadius * 2)
-            icon.frame = label.frame.insetBy(dx: 12, dy: 12)
+            icon.frame = label.frame.insetBy(dx: 15, dy: 15)
         }
     }
 
@@ -194,8 +209,7 @@ final class TouchControlsUIView: UIView {
                 stickTouch = touch
                 stickOrigin = point
                 updateStickVisual(offset: .zero)
-                stickBase.isHidden = false
-                stickKnob.isHidden = false
+                setStickHidden(false)
             }
         }
     }
@@ -233,8 +247,7 @@ final class TouchControlsUIView: UIView {
             if touch == stickTouch {
                 stickTouch = nil
                 store?.release(from: .touch)
-                stickBase.isHidden = true
-                stickKnob.isHidden = true
+                setStickHidden(true)
             }
             if touch == normalTouch {
                 normalTouch = nil
@@ -257,6 +270,16 @@ final class TouchControlsUIView: UIView {
         stickBase.layout(center: stickOrigin, radius: 48)
         stickKnob.layout(center: CGPoint(x: stickOrigin.x + clampedX, y: stickOrigin.y + clampedY),
                          radius: 22)
+        // Arrows just inside the ring; the held direction (the same reading
+        // as the store's: the larger axis past the dead zone) lights up.
+        let held: Direction? = (abs(offset.x) < 12 && abs(offset.y) < 12) ? nil
+            : abs(offset.x) >= abs(offset.y) ? (offset.x > 0 ? .right : .left) : (offset.y > 0 ? .down : .up)
+        for (direction, arrow) in arrowLayers {
+            let v = direction.vector
+            let at = CGPoint(x: stickOrigin.x + CGFloat(v.x) * 34, y: stickOrigin.y + CGFloat(v.y) * 34)
+            arrow.frame = CGRect(x: at.x - 8, y: at.y - 8, width: 16, height: 16)
+            arrow.opacity = direction == held ? 1.0 : 0.45
+        }
         CATransaction.commit()
     }
 }
@@ -281,8 +304,15 @@ struct TouchControlsView: UIViewRepresentable {
 
     func updateUIView(_ uiView: TouchControlsUIView, context: Context) {
         if let art {
+            // The fire buttons wear the weapon pickups' icons (§15.2: an
+            // icon, not 普/特), cropped to their art; the stick wears the
+            // delivery's own arrow glyphs.
             uiView.iconProvider = { weaponID in
-                try? art.texture("px_projectile_" + weaponID).cgImage()
+                MenuArt.glyph(weaponID == "normal" ? "px_projectile_normal" : "px_pickup_\(weaponID)_weapon")
+            }
+            uiView.arrowProvider = { direction in
+                let name = switch direction { case .up: "up"; case .right: "right"; case .down: "down"; case .left: "left" }
+                return MenuArt.glyph("px_ui_icon_\(name)")
             }
         }
         uiView.updateIcons(specialWeaponID: specialWeaponID)

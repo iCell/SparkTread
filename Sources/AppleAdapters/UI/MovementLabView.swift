@@ -987,32 +987,7 @@ public struct MovementLabView: View {
     /// two compact rows so nothing is clipped on the 390-point floor.
     @ViewBuilder private var stageHUD: some View {
         if controller.stagePhase != nil, !Self.isIntro(flowPhase), !Self.isDimmed(flowPhase) {
-            let hud = controller.hud
-            VStack(spacing: 4) {
-                HStack(spacing: 14) {
-                    Text("备用\(hud.lives)").foregroundStyle(.red)
-                    Label("待出\(hud.enemiesWaiting) 场上\(hud.enemiesOnField)", systemImage: "shield.lefthalf.filled")
-                        .foregroundStyle(.orange)
-                    Label((hud.baseMaxHP <= 8
-                           ? String(repeating: "■", count: max(0, hud.baseHP)) + String(repeating: "□", count: max(0, hud.baseMaxHP - hud.baseHP))
-                           : "\(hud.baseHP)/\(hud.baseMaxHP)") + (hud.shield ? "🛡" : ""), systemImage: "house.fill")
-                        .foregroundStyle(hud.baseHP > 1 ? .green : .red)
-                    Text("\(hud.score)").foregroundStyle(.yellow)
-                }
-                HStack(spacing: 14) {
-                    if hud.lifeState == .eliminated {
-                        Text("已阵亡").foregroundStyle(.red)
-                    } else if hud.lifeState == .awaitingRespawn {
-                        Text("重生中…").foregroundStyle(.cyan)
-                    } else {
-                        Text("护甲 \(hud.armor)/\(hud.maxArmor)").foregroundStyle(hud.armor > 1 ? .white : .red)
-                        Text("\(HUDLabels.weapon(hud.weaponID)) \(hud.ammo)/\(hud.maxAmmo)").foregroundStyle(.orange)
-                        Text("火力\(hud.powerLevel) 速度\(hud.speedLevel)").foregroundStyle(.white)
-                        Text("装备 \(HUDLabels.equipment(hud.equipmentID))").foregroundStyle(.mint)
-                        if hud.invincible { Text("无敌").foregroundStyle(.yellow) }
-                    }
-                }
-            }
+            StageHUDBar(hud: controller.hud)
             .id(hudTick)
             .font(.system(size: 12, weight: .bold, design: .monospaced))
             .padding(.horizontal, 12).padding(.vertical, 5)

@@ -1872,6 +1872,36 @@ drops nothing, fort and hidden cells never roll, an extra life is never a
 brick drop, and two seeds agree. Owner-facing: the expected yield per
 stage (2–4 hits of which at most 2 land) is in §17 for the playtest.
 
+*The HUD in icons, and the controls in plates (2026-10-08, owner).* The
+bar was all text; the owner asked for icons, pointing at 决战坦克 and the
+genre, and called the stick and fire buttons ugly. `StageHUDBar` shows
+every §15.2 item as the game's own art with a number or pips beside it:
+the player's tank and ×N for reserves; the enemy tank (archetype
+`normal_a` through the same appearance mapping as the field) with the
+number still to come and a dot per tank on the field; the base sprite in
+its damage state with the shield icon over it and its durability as pips;
+a star and the score; the armour pickup's shield with eight pips; the
+special weapon's pickup icon with the rounds left; the power and speed
+pickups with three pips each; the equipment's pickup icon or an empty
+slot; the invincibility star while it lasts. Icons are cropped to their
+drawn content (`MenuArt.glyph`) so the row is art, not canvas padding.
+The controls keep their glass (the owner's 2026-10-01 choice) but wear
+the plate language: a steel ring for the stick and the normal gun, fire
+yellow for the special channel, dark glass inside with a top sheen, the
+pressed state filling the glass with the channel's colour; the stick's
+base carries the delivery's four arrow glyphs and the held direction
+lights; the fire buttons wear the weapon pickups' icons. Hit geometry is
+untouched (66 pt visible, 90 pt hit circles 96 pt apart, 96/44 pt stick,
+12 pt dead zone, 36 pt leash). Verified on the simulator in a stage and
+in the arena. One reading from the gate worth keeping: the smoke render's
+arena pass reported ground 21.9 % (it had been 68.6 %), just over its 20 %
+floor. Reproduced by hand: a shot 2 s after launch classifies at 0 %, a
+shot at 5 s at 68.6 % — the app's first frame now arrives later (one
+GameAudio warming 26 cues at the root, under the launch image) and the
+script's first retry caught the hand-off mid-fade. A timing margin, not a
+rendering defect; if it recurs, the script should wait for two consecutive
+playfield classifications rather than accept the first.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
