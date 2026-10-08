@@ -9,7 +9,9 @@ import Observation
 /// simulation or a recording.
 @Observable
 public final class SettingsStore {
-    /// nil = follow the phone (`AppLanguage.system`).
+    /// nil = not chosen yet: the phone's language, English if the phone's
+    /// is not one of the six (`AppLanguage.system`). Settings shows that
+    /// one selected; there is no separate "system" choice.
     public var language: AppLanguage? { didSet { write("language", language?.rawValue) } }
     public var soundEnabled: Bool { didSet { write("soundEnabled", soundEnabled) } }
     /// 0…1, applied over every cue's own level.

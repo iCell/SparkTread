@@ -1984,6 +1984,17 @@ consecutive playfield readings; the HUD's ammo count wears the weapon's
 off the pause plate. Controller support stays deferred by the owner's
 word.
 
+*Two corrections from the owner (2026-10-08).* No "system" entry in the
+language row: the phone's language (English when the phone's is not one
+of the six) is simply the plate shown selected until the player picks
+another; the store keeps nil for "not chosen" and the row shows
+`effectiveLanguage`. And "Campaign" questioned: in English it reads as a
+military-sim term for what is an arcade stage run, so the four
+non-Chinese languages now say Start Game / Continue / New Game and
+"All Stages Cleared" (ゲームスタート / つづきから / はじめから, 게임 시작 /
+이어하기 / 처음부터, Jugar / Continuar / Nueva partida); the Chinese 战役 /
+戰役 is the owner's own word and stays.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

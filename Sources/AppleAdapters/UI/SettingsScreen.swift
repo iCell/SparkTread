@@ -57,11 +57,12 @@ struct SettingsList: View {
         @Bindable var settings = settings
         VStack(alignment: .leading, spacing: 18) {
             section(strings("settings.language")) {
-                // The language's own name for each, never translated,
-                // so the wrong language can still be undone.
-                let options: [(id: String, label: String)] = [("system", strings("settings.language.system"))]
-                    + AppLanguage.allCases.map { ($0.rawValue, $0.nativeName) }
-                PlateSegments(options: options, selection: settings.language?.rawValue ?? "system") { id in
+                // The six languages by their own names, never translated, so
+                // the wrong language can still be undone. No "system" entry
+                // (owner 2026-10-08): the phone's language is simply the one
+                // selected until the player picks another.
+                PlateSegments(options: AppLanguage.allCases.map { ($0.rawValue, $0.nativeName) },
+                              selection: settings.effectiveLanguage.rawValue) { id in
                     settings.language = AppLanguage(rawValue: id)
                 }
             }

@@ -2648,25 +2648,25 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Campaign Complete"
+            "value": "All Stages Cleared"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Campaña completada"
+            "value": "Todos los niveles superados"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "キャンペーンクリア"
+            "value": "全ステージクリア"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "캠페인 완료"
+            "value": "전 스테이지 클리어"
           }
         },
         "zh-Hans": {
@@ -3724,46 +3724,6 @@
         }
       }
     },
-    "settings.language.system": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Según el sistema"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "システムに従う"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "시스템 설정 따르기"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟随系统"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "依照系統設定"
-          }
-        }
-      }
-    },
     "settings.largeHUD": {
       "localizations": {
         "en": {
@@ -4530,25 +4490,25 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continue Campaign"
+            "value": "Continue"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continuar campaña"
+            "value": "Continuar"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "キャンペーンを続ける"
+            "value": "つづきから"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "캠페인 계속"
+            "value": "이어하기"
           }
         },
         "zh-Hans": {
@@ -4570,25 +4530,25 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New Campaign"
+            "value": "New Game"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nueva campaña"
+            "value": "Nueva partida"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "新しいキャンペーン"
+            "value": "はじめから"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "새 캠페인"
+            "value": "처음부터"
           }
         },
         "zh-Hans": {
@@ -4691,25 +4651,25 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Start Campaign"
+            "value": "Start Game"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Iniciar campaña"
+            "value": "Jugar"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "キャンペーン開始"
+            "value": "ゲームスタート"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "캠페인 시작"
+            "value": "게임 시작"
           }
         },
         "zh-Hans": {
