@@ -2234,6 +2234,21 @@ a weave instead of a gallery. Validator passes (both routes reach the
 critical crate at (2, 15)); no test pins the layout; the card's map
 redraws from the content.
 
+*R5.19 — alive cap 50 / 70 / 100 % (2026-10-09, owner).* Owner: 把同场敌数
+上限和敌人加强弹药在休闲难度下降低为 50%，标准难度为 70%，老兵皆为 100%.
+`maxAliveEnemiesPercent` 70 / 85 / 100 → 50 / 70 / 100 (stage 7's 6 →
+3 / 4 / 6; stage 1's 4 → 2 / 2 / 4; the floor of 1 holds). The
+`enemySpecialAmmoPercent` field is set to the same numbers, but it is
+inert: GAME_RULES §9.1 gives enemies unlimited special ammunition and
+nothing in GameCore or the builder reads the field (the table given to
+the owner earlier today listed it as if it were live — corrected in
+chat). Whether enemy special ammo should become finite is the owner's
+call; until then the field is a recorded value. `DifficultyContentTests`
+updated. The owner's screenshot of stage 7 with the old walls was taken
+from the earlier build or a resumed mid-stage snapshot (which carries
+its world's terrain); the installed bundle holds the new layout —
+verified in the deployed .app.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
