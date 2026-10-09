@@ -12,5 +12,7 @@
   "telegraphTicksPercent": 100,
   "composition": "baseline",
   "alliedBaseDamage": true,
-  "enemySpecialAmmoPercent": 100
+  "enemySpecialAmmoPercent": 100,
+  "startingLives": 3,
+  "dropChancePercentScale": 100
 }

@@ -64,6 +64,13 @@ import GameCore
         #expect(model.run(forStageIndex: 1)?.difficultyID == "veteran") // a new run on that stage, not the casual checkpoint
         #expect(model.run(forStageIndex: 0)?.difficultyID == "veteran")
         #expect(AppFlowModel(campaign: campaign).difficultyID == "standard")
+        // R5.12: a new run starts with the difficulty's reserves; an unlisted
+        // difficulty starts with 3.
+        #expect(model.run(forStageIndex: 0)?.checkpoint.lives == 3)
+        model.startingLivesByDifficulty = ["casual": 5, "standard": 3, "veteran": 1]
+        #expect(model.run(forStageIndex: 0)?.checkpoint.lives == 1)
+        model.difficultyID = "casual"
+        #expect(model.run(forStageIndex: 0)?.checkpoint.lives == 5)
     }
 
     @Test func launchEnvironmentSkipsTheTitle() {

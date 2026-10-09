@@ -29,6 +29,35 @@ private let vs01URL = repoRoot
         #expect(world.stage?.maxAliveEnemies == 4)
     }
 
+    /// R5.12 (ADR-0025): stages 2–12 roll ordinary drops at 20 % from one
+    /// weighted table that holds the extra life once; stage 1 keeps the
+    /// reference's channels. Until 2026-10-09 every table was empty, so
+    /// nothing ever dropped and the brick drops of ADR-0023 were inert.
+    @Test func everyStageAfterTheFirstRollsDropsFromTheWeightedTable() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let campaign = try CampaignLoader.load(at: root.appendingPathComponent("Content/campaigns/campaign_v1.json"))
+        for (index, id) in campaign.stageIDs.enumerated() {
+            let def = try StageLoader.loadDefinition(at: root.appendingPathComponent("Content/stages/\(id).json"))
+            if index == 0 {
+                #expect(def.dropChancePercent == 0 && def.dropTable.isEmpty, "\(id)")
+                continue
+            }
+            #expect(def.dropChancePercent == 20, "\(id)")
+            #expect(def.dropTable.count == 15 && def.dropTable.filter { $0 == "extra_life" }.count == 1, "\(id)")
+            #expect(def.dropTable.filter { $0 == "armor_up" }.count == 3 && def.dropTable.filter { $0 == "ammo_crate" }.count == 3, "\(id)")
+            // The brick drops draw from this table minus the extra life: never empty.
+            #expect(def.dropTable.contains { $0 != "extra_life" }, "\(id)")
+        }
+        // The builder scales the chance by the difficulty.
+        let url = root.appendingPathComponent("Content/stages/\(campaign.stageIDs[1]).json")
+        let def = try StageLoader.loadDefinition(at: url)
+        let casual = try DifficultyLoader.load(at: root.appendingPathComponent("Content/difficulties/casual.json"))
+        let veteran = try DifficultyLoader.load(at: root.appendingPathComponent("Content/difficulties/veteran.json"))
+        #expect(try StageBuilder.build(def, difficulty: casual).stage?.dropChancePercent == 30)
+        #expect(try StageBuilder.build(def, difficulty: veteran).stage?.dropChancePercent == 10)
+    }
+
     /// The loaded world is deterministic and stable — a golden checksum so
     /// an accidental content edit is caught. Regenerate with a review note.
     @Test func loadedVS01ChecksumIsStable() throws {

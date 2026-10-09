@@ -97,7 +97,7 @@ public enum StageBuilder {
             telegraphTicks: difficulty.telegraphTicks(authored: def.telegraphTicks),
             playerRespawnCell: Vec2i(x: playerCell[0], y: playerCell[1]),
             dropTable: def.dropTable,
-            dropChancePercent: def.dropChancePercent,
+            dropChancePercent: difficulty.dropChancePercent(authored: def.dropChancePercent),
             carriedPickupQueue: carriedQueue,
             hiddenPickups: (def.hiddenPickups ?? []).map {
                 HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id, critical: $0.critical ?? false)

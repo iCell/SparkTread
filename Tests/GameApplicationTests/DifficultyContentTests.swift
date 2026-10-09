@@ -24,6 +24,11 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         // GAME_RULES §9.3: the spawn process is 45 ticks on every difficulty.
         #expect(casual.telegraphTicksPercent == 100 && veteran.telegraphTicksPercent == 100)
         #expect(casual.enemySpecialAmmoPercent == 70 && veteran.enemySpecialAmmoPercent == 140)
+        // R5.12 (ADR-0025): reserves 5 / 3 / 1, random drops 150 / 100 / 50 %.
+        #expect(casual.startingLives == 5 && standard.startingLives == 3 && veteran.startingLives == 1)
+        #expect(casual.dropChancePercentScale == 150 && standard.dropChancePercentScale == 100 && veteran.dropChancePercentScale == 50)
+        #expect(casual.dropChancePercent(authored: 20) == 30 && veteran.dropChancePercent(authored: 20) == 10)
+        #expect(casual.dropChancePercent(authored: 80) == 100) // capped
         for def in [casual, standard, veteran] { #expect(DifficultyValidator.validate(def).isEmpty) }
     }
 

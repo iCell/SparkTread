@@ -2015,6 +2015,42 @@ checkpoint are unchanged. Replay format 13 → 14; no golden moved (none
 has a player death). `RespawnTests` re-pinned; §17 item 6 watches whether
 the later stages turn punishing.
 
+*Lives across stages in the original (2026-10-09, owner's question).* The
+rulebook's appendix A had listed lives among the values the video could
+not measure. It can: part 1 of BV14b411K7bv (re-fetched at 360p; the
+first 480p fetch decoded only to 8.5 min) shows the reserves as small tank
+icons under the score, switching to "icon ×NN" from five up. Sampled at
+1 fps across two stage changes: four icons before the card and four after
+(≈1300–1360 s), "06" before and "06" after (≈1800–1860 s); a 1UP took
+three to four, a death took 07 to 06 with nothing restored, and a Game
+Over at ≈975 s continued at three with the score reset. So the original
+carries reserves across stages, which is what §11.3 says; the owner asked
+because the select screen had been handing back the checkpoint (fixed the
+same day).
+
+*The heart's drop rate, and what it uncovered — GAME_RULES R5.12,
+ADR-0025 (2026-10-09, owner).* Asked how often the extra life drops, the
+content answered 0 %: every stage had an empty `dropTable` and chance 0
+(authored 2026-10-03 with carriers, hidden treasures and fixed spawns
+only), so ordinary kills never rolled — and ADR-0023's brick drops, which
+draw from the same table, had been inert in all twelve stages. The owner
+then decided the random rate should follow the difficulty and a new run's
+reserves should be 5 / 3 / 1. Done: `DifficultyDefinition.startingLives`
+and `dropChancePercentScale` (150 / 100 / 50; lenient decode, validated);
+`StageBuilder` scales the authored chance, capped at 100; a run from the
+select screen starts with the difficulty's reserves
+(`SessionState.campaignStart(lives:)`, read by the flow model from the
+bundled profiles at launch); stages 2–12 author 20 % from one weighted
+table (armor ×3, ammo crate ×3, speed ×2, power ×2, base shield, freeze,
+bomb, invincibility, extra life ×1 — the heart ≈1.3 % per kill on
+standard, beside the three authored hearts of stages 7, 11 and 12);
+stage 1 keeps the reference's channels. Brick drops stay unscaled by the
+owner's 2026-10-08 word. The simulation is untouched (the chance was
+always content), so the replay format stays 14. Tests: the three
+profiles' numbers and the capped scaling, `campaignStart(lives:)`, every
+stage's table, the builder's scaled chance, and the flow model's lives
+by difficulty.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

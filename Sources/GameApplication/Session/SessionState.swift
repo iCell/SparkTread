@@ -31,15 +31,18 @@ public struct SessionState: Codable, Equatable, Sendable {
 
     /// Campaign start (plan §6.4 PROVISIONAL values): 3 lives, no score,
     /// Rapid with 50 rounds, no upgrades.
-    public static let campaignStart: SessionState = {
+    public static let campaignStart: SessionState = campaignStart(lives: PlayerState(playerID: .one).lives)
+
+    /// Campaign start with a difficulty's reserve count (R5.12: 5 / 3 / 1).
+    public static func campaignStart(lives: Int) -> SessionState {
         let fresh = PlayerState(playerID: .one)
-        return SessionState(lives: fresh.lives, score: fresh.score,
+        return SessionState(lives: lives, score: fresh.score,
                             specialAmmoByWeapon: fresh.specialAmmoByWeapon,
                             retainedSpeedLevel: fresh.retainedSpeedLevel,
                             retainedPowerLevel: fresh.retainedPowerLevel,
                             retainedEquipmentID: fresh.retainedEquipmentID,
                             retainedSpecialWeaponID: fresh.retainedSpecialWeaponID)
-    }()
+    }
 
     /// The state a world's player carries out of a stage: the retained
     /// upgrades are read from the live tank when it exists (the retention

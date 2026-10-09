@@ -211,8 +211,8 @@
   "initialEnemyDelayTicks": 240,
   "telegraphTicks": 45,
   "pickupSpawns": [],
-  "dropTable": [],
-  "dropChancePercent": 0,
+  "dropTable": ["armor_up", "armor_up", "armor_up", "ammo_crate", "ammo_crate", "ammo_crate", "speed_up", "speed_up", "power_up", "power_up", "base_shield", "freeze_enemy", "bomb", "invincibility", "extra_life"],
+  "dropChancePercent": 20,
   "carriedDrops": [
     {
       "queueIndex": 5,

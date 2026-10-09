@@ -29,6 +29,9 @@ public struct AppFlowModel: Equatable, Sendable {
     /// run keeps its own.
     public var difficultyID: String = CampaignRun.defaultDifficultyID
     public static let difficultyIDs = ["casual", "standard", "veteran"]
+    /// R5.12: the reserve tanks each difficulty starts with, read from the
+    /// difficulty content at launch; an id not listed starts with 3.
+    public var startingLivesByDifficulty: [String: Int] = [:]
 
     public init(campaign: CampaignDefinition?, progress: CampaignProgress? = nil,
                 suspended: SuspendedSession? = nil, autostart: Bool = false, lab: Bool = false) {
@@ -51,7 +54,9 @@ public struct AppFlowModel: Equatable, Sendable {
     /// a "new game" started with the old run's lives and score (owner).
     public func run(forStageIndex index: Int) -> CampaignRun? {
         guard let campaign, isUnlocked(stageIndex: index) else { return nil }
-        return CampaignRun(campaign: campaign, stageIndex: index, difficultyID: difficultyID)
+        return CampaignRun(campaign: campaign, stageIndex: index,
+                           checkpoint: .campaignStart(lives: startingLivesByDifficulty[difficultyID] ?? 3),
+                           difficultyID: difficultyID)
     }
 
     /// Resuming the snapshot leaves the title; declining discards it.
@@ -128,6 +133,13 @@ public struct AppRootView: View {
             catch { fatalError("bundled campaign failed to load: \(error)") }
         }
         self.campaign = campaign
+        // Each difficulty's starting reserves (R5.12), from the same content
+        // the stages are built with; a profile that fails to load leaves
+        // its difficulty at 3, and the gate validates the profiles anyway.
+        var startingLives: [String: Int] = [:]
+        for id in AppFlowModel.difficultyIDs {
+            if let def = try? DifficultyLoader.load(id: id, bundle: .main) { startingLives[id] = def.startingLives }
+        }
         var maps: [String: StagePreview.Map] = [:]
         for stageID in campaign?.stageIDs ?? [] {
             // The campaign loader already proved every stage decodes; a card
@@ -156,8 +168,9 @@ public struct AppRootView: View {
             }
         }
         self.store = store
-        let model = AppFlowModel(campaign: campaign, progress: progress, suspended: suspended,
+        var model = AppFlowModel(campaign: campaign, progress: progress, suspended: suspended,
                                  autostart: env["SPARKTREAD_AUTOSTART"] != nil, lab: lab)
+        model.startingLivesByDifficulty = startingLives
         _model = State(initialValue: model)
         _storeNotice = State(initialValue: notice)
         _controller = State(initialValue: Self.makeController(for: model.screen, run: model.run(forStageIndex: 0),

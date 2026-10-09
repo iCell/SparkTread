@@ -37,6 +37,9 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
         #expect(start.retainedSpeedLevel == 1 && start.retainedPowerLevel == 0 // GAME_RULES §11.3
                 && start.retainedEquipmentID == nil && start.retainedSpecialWeaponID == "rapid")
         #expect(start.validationIssues.isEmpty)
+        // R5.12: a difficulty's reserves, everything else the fresh player's.
+        let casual = SessionState.campaignStart(lives: 5)
+        #expect(casual.lives == 5 && casual.score == 0 && casual.specialAmmoByWeapon == ["rapid": 50])
     }
 
     @Test func carriedStateReadsTheLiveTankAndAppliesToAFreshPlayer() throws {
