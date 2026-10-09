@@ -58,6 +58,9 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         UIRequiresFullScreen: true
+        # HTTPS only (Firebase): exempt from export documentation, so no
+        # compliance question on every upload.
+        ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
@@ -69,7 +72,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1" # V1 ships for iPhone only (ADR-0028)
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: HFA66PX9R5 # personal team (free provisioning)
+        DEVELOPMENT_TEAM: HFA66PX9R5 # the paid team that owns io.icell.sparktread in App Store Connect
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
 schemes:
   SparkTread:
