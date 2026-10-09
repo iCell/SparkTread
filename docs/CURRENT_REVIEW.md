@@ -2075,6 +2075,15 @@ would have overwritten the document and locked stages an earlier run had
 opened; `persistProgress` now writes the union of the stored and the
 run's completed stages and the greater best score. Two tests pin both.
 
+*Stage 4's cap (2026-10-09, owner, screenshot).* 水路侧袭 was too hard to
+pass: the top-centre bastion's brick cap over its pocket at columns
+27–28 (rows 4–5), directly above the steel plug at rows 8–9 and in line
+with the base below, is now steel — the owner circled it and asked for
+steel. The brick cap rect [23,4,31,5] became [23,4,26,5] + [29,4,31,5]
+and the steel layer gained [27,4,28,5]; the content validator passes
+(the base stays reachable through brick, not steel). No other cell
+changed; the stage's seed and roster are as authored.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
