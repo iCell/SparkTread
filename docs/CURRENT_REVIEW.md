@@ -2298,12 +2298,14 @@ R5.21 cut had kept every archetype at one tank or more. The owner does
 not want that floor: a type that shows up once in a stage teaches
 nothing. Types left at a single tank and not in the stage's §14.1
 must-appear list are gone — stage 2 rapid_b, stage 4 fire_a, stage 5
-ap_a, stage 7 explosion_a — totals 17 / 21 / 21 / 23 → 16 / 17 / 17 /
-18 (stage 3's ap_a and ap_c stay at one each: they are the stage's
+ap_a, stage 7 explosion_a — totals 17 / 21 / 21 / 23 → 16 / 20 / 20 /
+22 with reinforcements (stage 3's ap_a and ap_c stay at one each: they are the stage's
 teaching). Every type still appears by stage 10 (rapid_b in 5 and 9,
 fire_a in 2 and 9, ap_a in 3 and 6, explosion_a in 3 and 6). Carrier
 indices and phase triggers remain inside the shorter queues. B.18
 amended; the §14.1 table follows.
+Owner's decision afterwards (维持原状): the rosters stay as they are now;
+no deeper cut.
 
 ## Remaining gaps / follow-up review
 
