@@ -53,6 +53,8 @@ targets:
           UIImageName: LaunchBackdrop
           UIColorName: LaunchBase
           UIImageRespectsSafeAreaInsets: false
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         UIRequiresFullScreen: true
@@ -62,6 +64,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.icell.sparktread
+        MARKETING_VERSION: "0.1.0" # matches the App Store Connect version
+        CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1" # V1 ships for iPhone only (ADR-0028)
         CODE_SIGN_STYLE: Automatic

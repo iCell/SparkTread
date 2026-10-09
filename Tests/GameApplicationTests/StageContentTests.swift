@@ -159,6 +159,19 @@ private let vs01URL = repoRoot
         #expect(StageValidator.validate(def).contains { $0.contains("straight lane") }) // too low
     }
 
+    /// Owner 2026-10-09 (stage 2): a spawn walled in by water and brick
+    /// left its tanks stuck. Enclosing VS-01's corner spawn the same way is
+    /// rejected; the shipped stages pass (everyShippedStageValidates…).
+    @Test func validatorRejectsATrappedSpawn() throws {
+        var def = try StageLoader.decode(Data(contentsOf: vs01URL))
+        #expect(!StageValidator.validate(def).contains { $0.contains("trapped") })
+        def.terrain.layers.append(.init(kind: "ground", rects: [[1, 1, 6, 5]], cells: nil))
+        def.terrain.layers.append(.init(kind: "water", rects: [[1, 4, 6, 5], [5, 1, 6, 3]], cells: nil))
+        def.terrain.layers.append(.init(kind: "brick", rects: [[3, 3, 4, 3]], cells: nil))
+        let issues = StageValidator.validate(def)
+        #expect(issues.contains { $0.contains("enemy spawn [1, 1]") && $0.contains("trapped") })
+    }
+
     @Test func validatorRejectsUnreachableBase() {
         var def = try! StageLoader.decode(Data(contentsOf: vs01URL))
         // Wall the base off completely with a steel ring around row 22.

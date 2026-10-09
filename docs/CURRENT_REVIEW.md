@@ -2390,6 +2390,21 @@ validated 50…500; mixed into the checksum. `BaseShieldDurationTests`
 (the rule at 100 / 200 / 300 and a pickup collected in a stage) and
 `DifficultyContentTests`. Replay format 18 → 19; no golden moved.
 
+*Stage 2's trapped corners — R5.24 (2026-10-09, owner: 第 2 关的地图设计有点
+问题，左上角和右上角的坦克被困住了).* Each corner spawn sat in a pocket:
+rows 1–2 ran only to the water column at x 12–13 (x 42–43 on the right),
+which started on row 2 — a tank is two cells tall, so row 1 alone does
+not pass — with foliage below and the water band of rows 7–8 under that;
+the only exit was shooting through the brick at x 6–11. A footprint
+flood from every spawn of every stage (no wall broken, no water crossed)
+found stage 2's two corners reaching 26 positions and every other spawn
+reaching the base. The water columns now start on row 3, so rows 1–2 run
+the width of the arena. `StageValidator.drivesToBase` enforces it for
+every stage from now on (a 2×2 footprint over ground, ice and foliage
+must reach a cell beside the fort or the base);
+`StageContentTests.validatorRejectsATrappedSpawn` pins it, and the
+validator flags both corners on the old stage 2. Content only.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

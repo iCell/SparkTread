@@ -296,7 +296,50 @@ public enum StageValidator {
                 issues.append("columns \(x0)–\(x0 + 1) above the fort are open from row 3 to \(openTo): a straight lane from the spawns onto the base; a wall must stand in them by row \(centreLaneWallByRow)")
             }
         }
+
+        // Every enemy spawn drives out (GAME_RULES §14.2, R5.24; owner
+        // 2026-10-09 on stage 2: the corner tanks sat in pockets of water
+        // and brick and left only by shooting a way out, which the AI may
+        // never do). A plain tank's 2×2 footprint, over ground, ice and
+        // foliage only — no wall broken, no water crossed — must reach a
+        // cell beside the fort or the base.
+        if footprintInBounds(def.baseSpawn) {
+            for spawn in def.enemySpawns where footprintInBounds(spawn) && !drivesToBase(def, from: spawn) {
+                issues.append("enemy spawn \(spawn) cannot drive to the base without breaking a wall or crossing water: a tank spawned there is trapped")
+            }
+        }
         return issues
+    }
+
+    /// Whether a footprint starting at `spawn` reaches, over drivable cells
+    /// only, a cell beside the fort template or the base (§14.2).
+    static func drivesToBase(_ def: StageDefinition, from spawn: [Int]) -> Bool {
+        let arena = ArenaSpecification.universal
+        let base = def.baseSpawn
+        func isBase(_ x: Int, _ y: Int) -> Bool { x >= base[0] && x < base[0] + 2 && y >= base[1] && y < base[1] + 2 }
+        func drivable(_ x: Int, _ y: Int) -> Bool {
+            guard x >= 0, y >= 0, x < arena.cellsWide, y < arena.cellsHigh, !isBase(x, y) else { return false }
+            let cell = authoredCell(def, at: [x, y])
+            return !cell.kind.isWall && cell.kind != .base && cell.surface != .water
+        }
+        func fits(_ x: Int, _ y: Int) -> Bool {
+            drivable(x, y) && drivable(x + 1, y) && drivable(x, y + 1) && drivable(x + 1, y + 1)
+        }
+        let anchors = (def.fortTemplate ?? []).filter { $0.count == 2 }
+            + [base, [base[0] + 1, base[1]], [base[0], base[1] + 1], [base[0] + 1, base[1] + 1]]
+        var beside = Set<Int>()
+        for n in neighborsOf(anchors) where drivable(n[0], n[1]) { beside.insert(n[0] * 100 + n[1]) }
+        guard fits(spawn[0], spawn[1]) else { return false }
+        var seen: Set<Int> = [spawn[0] * 100 + spawn[1]]
+        var stack = [(spawn[0], spawn[1])]
+        while let (x, y) = stack.popLast() {
+            for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] where beside.contains((x + dx) * 100 + y + dy) { return true }
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let n = (x + dx, y + dy)
+                if fits(n.0, n.1), seen.insert(n.0 * 100 + n.1).inserted { stack.append(n) }
+            }
+        }
+        return false
     }
 
     /// The last row by which the fort's columns must hold a wall (§14.2).
