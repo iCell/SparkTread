@@ -270,7 +270,7 @@
     },
     {
       "archetype": "normal_b",
-      "count": 6
+      "count": 8
     },
     {
       "archetype": "rapid_b",
@@ -286,7 +286,7 @@
     },
     {
       "archetype": "ap_d",
-      "count": 3
+      "count": 1
     }
   ],
   "enemySpawns": [

@@ -2084,6 +2084,13 @@ and the steel layer gained [27,4,28,5]; the content validator passes
 (the base stays reachable through brick, not steel). No other cell
 changed; the stage's seed and roster are as authored.
 
+*Stage 4's AP tanks (2026-10-09, owner).* Still too hard: fewer AP tanks.
+The roster had three 穿甲D in the queue plus one in the amphibious-flank
+reinforcement; the queue now has one (3 → 1) and two more 普通B (6 → 8),
+so the stage still fields its 24 + 4 of §14.1's budget of 28 and still
+introduces 穿甲D — once in the queue, once as the elite phase's own. The
+carriers' queue indices are unchanged; the validator passes.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
