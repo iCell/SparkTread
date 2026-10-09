@@ -279,15 +279,35 @@ public final class MovementLabController {
         campaignRun = run
         // Checkpoint after every completed stage (§5.1): completed stages,
         // the run to continue (none once the campaign is complete), best score.
-        persist { store in
-            try store.saveProgress(CampaignProgress(
-                campaignID: run.campaign.id, completedStageIDs: run.completedStageIDs,
-                checkpoint: hasNext ? run : nil, bestScore: bestScore))
-        }
+        persistProgress(checkpoint: hasNext ? run : nil, run: run)
         if !hasNext {
             campaignComplete = true
             syncInputAdmission()
         }
+    }
+
+    /// Writes the progress document around `run`: the completed stages are
+    /// the UNION of the stored document's and the run's, so a new run that
+    /// starts part-way never locks stages an earlier run opened; the best
+    /// score is the greater of the two.
+    private func persistProgress(checkpoint: CampaignRun?, run: CampaignRun) {
+        persist { store in
+            let stored = try store.loadProgress()
+            let completed = Array(Set((stored?.completedStageIDs ?? []) + run.completedStageIDs)).sorted()
+            try store.saveProgress(CampaignProgress(
+                campaignID: run.campaign.id, completedStageIDs: completed,
+                checkpoint: checkpoint, bestScore: max(bestScore, stored?.bestScore ?? 0)))
+        }
+    }
+
+    /// A run the player has just started from the title or the select
+    /// screen becomes the run to continue (owner 2026-10-09: a new casual
+    /// game, lost on its first stage, then 继续 resumed an OLD run with its
+    /// last lives — because a checkpoint was only ever written on a win).
+    /// Written at the start, with the run's own starting state.
+    public func checkpointRunStart() {
+        guard let run = campaignRun, !campaignComplete else { return }
+        persistProgress(checkpoint: run, run: run)
     }
 
     /// The player's 下一关 on a won stage's results: build the booked next

@@ -159,4 +159,37 @@ private func play(_ controller: MovementLabController, ticks: Int = 0) {
         // The files stay for inspection.
         #expect(FileManager.default.fileExists(atPath: store.progressURL.path))
     }
+    /// Owner 2026-10-09: a new casual game, lost on its first stage, then
+    /// 继续 resumed an OLD run with its last lives — a checkpoint had only
+    /// ever been written on a win. A started run is the run to continue
+    /// from its first tick, and the stages an earlier run opened stay open.
+    @Test @MainActor func aStartedRunBecomesTheCheckpointAndKeepsEarlierProgress() throws {
+        let store = InMemorySaveStore()
+        let old = CampaignRun(campaign: campaign, stageIndex: 1, checkpoint: .campaignStart(lives: 0),
+                              completedStageIDs: ["a_01_x"], difficultyID: "veteran")
+        try store.saveProgress(CampaignProgress(campaignID: "test", completedStageIDs: ["a_01_x"], checkpoint: old, bestScore: 900))
+        let fresh = CampaignRun(campaign: campaign, stageIndex: 0, checkpoint: .campaignStart(lives: 5), difficultyID: "casual")
+        let controller = MovementLabController(campaign: fresh, stages: provider(), persistence: store)
+        controller.checkpointRunStart()
+        let progress = try #require(store.progress)
+        #expect(progress.checkpoint == fresh && progress.checkpoint?.checkpoint.lives == 5)
+        #expect(progress.completedStageIDs == ["a_01_x"] && progress.bestScore == 900) // nothing lost
+    }
+
+    /// A win in a run that started part-way writes the UNION of completed
+    /// stages, never just its own: until 2026-10-09 the document took the
+    /// run's list and could lock stages an earlier run had opened.
+    @Test @MainActor func aWinNeverLocksStagesAnEarlierRunOpened() throws {
+        let store = InMemorySaveStore()
+        try store.saveProgress(CampaignProgress(campaignID: "test", completedStageIDs: ["a_01_x", "a_02_y"], checkpoint: nil, bestScore: 2000))
+        let run = CampaignRun(campaign: campaign, stageIndex: 0, checkpoint: .campaignStart(lives: 3))
+        let controller = MovementLabController(campaign: run, stages: provider(instantWin: ["a_01_x"]), persistence: store)
+        controller.applicationDidBecomeActive()
+        var steps = 0
+        while controller.flow.phase != .finished, steps < 3000 { controller.stepOneTick(); steps += 1 }
+        let progress = try #require(store.progress)
+        #expect(Set(progress.completedStageIDs) == ["a_01_x", "a_02_y"])
+        #expect(progress.bestScore == 2000) // the stored best beats this run's 530
+        #expect(progress.checkpoint?.stageID == "a_02_y")
+    }
 }

@@ -55,7 +55,7 @@ import GameCore
         #expect(model.resumeSuspended() == snapshot && model.screen == .playing(stageIndex: 0))
     }
 
-    @Test func theDifficultyChoiceShapesNewRunsNotTheCheckpoint() {
+    @Test func theDifficultyChoiceShapesNewRunsNotTheCheckpoint() throws {
         let checkpoint = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["a_01_x"], difficultyID: "casual")
         var model = AppFlowModel(campaign: campaign, progress: CampaignProgress(campaignID: "c", completedStageIDs: ["a_01_x"], checkpoint: checkpoint))
         #expect(model.difficultyID == "casual") // follows the checkpoint
@@ -71,6 +71,10 @@ import GameCore
         #expect(model.run(forStageIndex: 0)?.checkpoint.lives == 1)
         model.difficultyID = "casual"
         #expect(model.run(forStageIndex: 0)?.checkpoint.lives == 5)
+        // The run just started is what 继续战役 offers, in its own difficulty.
+        let started = try #require(model.run(forStageIndex: 0))
+        model.adoptCheckpoint(started)
+        #expect(model.checkpoint == started && model.difficultyID == "casual")
     }
 
     @Test func launchEnvironmentSkipsTheTitle() {

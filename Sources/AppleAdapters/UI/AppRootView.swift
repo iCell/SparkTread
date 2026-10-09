@@ -70,6 +70,11 @@ public struct AppFlowModel: Equatable, Sendable {
 
     public mutating func openCampaignSelect() { screen = .campaignSelect }
     public mutating func openSettings() { screen = .settings }
+    /// The run just started is the one 继续战役 offers from now on.
+    public mutating func adoptCheckpoint(_ run: CampaignRun) {
+        checkpoint = run
+        difficultyID = run.difficultyID
+    }
     public mutating func startTraining() { screen = .playing(stageIndex: nil) }
     public mutating func backToTitle() { screen = .title }
 
@@ -231,7 +236,12 @@ public struct AppRootView: View {
 
     private func start(_ run: CampaignRun) {
         guard model.startCampaign(at: run.stageIndex) else { return }
-        controller = MovementLabController(campaign: run, stages: .bundled(), audio: audio, persistence: store)
+        let started = MovementLabController(campaign: run, stages: .bundled(), audio: audio, persistence: store)
+        // This run is the one to continue from now — on disk and on the
+        // title — even if its first stage is lost.
+        started.checkpointRunStart()
+        model.adoptCheckpoint(run)
+        controller = started
     }
 
     private func startTraining() {

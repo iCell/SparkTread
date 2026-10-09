@@ -2061,6 +2061,20 @@ gone from the core and the checksum. Replay format 14 → 15; no golden
 has a stage, so none moved. `BrickDropTests` now asserts the placement
 draw and a legal landing rather than nearness.
 
+*继续 resumed an old run (2026-10-09, owner).* The owner had a run to
+continue with its last lives, started a new casual game (five reserves),
+lost its first stage, and 继续战役 brought back the old run. A checkpoint
+had only ever been written when a stage was WON (`bookWonStage`), so a
+run that loses its first stage never existed on disk or on the title.
+Now `MovementLabController.checkpointRunStart()` writes the started run
+as the checkpoint from its first tick — with its own starting state —
+and `AppFlowModel.adoptCheckpoint` points the title's 继续战役 at it; the
+root calls both in `start(_:)`. Found beside it: every progress write
+took the RUN's completed list, so a run started part-way that won a stage
+would have overwritten the document and locked stages an earlier run had
+opened; `persistProgress` now writes the union of the stored and the
+run's completed stages and the greater best score. Two tests pin both.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
