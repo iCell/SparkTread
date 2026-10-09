@@ -2215,6 +2215,25 @@ of whether Google Analytics was linked when the file was generated; if
 it is linked now, events already land, and if not, no local edit links
 it. Nothing to change in the repository.
 
+*Stage 7's walls (2026-10-09, owner: stage 07 的地图设计不合理，太容易死亡了).*
+Content only; the roster (13 rapid tanks, the stage's §14.1 teaching)
+stays. Why it killed: three thin wall rows with their gaps stacked at
+x 26–29 gave the centre spawn a straight lane of fire from row 1 to the
+fort's top, and nothing stood in front of the fort — rows 22 and 25 were
+open end to end, so the player's spawn at (23, 24) was shot along the
+bottom corridor from the moment it appeared (every neighbouring stage —
+6, 8, 10 — has white brick or steel in front of its fort). Now: the
+middle row's centre is closed (brick 10–17, 22–33, 38–45; gaps at 18–21
+and 34–37, off the top row's 26–29), the bottom row's centre gap over the
+fort is closed (brick 14–41), so no straight lane reaches the fort and
+the corridor is entered only through x 10–13 / 42–45 — past the supplies
+the stage is about; steel posts at x 20 and x 35 (rows 24–25) break the
+bottom rows' lines of fire beside the spawn and the fort's right flank;
+white-brick chicanes at x 16–17 and 38–39 (rows 22–23) make the corridor
+a weave instead of a gallery. Validator passes (both routes reach the
+critical crate at (2, 15)); no test pins the layout; the card's map
+redraws from the content.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
