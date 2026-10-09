@@ -2337,6 +2337,14 @@ landscape band (the app's real layout at 75 %). The captions' every claim
 is a shipped fact (12 stages, 4 themes, 20 enemy types, 5 weapon families,
 3 difficulties).
 
+*V1 ships for iPhone only — ADR-0028 (2026-10-09, owner: 第一版本只支持
+iPhone).* `TARGETED_DEVICE_FAMILY` "1,2" → "1" and the iPad-only
+orientation key removed; the plan's iPad-in-V1 lines point to the ADR.
+The store media are iPhone only (the iPad files were deleted from
+`AppStoreMedia/`; the iPad layout stays in the tooling). On iPad the app
+is offered as an iPhone app in compatibility mode; `ArenaLayoutTests`
+keeps its iPad sizes for that reason.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

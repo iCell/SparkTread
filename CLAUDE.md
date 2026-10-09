@@ -1,6 +1,6 @@
 # SparkTread
 
-Single-player tank-battle arcade game for iPhone (landscape first, iPad/macOS later). Swift + SpriteKit + SwiftUI. A modern remake informed by reverse-analysis of 决战坦克 v1.2.2.
+Single-player tank-battle arcade game for iPhone (landscape first, iPad/macOS later; V1 ships for iPhone only — ADR-0028). Swift + SpriteKit + SwiftUI. A modern remake informed by reverse-analysis of 决战坦克 v1.2.2.
 
 The owner writes in Chinese — answer in Chinese. Decisions that are the owner's (fixed product decisions, provisional numbers, anything marked 待所有者 in the docs) are posted to them in chat, never assumed.
 

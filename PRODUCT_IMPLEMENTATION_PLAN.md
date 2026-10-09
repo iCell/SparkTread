@@ -7,7 +7,7 @@ Status: Planning baseline for implementation and external AI review
 Date: 2026-09-01  
 Primary stack: Swift + SpriteKit + SwiftUI in the current stable Xcode toolchain  
 Primary target: iPhone, landscape orientation  
-Secondary targets: iPad, then macOS  
+Secondary targets: iPad, then macOS (V1 ships for iPhone only — ADR-0028)  
 First release mode: single-player only  
 Deferred mode: two-player online cooperative play  
 
@@ -882,7 +882,7 @@ Destructible terrain rendering uses composited chunk textures (for example 6×6-
 ### 17.3 Resolution behavior
 
 - Arena logic never changes with device, safe area, window size, or display scale.
-- Gameplay supports landscape orientation on iPhone and iPad; portrait gameplay is out of scope for V1.
+- Gameplay supports landscape orientation on iPhone and iPad; portrait gameplay is out of scope for V1. (V1 ships for iPhone only; iPad runs it in iPhone compatibility mode — ADR-0028.)
 - The entire universal arena is uniformly scaled to fit the available gameplay rectangle.
 - No device may crop the arena, stretch one axis, or expose additional playable terrain.
 - Extra aspect-ratio space is used for safe-area-aware HUD, controls, or non-gameplay background treatment; it never becomes exclusive playable terrain.
@@ -1197,7 +1197,7 @@ Deliverables:
 - performance, accessibility, input, save, and export hardening;
 - credits and rights audit;
 - crash/error reporting strategy appropriate to distribution;
-- App Store-ready iPhone packaging plus iPad and macOS build smoke coverage;
+- App Store-ready iPhone packaging plus iPad and macOS build smoke coverage (V1's App Store build is iPhone only — ADR-0028);
 - final content hashes and replay baselines.
 
 Exit criteria:

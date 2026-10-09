@@ -86,7 +86,9 @@ def candidates():
 
 
 SELECTION = json.load(open(os.path.join(HERE, "selection.json")))
-SIZES = {"iphone": (2868, 1320, "side"), "ipad": (2752, 2064, "top")}
+# V1 ships for iPhone only (ADR-0028); the iPad layout ("top", 2752x2064)
+# and its slots in selection.json stay for when iPad is a target again.
+SIZES = {"iphone": (2868, 1320, "side")}
 # The iPad simulator stays portrait; the landscape-only app is letterboxed
 # into this band of its 2064x2752 frame (its real landscape layout at 75 %).
 IPAD_BAND = "crop=2064:1548:0:602"

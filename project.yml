@@ -59,14 +59,11 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.icell.sparktread
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        TARGETED_DEVICE_FAMILY: "1,2"
+        TARGETED_DEVICE_FAMILY: "1" # V1 ships for iPhone only (ADR-0028)
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: HFA66PX9R5 # personal team (free provisioning)
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES

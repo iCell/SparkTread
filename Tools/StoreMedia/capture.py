@@ -184,9 +184,6 @@ if __name__ == "__main__":
         build()
         for n in STAGES:
             stage("iphone", n, 150, every=1.0)
-        menus("iphone", LANGS)
-        for n in STAGES[:2]:
-            stage("ipad", n, 90)
-        menus("ipad", LANGS)
+        menus("iphone", LANGS)  # V1 is iPhone only (ADR-0028); "ipad" still works on request
     else:
         sys.exit(__doc__)
