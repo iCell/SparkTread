@@ -1,0 +1,31 @@
+# App Store listing for SparkTread — text in fastlane/metadata/, media linked
+# from AppStoreMedia/ by Tools/StoreMedia/link_media.sh.
+#
+# Credentials never enter the repo: the App Store Connect API key (an App
+# Manager team key) is read from ~/.appstoreconnect/fastlane_api_key.json,
+# which points at the .p8 in ~/.appstoreconnect/private_keys/.
+#
+#   sh Tools/StoreMedia/link_media.sh
+#   fastlane deliver --skip_screenshots true    # text only
+#   fastlane deliver --skip_metadata true       # screenshots + previews
+#
+# Nothing here submits for review: that stays a decision made by hand.
+
+app_identifier("io.icell.sparktread")
+api_key_path(File.expand_path("~/.appstoreconnect/fastlane_api_key.json"))
+platform("ios")
+app_version("0.1.0")
+
+# The media and the text are the whole payload — the build goes up separately.
+skip_binary_upload(true)
+
+screenshots_path("./fastlane/screenshots")
+app_previews_path("./fastlane/previews")
+overwrite_screenshots(true)
+overwrite_preview_videos(true)
+preview_frame_time_code("00:00:03:00") # the poster frame, 3 s into the preview
+
+force(true)                      # non-interactive: skip the HTML preview prompt
+run_precheck_before_submit(false)
+submit_for_review(false)
+automatic_release(false)

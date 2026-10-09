@@ -1,0 +1,1 @@
+Primera versión de SparkTread: doce niveles en cuatro mundos, veinte tipos de tanques enemigos, cinco familias de armas, tres dificultades y un campo de prácticas.

@@ -1,0 +1,7 @@
+SparkTread is a single-player, offline arcade game. There is no account, no login and no in-app purchase, so no demo credentials are needed.
+
+How to play: the app is landscape-only. On the title screen tap Start Game, pick a difficulty, and play. The left thumb drives (four-way pad), the right thumb fires. Destroy the enemy tanks and keep your own base - the flag at the bottom of the arena - intact. Settings offers a Training Arena, six languages and accessibility switches (high contrast, larger HUD, reduced motion, haptics, mirrored controls).
+
+Analytics: the app includes Firebase Analytics for aggregate gameplay metrics. It collects no contact information, uses no IDFA and performs no tracking across apps or websites.
+
+Feedback: the Feedback button in Settings opens the player's own mail app with a short diagnostics footer (app version, system, device, language, difficulty, progress) that the player sees before sending. Nothing is sent unless the player sends it.

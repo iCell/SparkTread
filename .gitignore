@@ -13,3 +13,10 @@ __pycache__/
 
 # App Store screenshots and previews (Tools/StoreMedia/compose.py); large, rebuilt from captures.
 /AppStoreMedia/
+
+# fastlane keeps the listing text; the media are symlinks into AppStoreMedia/
+/fastlane/screenshots/
+/fastlane/previews/
+/fastlane/report.xml
+/fastlane/Preview.html
+/fastlane/test_output/

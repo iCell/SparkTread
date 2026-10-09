@@ -1,0 +1,30 @@
+SparkTread es un combate de tanques en pixel art para un jugador, hecho para iPhone: los duelos arcade que se comían nuestras monedas, reconstruidos desde cero para el tacto.
+
+Tu base está abajo del campo. Los tanques enemigos entran por arriba. Aguanta.
+
+DOCE NIVELES, CUATRO MUNDOS
+La frontera, la llanura inundable, la fábrica helada y la ciudadela de hierro. Cada mundo cambia el suelo bajo tus orugas y cada nivel trae su propia formación enemiga.
+
+VEINTE TIPOS DE TANQUES ENEMIGOS
+Exploradores rápidos, artilleros pesados, blindados con escudo: cada tipo lleva su arma y sus costumbres. En los últimos niveles los verás a todos a la vez.
+
+CINCO FAMILIAS DE ARMAS
+Normal, ráfaga, fuego, perforante y explosiva. Los objetos cambian tu cañón en plena pelea, y cada familia responde distinto ante los cuatro materiales de muro: el acero solo cede al fuego perforante y el acero pulido no cede ante nada.
+
+EL TERRENO ES UNA TÁCTICA
+Revienta el ladrillo para abrir un carril, cruza el agua con el equipo anfibio, monta orugas antideslizantes para el hielo y prende la hierba para despejar la línea de tiro.
+
+OBJETOS QUE CAMBIAN EL COMBATE
+Mejoras de velocidad, blindaje y potencia, una vida extra, un escudo para la base, congelar a los enemigos, una bomba que limpia la pantalla, y los ladrillos sueltos de los muros, que reconstruyen el de tu base.
+
+TRES DIFICULTADES
+Casual, Estándar y Veterano. Casual te da cinco vidas, enemigos que deciden más despacio y objetos de sobra. Veterano te da una vida y enemigos que disparan en serio.
+
+TAMBIÉN DENTRO
+• Progreso guardado nivel a nivel: deja el teléfono y sigue más tarde
+• Un campo de prácticas para aprender armas y terreno sin gastar vidas
+• Seis idiomas, siguiendo el ajuste de tu teléfono
+• Modo de alto contraste, HUD más grande, menos movimiento, vibración, controles invertidos
+• Se juega completamente sin conexión. Sin anuncios, sin compras integradas, solo un jugador.
+
+Horizontal, iPhone, dos pulgares.

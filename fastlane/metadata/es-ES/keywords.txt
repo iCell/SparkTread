@@ -1,0 +1,1 @@
+tanque,tanques,arcade,retro,pixel,disparos,clasico,defensa,un jugador,sin conexion,2d,guerra
