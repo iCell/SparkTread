@@ -2122,6 +2122,48 @@ alone so no golden moves; the standard difficulty is now the content's
 instead of equating standard with the core default. §9.2 table, §10.5,
 appendix B.12, ADR-0025 amendment.
 
+*继续 offered the stage the run started on (2026-10-09, owner).* Reached
+stage 6, backed out, 继续战役 offered stage 4: the controller wrote the
+advanced run to disk at every win, but the in-memory flow model had kept
+the run as adopted at the start. `leaveGame` now hands the title the run
+as it stands (the stage reached; a lost or abandoned stage from its own
+checkpoint) and clears it when the campaign is complete.
+
+*R5.16 — casual eased again (2026-10-09, owner: 休闲档位还是很难).* Casual
+decides every 50 ticks (was 40), leans on the base 40 % (was 50), wanders
+25 %, fires in 35 % windows (was 50), warns 130 % as long before a spawn,
+and fields 70 % of each stage's and phase's alive cap (6 → 4) through the
+new `maxAliveEnemiesPercent` (validated 10…200; standard and veteran 100).
+§9.2 table, §9.3, appendix B.13. Standard and veteran unchanged.
+
+*R5.17 — standard and veteran eased too (2026-10-09, owner).* Standard:
+interval 40, focus 60 %, wander 15 %, fire 55 %, telegraph 115 %, alive
+cap 85 %. Veteran: interval 30, focus 85 %, wander 10 %, fire 80 %
+(telegraph and cap 100 %). The order casual < standard < veteran holds
+on every knob. Appendix B.14.
+
+*Firebase Analytics (2026-10-09, owner: the basics plus every install's
+progress through the campaign).* The boundary first: the adapters NAME
+the moments (`AnalyticsEvent` — stage_start, stage_clear, stage_fail,
+campaign_complete, with stage number, id, difficulty, score, lives,
+reason) and the install's progress as user properties
+(`furthest_stage_cleared`, `stages_cleared`, `last_difficulty`), through
+an `AnalyticsSink` the app installs; the SDK lives only in the app target
+(`FirebaseAnalyticsSink`, `FirebaseAnalyticsCore`, the product without IDFA support, so no
+tracking prompt), configured at launch only when
+`GoogleService-Info.plist` is bundled — without it the app runs with no
+analytics and no half-configured SDK. The controller emits starts at
+construction and on every `adopt` (retry, 下一关, 再来一局), clears from
+`bookWonStage` with the carried score and lives, the campaign's
+completion, and fails from the `stageLost` event; the progress properties
+are set from the persisted union at every win and from the document at
+launch. Firebase's own first_open / session_start / screen_view cover the
+basics. `AnalyticsTests` drives a two-stage run through a recording sink.
+Needed from the owner: the project's `GoogleService-Info.plist` at
+`Sources/GoldenEagleApp/` (it is picked up by xcodegen's source folder);
+and App Privacy answers at submission (Firebase Analytics: identifiers
+and usage data, not linked to identity, not for tracking).
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

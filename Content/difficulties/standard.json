@@ -3,16 +3,17 @@
   "id": "standard",
   "displayNameKey": "difficulty.standard.name",
   "enemyBehavior": {
-    "decisionIntervalTicks": 30,
-    "baseFocusPercent": 80,
-    "wanderPercent": 10,
-    "fireWindowPercent": 80,
+    "decisionIntervalTicks": 40,
+    "baseFocusPercent": 60,
+    "wanderPercent": 15,
+    "fireWindowPercent": 55,
     "courseCommitPercent": 55
   },
-  "telegraphTicksPercent": 100,
+  "telegraphTicksPercent": 115,
   "composition": "baseline",
   "alliedBaseDamage": true,
   "enemySpecialAmmoPercent": 100,
   "startingLives": 3,
-  "dropChancePercentScale": 100
+  "dropChancePercentScale": 100,
+  "maxAliveEnemiesPercent": 85
 }

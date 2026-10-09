@@ -75,6 +75,13 @@ import GameCore
         let started = try #require(model.run(forStageIndex: 0))
         model.adoptCheckpoint(started)
         #expect(model.checkpoint == started && model.difficultyID == "casual")
+        // Leaving a run that has moved on hands the title the run as it
+        // stands; a complete campaign leaves nothing to continue into.
+        let advanced = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["a_01_x"], difficultyID: "casual")
+        model.adoptCheckpoint(advanced)
+        #expect(model.checkpoint?.stageIndex == 1)
+        model.clearCheckpoint()
+        #expect(model.checkpoint == nil)
     }
 
     @Test func launchEnvironmentSkipsTheTitle() {

@@ -147,6 +147,15 @@ public final class MovementLabController {
         input.isAcceptingInput = false
         self.audio.suspend()
         self.haptics.suspend()
+        logStageStart()
+    }
+
+    /// Analytics: a campaign stage begins — at construction, on retry, on
+    /// 下一关 and on 再来一局 (every `adopt`).
+    private func logStageStart() {
+        guard let run = campaignRun else { return }
+        GameAnalytics.log(.stageStarted(stageNumber: run.stageNumber, stageID: run.stageID, difficulty: run.difficultyID))
+        GameAnalytics.set(.lastDifficulty, run.difficultyID)
     }
 
     /// Resumes a suspended session (plan §17.5, ADR-0003 §3): the snapshot
@@ -240,6 +249,7 @@ public final class MovementLabController {
         themeID = made.themeID
         wonStageBooked = false
         replaceSession(made.session)
+        logStageStart()
     }
 
     /// Stage worlds open with the intro card; the lab and worlds without a
@@ -275,7 +285,10 @@ public final class MovementLabController {
         lastCompletedRecording = session.recording
         let exit = SessionState.carried(from: session.world) ?? run.checkpoint
         bestScore = max(bestScore, exit.score)
+        GameAnalytics.log(.stageCleared(stageNumber: run.stageNumber, stageID: run.stageID, difficulty: run.difficultyID,
+                                        score: exit.score, lives: exit.lives))
         let hasNext = run.advance(exitState: exit)
+        if !hasNext { GameAnalytics.log(.campaignCompleted(difficulty: run.difficultyID, score: exit.score)) }
         campaignRun = run
         // Checkpoint after every completed stage (§5.1): completed stages,
         // the run to continue (none once the campaign is complete), best score.
@@ -297,6 +310,8 @@ public final class MovementLabController {
             try store.saveProgress(CampaignProgress(
                 campaignID: run.campaign.id, completedStageIDs: completed,
                 checkpoint: checkpoint, bestScore: max(bestScore, stored?.bestScore ?? 0)))
+            // The install's progress, as the audience is cut by it.
+            GameAnalytics.recordProgress(completedStageIDs: completed)
         }
     }
 
@@ -607,6 +622,10 @@ public final class MovementLabController {
             }
             if case .stageLost(let reason) = event {
                 flow.beginOutro(won: false, resultRows: KillTally.tableRows, lossReason: reason)
+                if let run = campaignRun {
+                    GameAnalytics.log(.stageFailed(stageNumber: run.stageNumber, stageID: run.stageID,
+                                                   difficulty: run.difficultyID, reason: reason))
+                }
             }
         }
         // A decided stage is no longer resumable: the snapshot goes (§16.1).

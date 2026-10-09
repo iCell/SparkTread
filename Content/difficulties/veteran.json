@@ -3,10 +3,10 @@
   "id": "veteran",
   "displayNameKey": "difficulty.veteran.name",
   "enemyBehavior": {
-    "decisionIntervalTicks": 20,
-    "baseFocusPercent": 110,
-    "wanderPercent": 5,
-    "fireWindowPercent": 120,
+    "decisionIntervalTicks": 30,
+    "baseFocusPercent": 85,
+    "wanderPercent": 10,
+    "fireWindowPercent": 80,
     "courseCommitPercent": 40
   },
   "telegraphTicksPercent": 100,
@@ -14,5 +14,6 @@
   "alliedBaseDamage": true,
   "enemySpecialAmmoPercent": 140,
   "startingLives": 1,
-  "dropChancePercentScale": 50
+  "dropChancePercentScale": 50,
+  "maxAliveEnemiesPercent": 100
 }

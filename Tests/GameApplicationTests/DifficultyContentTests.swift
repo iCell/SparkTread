@@ -18,16 +18,20 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         let veteran = try DifficultyLoader.load(at: difficultyURL("veteran"))
         // R5.15 (owner 2026-10-09): every difficulty leans on the base and
         // fires less than the code's pre-content default; standard is 80/80.
-        #expect(standard.enemyBehavior.baseFocusPercent == 80 && standard.enemyBehavior.fireWindowPercent == 80)
-        #expect(casual.enemyBehavior.baseFocusPercent == 50 && casual.enemyBehavior.fireWindowPercent == 50)
-        #expect(veteran.enemyBehavior.baseFocusPercent == 110 && veteran.enemyBehavior.fireWindowPercent == 120)
+        #expect(standard.enemyBehavior.baseFocusPercent == 60 && standard.enemyBehavior.fireWindowPercent == 55)
+        #expect(casual.enemyBehavior.baseFocusPercent == 40 && casual.enemyBehavior.fireWindowPercent == 35)
+        // R5.16: casual also decides slower, warns longer and fields fewer at once.
+        #expect(casual.enemyBehavior.decisionIntervalTicks == 50 && casual.telegraphTicksPercent == 130)
+        #expect(casual.maxAliveEnemiesPercent == 70 && standard.maxAliveEnemiesPercent == 85 && veteran.maxAliveEnemiesPercent == 100)
+        #expect(casual.maxAliveEnemies(authored: 6) == 4 && casual.maxAliveEnemies(authored: 1) == 1)
+        #expect(veteran.enemyBehavior.baseFocusPercent == 85 && veteran.enemyBehavior.fireWindowPercent == 80)
         #expect(standard.composition == .baseline && standard.alliedBaseDamage)
         #expect(!casual.alliedBaseDamage && veteran.alliedBaseDamage) // ADR-0005: Off / On / On
         #expect(casual.composition == .forgiving && veteran.composition == .advanced)
         #expect(casual.enemyBehavior.decisionIntervalTicks > standard.enemyBehavior.decisionIntervalTicks)
         #expect(veteran.enemyBehavior.decisionIntervalTicks < standard.enemyBehavior.decisionIntervalTicks)
         // GAME_RULES §9.3: the spawn process is 45 ticks on every difficulty.
-        #expect(casual.telegraphTicksPercent == 100 && veteran.telegraphTicksPercent == 100)
+        #expect(standard.telegraphTicksPercent == 115 && veteran.telegraphTicksPercent == 100)
         #expect(casual.enemySpecialAmmoPercent == 70 && veteran.enemySpecialAmmoPercent == 140)
         // R5.12 (ADR-0025): reserves 5 / 3 / 1, random drops 150 / 100 / 50 %.
         #expect(casual.startingLives == 5 && standard.startingLives == 3 && veteran.startingLives == 1)

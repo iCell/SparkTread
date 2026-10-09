@@ -3,16 +3,17 @@
   "id": "casual",
   "displayNameKey": "difficulty.casual.name",
   "enemyBehavior": {
-    "decisionIntervalTicks": 40,
-    "baseFocusPercent": 50,
-    "wanderPercent": 20,
-    "fireWindowPercent": 50,
+    "decisionIntervalTicks": 50,
+    "baseFocusPercent": 40,
+    "wanderPercent": 25,
+    "fireWindowPercent": 35,
     "courseCommitPercent": 70
   },
-  "telegraphTicksPercent": 100,
+  "telegraphTicksPercent": 130,
   "composition": "forgiving",
   "alliedBaseDamage": false,
   "enemySpecialAmmoPercent": 70,
   "startingLives": 5,
-  "dropChancePercentScale": 150
+  "dropChancePercentScale": 150,
+  "maxAliveEnemiesPercent": 70
 }

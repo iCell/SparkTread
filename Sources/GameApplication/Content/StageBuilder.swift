@@ -91,7 +91,7 @@ public enum StageBuilder {
 
         world.stage = StageState(
             spawnQueue: difficulty.apply(toComposition: queue),
-            maxAliveEnemies: def.maxAliveEnemies,
+            maxAliveEnemies: difficulty.maxAliveEnemies(authored: def.maxAliveEnemies),
             enemyStartDelayTicks: def.initialEnemyDelayTicks,
             spawnPointsCells: def.enemySpawns.map { Vec2i(x: $0[0], y: $0[1]) },
             telegraphTicks: difficulty.telegraphTicks(authored: def.telegraphTicks),
@@ -112,7 +112,8 @@ public enum StageBuilder {
             directorPhases: (def.directorPhases ?? []).map { phase in
                 DirectorPhase(id: phase.id, afterSpawned: phase.afterSpawned,
                               reinforcements: difficulty.apply(toComposition: phase.reinforcements),
-                              maxAliveEnemies: phase.maxAliveEnemies, repairsBase: phase.repairsBase)
+                              maxAliveEnemies: phase.maxAliveEnemies.map { difficulty.maxAliveEnemies(authored: $0) },
+                              repairsBase: phase.repairsBase)
             })
 
         var events: [DomainEvent] = []

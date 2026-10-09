@@ -75,6 +75,9 @@ public struct AppFlowModel: Equatable, Sendable {
         checkpoint = run
         difficultyID = run.difficultyID
     }
+
+    /// The campaign is complete: nothing to continue into.
+    public mutating func clearCheckpoint() { checkpoint = nil }
     public mutating func startTraining() { screen = .playing(stageIndex: nil) }
     public mutating func backToTitle() { screen = .title }
 
@@ -173,6 +176,9 @@ public struct AppRootView: View {
             }
         }
         self.store = store
+        // The install's progress as the analytics sees it, from the document
+        // at launch (the sink is installed by the app before this runs).
+        GameAnalytics.recordProgress(completedStageIDs: progress?.completedStageIDs ?? [])
         var model = AppFlowModel(campaign: campaign, progress: progress, suspended: suspended,
                                  autostart: env["SPARKTREAD_AUTOSTART"] != nil, lab: lab)
         model.startingLivesByDifficulty = startingLives
@@ -263,6 +269,14 @@ public struct AppRootView: View {
 
     private func leaveGame(_ controller: MovementLabController) {
         model.recordCompleted(stageIDs: controller.campaignRun?.completedStageIDs ?? [])
+        // The title's 继续战役 follows the run as it stands on leaving — the
+        // stage it has reached, not the one it started on. The controller
+        // wrote that to disk at every win; the in-memory model had kept
+        // the run as started (owner 2026-10-09: reached stage 6, backed out,
+        // 继续 offered stage 4).
+        if let run = controller.campaignRun {
+            if controller.campaignComplete { model.clearCheckpoint() } else { model.adoptCheckpoint(run) }
+        }
         if let failure = controller.persistenceFailure { storeNotice = ("notice.saveFailed", failure) }
         self.controller = nil
         model.discardSuspended()
