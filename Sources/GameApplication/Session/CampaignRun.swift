@@ -61,8 +61,10 @@ public struct CampaignRun: Codable, Equatable, Sendable {
         return true
     }
 
-    /// True once every stage has been completed.
-    public var isComplete: Bool { completedStageIDs.count == campaign.stageIDs.count }
+    /// True once the run has completed the campaign's last stage. A run
+    /// started part-way (a stage card) completes fewer stages than the
+    /// campaign has; what makes it complete is reaching the end.
+    public var isComplete: Bool { completedStageIDs.last == campaign.stageIDs.last }
 
     /// Domain checks for a run restored from data.
     public var validationIssues: [String] {
@@ -70,8 +72,19 @@ public struct CampaignRun: Codable, Equatable, Sendable {
         if difficultyID.isEmpty { issues.append("difficulty id is empty") }
         if !campaign.stageIDs.indices.contains(stageIndex) { issues.append("stage index \(stageIndex) out of range") }
         if completedStageIDs.count > campaign.stageIDs.count { issues.append("more completed stages than the campaign has") }
-        for (i, id) in completedStageIDs.enumerated() where i < campaign.stageIDs.count && campaign.stageIDs[i] != id {
-            issues.append("completed stage '\(id)' out of campaign order")
+        // The completed stages are the run's own, in campaign order, ending
+        // at the stage before the current one (or at the current one once
+        // the last stage is done). A run may START part-way — a stage card
+        // — so this is a contiguous slice, not the campaign's prefix. Until
+        // 2026-10-09 it demanded the prefix, every progress save of a run
+        // started on stage 4 threw, and 继续 stayed on stage 4 (owner).
+        let n = completedStageIDs.count
+        if n > 0, campaign.stageIDs.indices.contains(stageIndex) {
+            let end = isLastStage && completedStageIDs.last == stageID ? stageIndex + 1 : stageIndex
+            let start = end - n
+            if start < 0 || Array(campaign.stageIDs[start..<end]) != completedStageIDs {
+                issues.append("completed stages \(completedStageIDs) are not the run's stages in campaign order")
+            }
         }
         return issues
     }

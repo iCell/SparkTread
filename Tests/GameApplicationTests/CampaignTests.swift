@@ -111,11 +111,30 @@ private func instantWin(_ id: String, session: SessionState) throws -> WorldStat
         var run = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["s1"])
         #expect(run.validationIssues.isEmpty)
         run = CampaignRun(campaign: campaign, stageIndex: 1, completedStageIDs: ["s2"])
-        #expect(run.validationIssues.contains { $0.contains("out of campaign order") })
+        #expect(run.validationIssues.contains { $0.contains("campaign order") })
+        run = CampaignRun(campaign: campaign, stageIndex: 2, completedStageIDs: ["s1"]) // a gap
+        #expect(run.validationIssues.contains { $0.contains("campaign order") })
         var bad = SessionState.campaignStart
         bad.score = -5
         run = CampaignRun(campaign: campaign, checkpoint: bad)
         #expect(run.validationIssues.contains { $0.contains("score") })
+    }
+
+    /// Owner 2026-10-09: reached stage 6 from a run started on stage 4,
+    /// 继续 still offered stage 4 — the run's completed stages ["4", "5"]
+    /// failed the "campaign prefix" check, so no progress save after a win
+    /// ever landed. A run started part-way is valid at every step and is
+    /// complete once it has done the last stage.
+    @Test func aRunStartedPartWayStaysValidAndCompletesAtTheEnd() {
+        var run = CampaignRun(campaign: campaign, stageIndex: 1)
+        #expect(run.validationIssues.isEmpty && !run.isComplete)
+        var advanced = run.advance(exitState: .campaignStart)
+        #expect(advanced)
+        #expect(run.stageID == "s3" && run.completedStageIDs == ["s2"] && run.validationIssues.isEmpty && !run.isComplete)
+        advanced = run.advance(exitState: .campaignStart)
+        #expect(!advanced)
+        #expect(run.completedStageIDs == ["s2", "s3"] && run.validationIssues.isEmpty && run.isComplete)
+        #expect(CampaignRun(campaign: campaign, stageIndex: 2, completedStageIDs: ["s2"]).validationIssues.isEmpty)
     }
 
     @Test func campaignDefinitionsAreValidatedStructurallyAndAgainstStages() throws {

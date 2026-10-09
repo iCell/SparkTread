@@ -192,4 +192,25 @@ private func play(_ controller: MovementLabController, ticks: Int = 0) {
         #expect(progress.bestScore == 2000) // the stored best beats this run's 530
         #expect(progress.checkpoint?.stageID == "a_02_y")
     }
+
+    /// Owner 2026-10-09 (second report): a run started from the stage-4
+    /// card cleared stages 4 and 5, yet after a relaunch 继续 offered
+    /// stage 4 — the document's save had thrown on every win because the
+    /// run's completed stages were checked as the campaign's prefix. A win
+    /// in a run started part-way checkpoints the stage it reached.
+    @Test @MainActor func aWinInARunStartedPartWayCheckpointsTheStageReached() throws {
+        let three = CampaignDefinition(id: "test", displayNameKey: "k", stageIDs: ["a_01_x", "a_02_y", "a_03_z"])
+        let store = InMemorySaveStore()
+        try store.saveProgress(CampaignProgress(campaignID: "test", completedStageIDs: ["a_01_x"], checkpoint: nil, bestScore: 0))
+        let run = CampaignRun(campaign: three, stageIndex: 1, checkpoint: .campaignStart(lives: 3))
+        let controller = MovementLabController(campaign: run, stages: provider(instantWin: ["a_02_y"]), persistence: store)
+        controller.checkpointRunStart()
+        controller.applicationDidBecomeActive()
+        var steps = 0
+        while controller.flow.phase != .finished, steps < 3000 { controller.stepOneTick(); steps += 1 }
+        #expect(controller.persistenceFailure == nil)
+        let progress = try #require(store.progress)
+        #expect(progress.checkpoint?.stageID == "a_03_z" && progress.checkpoint?.completedStageIDs == ["a_02_y"])
+        #expect(Set(progress.completedStageIDs) == ["a_01_x", "a_02_y"])
+    }
 }

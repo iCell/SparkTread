@@ -2164,6 +2164,35 @@ Needed from the owner: the project's `GoogleService-Info.plist` at
 and App Privacy answers at submission (Firebase Analytics: identifiers
 and usage data, not linked to identity, not for tracking).
 
+*继续 offered stage 4 again — the real cause (2026-10-09, owner, second
+report).* The `leaveGame` fix above held only in memory: after a relaunch
+继续 still offered stage 4. The progress document had NOT been written at
+any win of that run. `CampaignRun.validationIssues` — which gates every
+`saveProgress` and every suspended-session write — demanded the run's
+completed stages be the campaign's prefix from stage 1; a run started
+from the stage-4 card completes ["04", "05"], failed the check, and
+every save threw into `persistenceFailure` (surfaced only as a title
+notice). The rule is now what a run actually does: its completed stages
+are a contiguous slice of the campaign ending at the stage before the
+current one (or at the current one once the last stage is done), so a
+run may start anywhere. `isComplete` likewise means "completed the last
+stage", not "completed as many stages as the campaign has". Pinned by
+`CampaignTests.aRunStartedPartWayStaysValidAndCompletesAtTheEnd` and
+`PersistenceLifecycleTests.aWinInARunStartedPartWayCheckpointsTheStageReached`
+(a run started on stage 2 of three wins it; the checkpoint on disk is
+stage 3 and nothing threw). The owner's clears of stages 4 and 5 on the
+phone were never written and cannot be recovered; the stage cards for 1–3
+stay open from the earlier runs.
+
+*The owner's Firebase plist (2026-10-09).* Pulled (`d1406eb`):
+`Sources/GoldenEagleApp/GoogleService-Info.plist`, bundle id
+`io.icell.sparktread`, project `sparktread-d0109`. Its
+`IS_ANALYTICS_ENABLED` is false, which is how Firebase stamps a plist
+downloaded before Google Analytics was linked to the project; the SDK
+still logs, but the events only appear in the console once Analytics is
+enabled under the project's Integrations and the plist is downloaded
+again. Owner's side.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
