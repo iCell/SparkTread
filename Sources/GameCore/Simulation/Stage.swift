@@ -415,11 +415,10 @@ enum Stage {
     }
 
     /// Queues a drop (§10.2); placement happens in step 8.
-    static func requestPickup(_ world: inout WorldState, pickupID: String, critical: Bool,
-                              preferredCell: Vec2i? = nil) {
+    static func requestPickup(_ world: inout WorldState, pickupID: String, critical: Bool) {
         guard var stage = world.stage else { return }
         stage.pendingPickups.append(PendingPickup(requestID: stage.nextPickupRequestID, requestTick: world.tick,
-                                                  pickupID: pickupID, critical: critical, preferredCell: preferredCell))
+                                                  pickupID: pickupID, critical: critical))
         stage.nextPickupRequestID += 1
         world.stage = stage
     }
@@ -429,23 +428,25 @@ enum Stage {
     /// stream, in (y, x) order, until the stage's cap is reached — a capped
     /// stage rolls nothing more. A granted drop takes an entry of the drop
     /// table other than an extra life (lives are not farmed out of walls)
-    /// and asks to be placed nearest the cleared cell. Fort cells and cells
-    /// under a hidden pickup were never queued (Combat). The roll is one
-    /// draw; the choice a second draw only when the roll succeeds.
+    /// and is placed like every other drop — at random among the legal
+    /// areas (owner 2026-10-09: 随机散落在能够出现的地方, not where the brick
+    /// was). Fort cells and cells under a hidden pickup were never queued
+    /// (Combat). The roll is one draw; the choice a second draw only when
+    /// the roll succeeds; the placement its own, in step 8.
     static func rollBrickDrops(_ world: inout WorldState) {
         guard var stage = world.stage, !stage.clearedBrickCells.isEmpty else { return }
         let cells = stage.clearedBrickCells.sorted { ($0.y, $0.x) < ($1.y, $1.x) }
         stage.clearedBrickCells = []
         world.stage = stage
         let table = stage.dropTable.filter { $0 != "extra_life" }
-        for cell in cells {
+        for _ in cells {
             guard stage.brickDropsGranted < stage.brickDropCap, !table.isEmpty else { break }
             let roll = world.rng.drops.next(upperBound: 1000)
             guard roll < stage.brickDropChancePermille else { continue }
             let pick = world.rng.drops.next(upperBound: table.count)
             stage.brickDropsGranted += 1
             world.stage = stage
-            requestPickup(&world, pickupID: table[pick], critical: false, preferredCell: cell)
+            requestPickup(&world, pickupID: table[pick], critical: false)
             stage = world.stage ?? stage
         }
         world.stage = stage
@@ -479,17 +480,7 @@ enum Stage {
                 remaining.append(request)
                 continue
             }
-            // A brick drop lands where the brick was — the legal area whose
-            // centre is nearest the cleared cell's, first in (y, x) on a tie,
-            // and no draw is spent; every other request draws from the
-            // candidates (§10.2).
-            let pick: Vec2i
-            if let near = request.preferredCell {
-                func distance(_ c: Vec2i) -> Int { abs(2 * c.x + 2 - 2 * near.x - 1) + abs(2 * c.y + 2 - 2 * near.y - 1) }
-                pick = candidates.min { (distance($0), $0.y, $0.x) < (distance($1), $1.y, $1.x) }!
-            } else {
-                pick = candidates[world.rng.drops.next(upperBound: candidates.count)]
-            }
+            let pick = candidates[world.rng.drops.next(upperBound: candidates.count)]
             placePickup(&world, pickupID: request.pickupID, cell: pick, critical: request.critical,
                         graceTicks: 0, rules: rules, events: &events)
         }

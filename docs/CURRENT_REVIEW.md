@@ -2051,6 +2051,16 @@ profiles' numbers and the capped scaling, `campaignStart(lives:)`, every
 stage's table, the builder's scaled chance, and the flow model's lives
 by difficulty.
 
+*Half the drops, scattered — R5.13 (2026-10-09, owner).* After playing:
+the drops were too frequent, and a brick drop should not appear where the
+brick was. Stages 2–12 author 10 % (15 / 10 / 5 % by difficulty); brick
+drops default to 15 ‰ (1.5 %, was 3 %) with the cap kept; and a brick drop is
+placed like every other drop — a `drop` draw among the legal, reachable
+areas — so `PendingPickup.preferredCell` and the nearest-area branch are
+gone from the core and the checksum. Replay format 14 → 15; no golden
+has a stage, so none moved. `BrickDropTests` now asserts the placement
+draw and a legal landing rather than nearness.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

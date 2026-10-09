@@ -81,14 +81,10 @@ public struct PendingPickup: Codable, Equatable, Sendable {
     public let requestTick: Int
     public let pickupID: String
     public let critical: Bool
-    /// §10.5: a brick drop wants the legal area nearest the cell that was
-    /// cleared; nil places at random like every other drop.
-    public var preferredCell: Vec2i?
-    public init(requestID: Int, requestTick: Int, pickupID: String, critical: Bool, preferredCell: Vec2i? = nil) {
+    public init(requestID: Int, requestTick: Int, pickupID: String, critical: Bool) {
         self.requestID = requestID
         self.requestTick = requestTick
         self.pickupID = pickupID
-        self.preferredCell = preferredCell
         self.critical = critical
     }
 }
@@ -143,7 +139,7 @@ public struct StageState: Codable, Equatable, Sendable {
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 20,
                 carriedPickupQueue: [CarriedPickup?] = [], hiddenPickups: [HiddenPickup] = [],
                 fortTemplate: [Vec2i] = [],
-                brickDropChancePermille: Int = 30, brickDropCap: Int = 2,
+                brickDropChancePermille: Int = 15, brickDropCap: Int = 2,
                 clearBonus: ScoreRules.ClearBonus = .none,
                 enemyBehavior: EnemyBehaviorProfile = .standard,
                 directorPhases: [DirectorPhase] = []) {

@@ -43,7 +43,7 @@ private let vs01URL = repoRoot
                 #expect(def.dropChancePercent == 0 && def.dropTable.isEmpty, "\(id)")
                 continue
             }
-            #expect(def.dropChancePercent == 20, "\(id)")
+            #expect(def.dropChancePercent == 10, "\(id)")
             #expect(def.dropTable.count == 15 && def.dropTable.filter { $0 == "extra_life" }.count == 1, "\(id)")
             #expect(def.dropTable.filter { $0 == "armor_up" }.count == 3 && def.dropTable.filter { $0 == "ammo_crate" }.count == 3, "\(id)")
             // The brick drops draw from this table minus the extra life: never empty.
@@ -54,8 +54,8 @@ private let vs01URL = repoRoot
         let def = try StageLoader.loadDefinition(at: url)
         let casual = try DifficultyLoader.load(at: root.appendingPathComponent("Content/difficulties/casual.json"))
         let veteran = try DifficultyLoader.load(at: root.appendingPathComponent("Content/difficulties/veteran.json"))
-        #expect(try StageBuilder.build(def, difficulty: casual).stage?.dropChancePercent == 30)
-        #expect(try StageBuilder.build(def, difficulty: veteran).stage?.dropChancePercent == 10)
+        #expect(try StageBuilder.build(def, difficulty: casual).stage?.dropChancePercent == 15)
+        #expect(try StageBuilder.build(def, difficulty: veteran).stage?.dropChancePercent == 5)
     }
 
     /// The loaded world is deterministic and stable — a golden checksum so

@@ -61,3 +61,10 @@ profiles at launch. No simulation change.
 ## Migration cost
 
 None: old difficulty files decode with the defaults.
+
+## Amendment 2026-10-09: the base rate halved
+
+Owner, after a device session: 掉落的概率高了，砍一半. Stages 2–12 now
+author 10 % (was 20 %), so the difficulties land at 15 / 10 / 5 %; the
+table and the scale are unchanged. The extra life is ≈0.7 % per ordinary
+kill on standard.

@@ -260,7 +260,7 @@
   "telegraphTicks": 45,
   "pickupSpawns": [],
   "dropTable": ["armor_up", "armor_up", "armor_up", "ammo_crate", "ammo_crate", "ammo_crate", "speed_up", "speed_up", "power_up", "power_up", "base_shield", "freeze_enemy", "bomb", "invincibility", "extra_life"],
-  "dropChancePercent": 20,
+  "dropChancePercent": 10,
   "carriedDrops": [
     {
       "queueIndex": 3,

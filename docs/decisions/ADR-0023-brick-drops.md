@@ -72,3 +72,15 @@ Recordings of format 12 are rejected, as every version bump has done;
 suspended sessions carry the world verbatim and the new fields default on
 decode only through the builder, so a snapshot made before this change is
 rejected by its format version rather than mis-read.
+
+## Amendment 2026-10-09: half the chance, placed at random
+
+Owner, after a device session: the drops felt too frequent — halve them —
+and a brick drop should not appear where the brick was but scatter at
+random among the places a drop can appear. The default chance is now
+15 ‰ (1.5 %), the cap stays 2, and a brick drop is placed exactly like
+every other drop (§10.2, a `drop` draw among the legal areas);
+`PendingPickup.preferredCell` and the nearest-area branch are gone.
+Decision items 2 and 4 above are superseded accordingly. Replay format
+14 → 15. The ordinary drop rate was halved the same day (ADR-0025
+amendment).

@@ -29,16 +29,17 @@ import Testing
         #expect(world.terrain[10, 3].kind == .ground && world.terrain[10, 4].kind == .ground)
     }
 
-    @Test func aClearedCellDropsNearItselfAtFullChance() {
+    @Test func aClearedCellDropsSomewhereLegalAtFullChance() {
         var w = world(chance: 1000, cap: 1)
         clearTwoCells(&w)
         #expect(w.pickups.count == 1 && w.pickups.first?.pickupID == "speed_up")
         #expect(w.stage?.brickDropsGranted == 1 && w.stage?.clearedBrickCells.isEmpty == true)
-        // Placed at the legal 2×2 area nearest the cleared cell (10, 3):
-        // the cleared column itself is a one-cell slot, so the nearest
-        // whole area sits beside it, within two cells.
+        // Placed like every other drop: a legal 2×2 area drawn from the
+        // candidates (owner 2026-10-09: not where the brick was), so the
+        // placement spends a draw of its own beyond the roll and the choice.
+        #expect(w.rng.drops.draws == 3)
         let at = w.pickups[0].cell
-        #expect(abs(at.x - 10) <= 2 && abs(at.y - 3) <= 2, "placed at \(at)")
+        #expect(w.terrain[at.x, at.y].kind == .ground && w.terrain[at.x + 1, at.y + 1].kind == .ground)
     }
 
     @Test func theCapStopsFurtherDropsAndRolls() {
@@ -49,7 +50,7 @@ import Testing
         R5.step(&w, normal: true); R5.step(&w, R5.settle)
         R5.step(&w, normal: true); R5.step(&w, R5.settle) // cells (10, 5) and more fall
         #expect(w.pickups.count == 2)
-        #expect(w.rng.drops.draws == draws, "a capped stage rolls nothing")
+        #expect(w.rng.drops.draws == draws, "a capped stage rolls nothing, and places nothing")
     }
 
     @Test func zeroChanceDropsNothingButStillRolls() {
