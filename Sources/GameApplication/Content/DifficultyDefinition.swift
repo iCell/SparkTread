@@ -71,6 +71,12 @@ public struct DifficultyDefinition: Codable, Equatable, Sendable {
         min(100, authored * dropChancePercentScale / 100)
     }
 
+    /// The brick drop chance (§10.5, permille) under this difficulty —
+    /// the same scale as every other drop (R5.15), capped at 1000.
+    public func brickDropChancePermille(authored: Int) -> Int {
+        min(1000, authored * dropChancePercentScale / 100)
+    }
+
     /// The behaviour of the game before difficulty content existed: the
     /// authored composition, standard behaviour, allied base damage on.
     public static let standard = DifficultyDefinition(

@@ -4,9 +4,9 @@
   "displayNameKey": "difficulty.casual.name",
   "enemyBehavior": {
     "decisionIntervalTicks": 40,
-    "baseFocusPercent": 70,
+    "baseFocusPercent": 50,
     "wanderPercent": 20,
-    "fireWindowPercent": 70,
+    "fireWindowPercent": 50,
     "courseCommitPercent": 70
   },
   "telegraphTicksPercent": 100,

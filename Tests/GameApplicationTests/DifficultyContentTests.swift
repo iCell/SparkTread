@@ -16,7 +16,12 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         let casual = try DifficultyLoader.load(at: difficultyURL("casual"))
         let standard = try DifficultyLoader.load(at: difficultyURL("standard"))
         let veteran = try DifficultyLoader.load(at: difficultyURL("veteran"))
-        #expect(standard.enemyBehavior == .standard && standard.composition == .baseline && standard.alliedBaseDamage)
+        // R5.15 (owner 2026-10-09): every difficulty leans on the base and
+        // fires less than the code's pre-content default; standard is 80/80.
+        #expect(standard.enemyBehavior.baseFocusPercent == 80 && standard.enemyBehavior.fireWindowPercent == 80)
+        #expect(casual.enemyBehavior.baseFocusPercent == 50 && casual.enemyBehavior.fireWindowPercent == 50)
+        #expect(veteran.enemyBehavior.baseFocusPercent == 110 && veteran.enemyBehavior.fireWindowPercent == 120)
+        #expect(standard.composition == .baseline && standard.alliedBaseDamage)
         #expect(!casual.alliedBaseDamage && veteran.alliedBaseDamage) // ADR-0005: Off / On / On
         #expect(casual.composition == .forgiving && veteran.composition == .advanced)
         #expect(casual.enemyBehavior.decisionIntervalTicks > standard.enemyBehavior.decisionIntervalTicks)
@@ -29,6 +34,7 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         #expect(casual.dropChancePercentScale == 150 && standard.dropChancePercentScale == 100 && veteran.dropChancePercentScale == 50)
         #expect(casual.dropChancePercent(authored: 20) == 30 && veteran.dropChancePercent(authored: 20) == 10)
         #expect(casual.dropChancePercent(authored: 80) == 100) // capped
+        #expect(casual.brickDropChancePermille(authored: 30) == 45 && veteran.brickDropChancePermille(authored: 30) == 15)
         for def in [casual, standard, veteran] { #expect(DifficultyValidator.validate(def).isEmpty) }
     }
 

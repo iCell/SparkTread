@@ -104,7 +104,7 @@ public enum StageBuilder {
             },
             fortTemplate: (def.fortTemplate ?? []).map { Vec2i(x: $0[0], y: $0[1]) },
             fortTemplateKinds: (def.fortTemplate ?? []).map { StageValidator.authoredCell(def, at: $0).kind },
-            brickDropChancePermille: def.brickDropChancePermille ?? 15,
+            brickDropChancePermille: difficulty.brickDropChancePermille(authored: def.brickDropChancePermille ?? 30),
             brickDropCap: def.brickDropCap ?? 2,
             // Validated present above; the fallback is unreachable data hygiene.
             clearBonus: ScoreRules.reference.clearBonus(stageNumber: def.stageNumber ?? 1),

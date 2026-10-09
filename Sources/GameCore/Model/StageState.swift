@@ -143,7 +143,7 @@ public struct StageState: Codable, Equatable, Sendable {
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 20,
                 carriedPickupQueue: [CarriedPickup?] = [], hiddenPickups: [HiddenPickup] = [],
                 fortTemplate: [Vec2i] = [], fortTemplateKinds: [TerrainKind] = [],
-                brickDropChancePermille: Int = 15, brickDropCap: Int = 2,
+                brickDropChancePermille: Int = 30, brickDropCap: Int = 2,
                 clearBonus: ScoreRules.ClearBonus = .none,
                 enemyBehavior: EnemyBehaviorProfile = .standard,
                 directorPhases: [DirectorPhase] = []) {

@@ -2110,6 +2110,18 @@ golden's checksums did not move (its drive never fires). Tests: the
 crumble, the whole fort, the fort test's cracked white brick now
 restores uncracked.
 
+*R5.15 — the AI eased, brick drops scaled (2026-10-09, owner).* A casual
+session was still hard. Every difficulty's base focus and fire window
+came down: 50/50, 80/80, 110/120 (were 70/70, 100/100, 125/140); the
+other AI numbers stand. Brick drops go back to a 3 % base and take the
+same difficulty scale as every drop — 4.5 / 3 / 1.5 % — superseding the
+2026-10-08 "no tiers" and R5.13's 1.5 %. `EnemyBehaviorProfile.standard`
+in the core (the behaviour before difficulty content, 100/100) is left
+alone so no golden moves; the standard difficulty is now the content's
+80/80, and `DifficultyContentTests` asserts the three profiles' numbers
+instead of equating standard with the core default. §9.2 table, §10.5,
+appendix B.12, ADR-0025 amendment.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

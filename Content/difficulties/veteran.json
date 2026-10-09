@@ -4,9 +4,9 @@
   "displayNameKey": "difficulty.veteran.name",
   "enemyBehavior": {
     "decisionIntervalTicks": 20,
-    "baseFocusPercent": 125,
+    "baseFocusPercent": 110,
     "wanderPercent": 5,
-    "fireWindowPercent": 140,
+    "fireWindowPercent": 120,
     "courseCommitPercent": 40
   },
   "telegraphTicksPercent": 100,

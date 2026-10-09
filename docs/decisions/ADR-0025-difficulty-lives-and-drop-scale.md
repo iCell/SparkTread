@@ -68,3 +68,13 @@ Owner, after a device session: 掉落的概率高了，砍一半. Stages 2–12 
 author 10 % (was 20 %), so the difficulties land at 15 / 10 / 5 %; the
 table and the scale are unchanged. The extra life is ≈0.7 % per ordinary
 kill on standard.
+
+## Amendment 2026-10-09 (R5.15): brick drops scaled too; the AI eased
+
+Owner, after a casual session that was still hard: raise the brick drop
+chance and scale it by difficulty — base 3 % again, × the same scale as
+every drop (4.5 / 3 / 1.5 %), superseding the 2026-10-08 "no tiers" and
+R5.13's 1.5 % — and lower every difficulty's base focus and fire window:
+50/50, 80/80, 110/120 (were 70/70, 100/100, 125/140). The code's
+pre-content default behaviour stays 100/100 so no golden moves; standard
+is now the content's 80/80.

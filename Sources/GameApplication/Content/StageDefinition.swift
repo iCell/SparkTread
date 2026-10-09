@@ -29,7 +29,8 @@ public struct StageDefinition: Codable, Equatable, Sendable {
     public var dropTable: [String]
     public var dropChancePercent: Int
     /// §10.5 brick drops: permille per brick cell the player clears (absent
-    /// = 15) and the stage's cap (absent = 2).
+    /// = 30, scaled by the difficulty like every drop) and the stage's cap
+    /// (absent = 2).
     public var brickDropChancePermille: Int?
     public var brickDropCap: Int?
     /// Carrier drops: the enemy at `queueIndex` in the interleaved spawn
