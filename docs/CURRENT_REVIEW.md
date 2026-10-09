@@ -2293,6 +2293,18 @@ and (49, 11) stay under brick. The band at rows 17–18 stays one bar
 (18–37). First wall in every fort window: row 11. The stepped fort
 (rows 21–25) is the stage's authored double wall for 围墙轮换, untouched.
 
+*Stragglers dropped (2026-10-09, owner: 不是说每一关各种敌人都得出现的).* The
+R5.21 cut had kept every archetype at one tank or more. The owner does
+not want that floor: a type that shows up once in a stage teaches
+nothing. Types left at a single tank and not in the stage's §14.1
+must-appear list are gone — stage 2 rapid_b, stage 4 fire_a, stage 5
+ap_a, stage 7 explosion_a — totals 17 / 21 / 21 / 23 → 16 / 17 / 17 /
+18 (stage 3's ap_a and ap_c stay at one each: they are the stage's
+teaching). Every type still appears by stage 10 (rapid_b in 5 and 9,
+fire_a in 2 and 9, ap_a in 3 and 6, explosion_a in 3 and 6). Carrier
+indices and phase triggers remain inside the shorter queues. B.18
+amended; the §14.1 table follows.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

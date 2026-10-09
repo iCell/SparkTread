@@ -211,10 +211,6 @@
     {
       "archetype": "fire_a",
       "count": 2
-    },
-    {
-      "archetype": "explosion_a",
-      "count": 1
     }
   ],
   "enemySpawns": [

@@ -205,10 +205,6 @@
     {
       "archetype": "explosion_d",
       "count": 3
-    },
-    {
-      "archetype": "ap_a",
-      "count": 1
     }
   ],
   "enemySpawns": [
