@@ -274,8 +274,33 @@ public enum StageValidator {
                 issues.append("no enemy spawn can reach the base region on the undamaged map")
             }
         }
+
+        // No straight lane onto the fort (GAME_RULES §14.2, R5.20; owner
+        // 2026-10-09 on stages 7 and 8: an enemy out of the top spawn drove
+        // and fired straight down the fort's columns). In each 2-wide
+        // window over the fort's columns a wall — brick or steel family;
+        // water and foliage stop no shot — must stand by `centreLaneWallByRow`,
+        // counted from row 3 (the spawn band is open on every stage).
+        if footprintInBounds(def.baseSpawn) {
+            let fortTop = def.fortTemplate?.compactMap { $0.count == 2 ? $0[1] : nil }.min() ?? def.baseSpawn[1] - 1
+            for x0 in (def.baseSpawn[0] - 1)...(def.baseSpawn[0] + 1) {
+                var firstWall: Int?
+                for y in 3..<fortTop where firstWall == nil {
+                    for x in x0...(x0 + 1) where firstWall == nil {
+                        let kind = authoredCell(def, at: [x, y]).kind
+                        if kind.isBrickFamily || kind.isSteelFamily { firstWall = y }
+                    }
+                }
+                if let firstWall, firstWall <= centreLaneWallByRow { continue }
+                let openTo = firstWall.map { "row \($0 - 1)" } ?? "the fort"
+                issues.append("columns \(x0)–\(x0 + 1) above the fort are open from row 3 to \(openTo): a straight lane from the spawns onto the base; a wall must stand in them by row \(centreLaneWallByRow)")
+            }
+        }
         return issues
     }
+
+    /// The last row by which the fort's columns must hold a wall (§14.2).
+    public static let centreLaneWallByRow = 16
 
     /// The final authored cell (top kind and surface), replaying layers
     /// the way StageBuilder stacks them.

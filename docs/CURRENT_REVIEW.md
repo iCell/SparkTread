@@ -2249,6 +2249,26 @@ from the earlier build or a resumed mid-stage snapshot (which carries
 its world's terrain); the installed bundle holds the new layout —
 verified in the deployed .app.
 
+*No straight lane onto the fort — R5.20 (2026-10-09, owner: 这一关有一样的
+问题，解决它并且确保剩余的关卡不会出现同样的问题, stage 8 screenshot).* Measured
+every stage: in each 2-wide window over the fort's columns (26–29), the
+first wall row from row 3 down. Stage 8 had none (the centre corridor
+between the fine-steel gates ran from the spawn band onto the fort),
+stage 12 none (the ice rink, the foliage band and the brick gate at
+rows 20–21 all lie on the centre), stage 11 none in the 27–28 window;
+stage 7 was 13 after the morning's rewrite, stage 9 is 12, every other
+stage 3–6. Fixes in each stage's own vocabulary: stage 8 white brick
+[25,14,30,15] (the band is now continuous) and [26,21,29,22] (the
+bottom band too; the side gates at rows 10–12 / 15–17 remain the
+legal routes); stage 11 white brick [27,5,30,7] and brick [26,17,29,18];
+stage 12 a white-steel post [27,14,28,15] (AP would open steel) and
+the fort gate [26,20,29,21] turned to brick. Now a wall meets every
+window by row 14 at the latest. The constraint is permanent:
+`StageValidator` rejects a window without a wall by row 16
+(`centreLaneWallByRow`), GAME_RULES §14.2 states it, and
+`StageContentTests.validatorRejectsAnOpenLaneOntoTheFort` pins the
+rejection and the boundary. Rosters untouched.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

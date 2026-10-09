@@ -143,6 +143,21 @@ private let vs01URL = repoRoot
         #expect(issues.contains { $0.contains("blocking terrain") })
     }
 
+    /// Owner 2026-10-09 (stages 7 and 8): no straight lane from the spawn
+    /// band onto the fort. Clearing the fort's columns down to the fort is
+    /// rejected; a wall by row 16 in each window passes. The shipped stages
+    /// are covered by everyShippedStageValidatesBuildsAndNumbersContiguously.
+    @Test func validatorRejectsAnOpenLaneOntoTheFort() throws {
+        var def = try StageLoader.decode(Data(contentsOf: vs01URL))
+        def.terrain.layers.append(.init(kind: "ground", rects: [[26, 1, 29, 22]], cells: nil))
+        #expect(StageValidator.validate(def).contains { $0.contains("straight lane") })
+        def.terrain.layers.append(.init(kind: "brick", rects: [[26, 16, 29, 16]], cells: nil))
+        #expect(!StageValidator.validate(def).contains { $0.contains("straight lane") })
+        def.terrain.layers.append(.init(kind: "ground", rects: [[26, 16, 29, 16]], cells: nil))
+        def.terrain.layers.append(.init(kind: "white_brick", rects: [[26, 17, 29, 17]], cells: nil))
+        #expect(StageValidator.validate(def).contains { $0.contains("straight lane") }) // too low
+    }
+
     @Test func validatorRejectsUnreachableBase() {
         var def = try! StageLoader.decode(Data(contentsOf: vs01URL))
         // Wall the base off completely with a steel ring around row 22.
