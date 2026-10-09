@@ -87,8 +87,8 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         #expect(veteranWorld.stage?.spawnQueue.contains { $0.hasSuffix("_c") || $0.hasSuffix("_d") } == true)
         #expect(standardWorld.stage?.spawnQueue.count == casualWorld.stage?.spawnQueue.count)
         let phase = try #require(standardWorld.stage?.directorPhases.first)
-        #expect(phase.reinforcements == ["explosion_c", "ap_c", "ap_c"] && phase.maxAliveEnemies == 6 && phase.repairsBase)
-        #expect(casualWorld.stage?.directorPhases.first?.reinforcements == ["explosion_a", "ap_a", "ap_a"])
+        #expect(phase.reinforcements == ["explosion_c", "ap_c"] && phase.maxAliveEnemies == 6 && phase.repairsBase) // R5.21: two reinforcements
+        #expect(casualWorld.stage?.directorPhases.first?.reinforcements == ["explosion_a", "ap_a"])
         #expect(standardWorld.checksum() != casualWorld.checksum())
         #expect(WorldInvariants.violations(in: veteranWorld).isEmpty)
         // Content: invalid phases are reported by the validator.

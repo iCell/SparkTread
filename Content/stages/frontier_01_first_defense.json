@@ -43,9 +43,9 @@
   "baseSpawn": [27, 24],
   "playerSpawnsByID": { "1": [23, 24] },
   "enemyComposition": [
-    { "archetype": "normal_a", "count": 14 },
-    { "archetype": "normal_b", "count": 4 },
-    { "archetype": "rapid_a", "count": 2 }
+    { "archetype": "normal_a", "count": 11 },
+    { "archetype": "normal_b", "count": 3 },
+    { "archetype": "rapid_a", "count": 1 }
   ],
   "enemySpawns": [[1, 1], [27, 1], [53, 1]],
   "maxAliveEnemies": 4,
@@ -55,9 +55,9 @@
   "dropTable": [],
   "dropChancePercent": 0,
   "carriedDrops": [
-    { "queueIndex": 3, "pickup": "power_up" },
-    { "queueIndex": 10, "pickup": "base_shield" },
-    { "queueIndex": 17, "pickup": "bomb" }
+    { "queueIndex": 2, "pickup": "power_up" },
+    { "queueIndex": 7, "pickup": "base_shield" },
+    { "queueIndex": 12, "pickup": "bomb" }
   ],
   "fortTemplate": [[26, 23], [27, 23], [28, 23], [29, 23], [26, 24], [29, 24], [26, 25], [29, 25]],
   "hiddenPickups": [

@@ -237,11 +237,11 @@
     },
     {
       "archetype": "normal_d",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "rapid_c",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "rapid_d",
@@ -249,27 +249,27 @@
     },
     {
       "archetype": "fire_c",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "fire_d",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "ap_b",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "ap_d",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "explosion_c",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "explosion_d",
-      "count": 3
+      "count": 2
     }
   ],
   "enemySpawns": [
@@ -294,23 +294,23 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 5,
+      "queueIndex": 3,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 11,
+      "queueIndex": 8,
       "pickup": "max_armor_ammo"
     },
     {
-      "queueIndex": 17,
+      "queueIndex": 12,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 23,
+      "queueIndex": 17,
       "pickup": "invincibility"
     },
     {
-      "queueIndex": 29,
+      "queueIndex": 21,
       "pickup": "extra_life"
     }
   ],
@@ -367,16 +367,14 @@
   "directorPhases": [
     {
       "id": "all_arms",
-      "afterSpawned": 24,
+      "afterSpawned": 18,
       "reinforcements": [
         "normal_d",
         "rapid_d",
         "fire_d",
         "ap_d",
         "explosion_d",
-        "ap_b",
-        "rapid_c",
-        "explosion_c"
+        "ap_b"
       ],
       "maxAliveEnemies": 8,
       "repairsBase": true

@@ -194,19 +194,19 @@
   "enemyComposition": [
     {
       "archetype": "normal_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "normal_b",
-      "count": 5
+      "count": 4
     },
     {
       "archetype": "rapid_c",
-      "count": 7
+      "count": 5
     },
     {
       "archetype": "rapid_d",
-      "count": 6
+      "count": 4
     },
     {
       "archetype": "fire_a",
@@ -214,7 +214,7 @@
     },
     {
       "archetype": "explosion_a",
-      "count": 2
+      "count": 1
     }
   ],
   "enemySpawns": [
@@ -256,19 +256,19 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 5,
+      "queueIndex": 3,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 11,
+      "queueIndex": 8,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 17,
+      "queueIndex": 12,
       "pickup": "bomb"
     },
     {
-      "queueIndex": 23,
+      "queueIndex": 16,
       "pickup": "extra_life"
     }
   ],
@@ -325,7 +325,7 @@
   "directorPhases": [
     {
       "id": "fast_wave",
-      "afterSpawned": 20,
+      "afterSpawned": 14,
       "reinforcements": [
         "rapid_d",
         "rapid_c",

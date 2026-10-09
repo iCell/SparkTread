@@ -356,11 +356,11 @@
   "enemyComposition": [
     {
       "archetype": "normal_a",
-      "count": 6
+      "count": 5
     },
     {
       "archetype": "normal_c",
-      "count": 6
+      "count": 5
     },
     {
       "archetype": "normal_d",
@@ -368,15 +368,15 @@
     },
     {
       "archetype": "rapid_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "rapid_b",
-      "count": 2
+      "count": 1
     },
     {
       "archetype": "fire_a",
-      "count": 2
+      "count": 1
     },
     {
       "archetype": "fire_b",
@@ -405,20 +405,20 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 4,
+      "queueIndex": 3,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 5,
+      "queueIndex": 4,
       "pickup": "fire_weapon",
       "critical": true
     },
     {
-      "queueIndex": 11,
+      "queueIndex": 8,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 16,
+      "queueIndex": 12,
       "pickup": "freeze_enemy"
     }
   ],

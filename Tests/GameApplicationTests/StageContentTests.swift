@@ -19,8 +19,9 @@ private let vs01URL = repoRoot
         #expect(world.base != nil)
         #expect(world.player(.one)?.tankEntityID != nil)
         #expect(world.pickups.isEmpty) // reference stage 1 pre-places no pickups
-        // Reference stage 1 roster: 18 normal_a + 2 rapid_a.
-        #expect(world.stage?.spawnQueue.count == 20)
+        // Stage 1 roster after R5.21 (owner 2026-10-09: fewer enemies):
+        // 11 normal_a + 3 normal_b + 1 rapid_a.
+        #expect(world.stage?.spawnQueue.count == 15)
         // Reference drop channels: 3 carriers + 2 hidden treasures, no
         // natural roll in stage 1.
         #expect(world.stage?.carriedPickupQueue.compactMap { $0 }.count == 3)

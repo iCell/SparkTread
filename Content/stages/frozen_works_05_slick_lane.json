@@ -188,27 +188,27 @@
   "enemyComposition": [
     {
       "archetype": "normal_b",
-      "count": 4
-    },
-    {
-      "archetype": "normal_c",
-      "count": 5
-    },
-    {
-      "archetype": "rapid_a",
       "count": 3
     },
     {
-      "archetype": "rapid_b",
-      "count": 6
-    },
-    {
-      "archetype": "explosion_d",
+      "archetype": "normal_c",
       "count": 4
     },
     {
-      "archetype": "ap_a",
+      "archetype": "rapid_a",
       "count": 2
+    },
+    {
+      "archetype": "rapid_b",
+      "count": 5
+    },
+    {
+      "archetype": "explosion_d",
+      "count": 3
+    },
+    {
+      "archetype": "ap_a",
+      "count": 1
     }
   ],
   "enemySpawns": [
@@ -233,20 +233,20 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 3,
+      "queueIndex": 2,
       "pickup": "anti_skid",
       "critical": true
     },
     {
-      "queueIndex": 7,
+      "queueIndex": 5,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 12,
+      "queueIndex": 9,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 18,
+      "queueIndex": 13,
       "pickup": "ammo_crate"
     }
   ],
@@ -303,12 +303,11 @@
   "directorPhases": [
     {
       "id": "slick_push",
-      "afterSpawned": 16,
+      "afterSpawned": 12,
       "reinforcements": [
         "explosion_d",
         "rapid_b",
-        "normal_c",
-        "ap_a"
+        "normal_c"
       ],
       "maxAliveEnemies": 6,
       "repairsBase": false

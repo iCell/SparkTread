@@ -171,27 +171,27 @@
   "enemyComposition": [
     {
       "archetype": "normal_c",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "normal_d",
-      "count": 5
+      "count": 4
     },
     {
       "archetype": "rapid_a",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "ap_a",
-      "count": 3
+      "count": 2
     },
     {
       "archetype": "explosion_a",
-      "count": 6
+      "count": 5
     },
     {
       "archetype": "explosion_c",
-      "count": 4
+      "count": 3
     }
   ],
   "enemySpawns": [
@@ -216,20 +216,20 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 4,
+      "queueIndex": 3,
       "pickup": "ammo_crate",
       "critical": true
     },
     {
-      "queueIndex": 9,
+      "queueIndex": 6,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 14,
+      "queueIndex": 10,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 20,
+      "queueIndex": 15,
       "pickup": "max_armor_ammo"
     }
   ],
@@ -286,13 +286,12 @@
   "directorPhases": [
     {
       "id": "bulwark_breach",
-      "afterSpawned": 18,
+      "afterSpawned": 13,
       "reinforcements": [
         "explosion_c",
         "explosion_a",
         "normal_d",
-        "ap_a",
-        "rapid_a"
+        "ap_a"
       ],
       "maxAliveEnemies": 6,
       "repairsBase": false

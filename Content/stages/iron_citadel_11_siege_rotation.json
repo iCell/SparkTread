@@ -189,27 +189,27 @@
   "enemyComposition": [
     {
       "archetype": "normal_d",
-      "count": 5
+      "count": 4
     },
     {
       "archetype": "rapid_c",
-      "count": 4
-    },
-    {
-      "archetype": "ap_c",
       "count": 3
     },
     {
+      "archetype": "ap_c",
+      "count": 2
+    },
+    {
       "archetype": "explosion_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "explosion_c",
-      "count": 8
+      "count": 6
     },
     {
       "archetype": "explosion_d",
-      "count": 6
+      "count": 4
     }
   ],
   "enemySpawns": [
@@ -234,24 +234,24 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 4,
+      "queueIndex": 2,
       "pickup": "base_shield",
       "critical": true
     },
     {
-      "queueIndex": 10,
+      "queueIndex": 7,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 16,
+      "queueIndex": 11,
       "pickup": "ammo_crate"
     },
     {
-      "queueIndex": 22,
+      "queueIndex": 16,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 28,
+      "queueIndex": 20,
       "pickup": "bomb"
     }
   ],
@@ -372,14 +372,13 @@
   "directorPhases": [
     {
       "id": "siege_rotation",
-      "afterSpawned": 24,
+      "afterSpawned": 17,
       "reinforcements": [
         "explosion_d",
         "explosion_c",
         "explosion_c",
         "ap_c",
-        "normal_d",
-        "rapid_c"
+        "normal_d"
       ],
       "maxAliveEnemies": 8,
       "repairsBase": true

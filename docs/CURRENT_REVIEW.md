@@ -2269,6 +2269,19 @@ window by row 14 at the latest. The constraint is permanent:
 `StageContentTests.validatorRejectsAnOpenLaneOntoTheFort` pins the
 rejection and the boundary. Rosters untouched.
 
+*R5.21 — every roster cut by about a quarter (2026-10-09, owner: 敌方总数
+太多了，都降低一些).* Totals with reinforcements 20 / 22 / 27 / 28 / 28 /
+30 / 30 / 32 / 32 / 34 / 36 / 40 → 15 / 17 / 20 / 21 / 21 / 23 / 23 /
+24 / 24 / 26 / 27 / 30. Each archetype scaled by largest remainder, never
+below one, so every §14.1 "must appear" type and the 20-type coverage by
+stage 10 hold; reinforcements keep their leading entries (3→2, 4→3,
+5→4, 6→5, 8→6); carrier queue indices and phase triggers scale with the
+new queue length (uniqueness kept, all inside the queue); alive caps
+untouched. Edited at text level so each file keeps its hand layout
+(stages 1–2 write the roster one entry per line). Validator passes;
+§14.1 table and B.18 updated. The quarter is Claude's provisional
+number for the owner to judge in play.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

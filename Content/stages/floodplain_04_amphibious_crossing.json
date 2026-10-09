@@ -266,27 +266,27 @@
   "enemyComposition": [
     {
       "archetype": "normal_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "normal_b",
-      "count": 6
-    },
-    {
-      "archetype": "rapid_b",
-      "count": 4
-    },
-    {
-      "archetype": "fire_a",
-      "count": 2
-    },
-    {
-      "archetype": "explosion_b",
       "count": 5
     },
     {
-      "archetype": "ap_d",
+      "archetype": "rapid_b",
       "count": 3
+    },
+    {
+      "archetype": "fire_a",
+      "count": 1
+    },
+    {
+      "archetype": "explosion_b",
+      "count": 4
+    },
+    {
+      "archetype": "ap_d",
+      "count": 2
     }
   ],
   "enemySpawns": [
@@ -311,20 +311,20 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 3,
+      "queueIndex": 2,
       "pickup": "amphi_tank",
       "critical": true
     },
     {
-      "queueIndex": 8,
+      "queueIndex": 6,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 13,
+      "queueIndex": 9,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 19,
+      "queueIndex": 14,
       "pickup": "ammo_crate"
     }
   ],
@@ -381,12 +381,11 @@
   "directorPhases": [
     {
       "id": "amphibious_flank",
-      "afterSpawned": 16,
+      "afterSpawned": 12,
       "reinforcements": [
         "ap_d",
         "explosion_b",
-        "normal_b",
-        "rapid_b"
+        "normal_b"
       ],
       "maxAliveEnemies": 6,
       "repairsBase": false

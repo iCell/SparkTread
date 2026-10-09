@@ -214,15 +214,15 @@
   "enemyComposition": [
     {
       "archetype": "normal_a",
-      "count": 6
+      "count": 5
     },
     {
       "archetype": "normal_c",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "rapid_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "rapid_c",
@@ -230,15 +230,15 @@
     },
     {
       "archetype": "explosion_a",
-      "count": 4
+      "count": 3
     },
     {
       "archetype": "ap_a",
-      "count": 2
+      "count": 1
     },
     {
       "archetype": "ap_c",
-      "count": 2
+      "count": 1
     }
   ],
   "enemySpawns": [
@@ -263,29 +263,29 @@
   "dropChancePercent": 10,
   "carriedDrops": [
     {
-      "queueIndex": 3,
+      "queueIndex": 2,
       "pickup": "power_up"
     },
     {
-      "queueIndex": 5,
+      "queueIndex": 3,
       "pickup": "ap_weapon",
       "critical": true
     },
     {
-      "queueIndex": 9,
+      "queueIndex": 6,
       "pickup": "bomb"
     },
     {
-      "queueIndex": 11,
+      "queueIndex": 8,
       "pickup": "explosion_weapon",
       "critical": true
     },
     {
-      "queueIndex": 15,
+      "queueIndex": 11,
       "pickup": "base_shield"
     },
     {
-      "queueIndex": 21,
+      "queueIndex": 15,
       "pickup": "invincibility"
     }
   ],
@@ -309,10 +309,9 @@
   "directorPhases": [
     {
       "id": "elite_siege",
-      "afterSpawned": 16,
+      "afterSpawned": 12,
       "reinforcements": [
         "explosion_c",
-        "ap_c",
         "ap_c"
       ],
       "maxAliveEnemies": 6,
