@@ -2282,6 +2282,17 @@ untouched. Edited at text level so each file keeps its hand layout
 §14.1 table and B.18 updated. The quarter is Claude's provisional
 number for the owner to judge in play.
 
+*Stage 11 reshaped (2026-10-09, owner screenshot: 看起来也有点奇怪).* The
+morning's lane fix had filled the top row's centre gap, leaving one
+14-wide white-brick bar in a row of 5-wide blocks — out of rhythm. Now
+the top row is as authored again (six blocks, gap at 27–30) and the
+brick row at 11–13 carries the lane-break instead: five blocks symmetric
+about the arena's centre (3–7, 12–16, 23–32, 39–43, 48–52), the middle
+one a keystone over the fort's columns; the hidden treasures at (4, 11)
+and (49, 11) stay under brick. The band at rows 17–18 stays one bar
+(18–37). First wall in every fort window: row 11. The stepped fort
+(rows 21–25) is the stage's authored double wall for 围墙轮换, untouched.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
