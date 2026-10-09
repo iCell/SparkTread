@@ -30,6 +30,16 @@ public enum LifecycleRules {
     public static let comboWindowTicks = 120
 }
 
+/// R5.18 (ADR-0027, owner 2026-10-09: 如果当下的生命只有 1，则优先提高获取到
+/// 加命装备的几率): while the player's reserves are at or under the
+/// threshold, every extra-life entry of a stage's drop table counts
+/// `extraLifeWeightScaleAtLowReserves` times in an enemy-death drop's
+/// choice (GAME_RULES §10.2). Brick drops never carry a life (§10.5).
+public enum DropRules {
+    public static let lowReservesThreshold = 1
+    public static let extraLifeWeightScaleAtLowReserves = 6
+}
+
 public struct PlayerState: Codable, Equatable, Sendable {
     public let playerID: PlayerID
     public var active: Bool

@@ -2193,6 +2193,28 @@ still logs, but the events only appear in the console once Analytics is
 enabled under the project's Integrations and the plist is downloaded
 again. Owner's side.
 
+*R5.18 — the extra life at low reserves (2026-10-09, owner: 如果当下的生命只有
+1，则优先提高获取到加命装备的几率).* A GameCore rule, ADR-0027: while the
+reserves are at 1 or none, every extra-life entry of the drop table counts
+six times in the choice an enemy-death drop makes (standard table: 30 %
+instead of 6.7 %). The choice is still one `drop` draw — over the table
+plus the extra weight, an index past the end being the heart — so above
+the threshold the draw is the table's index exactly as before and no
+golden moved; replay format 16 → 17. Brick drops, which never carry a
+life, are untouched. `LowReserveDropBiasTests` (shares at 1 / 0 / 2
+reserves, the identity above the threshold, the draw budget through a
+kill). Provisional numbers (threshold 1, weight 6) posted to the owner;
+§17 item 7 watches veteran, which starts at one reserve.
+
+*The plist flag, answered (2026-10-09, owner: 直接改 plist 不就可以了).*
+Editing `IS_ANALYTICS_ENABLED` changes nothing: FirebaseCore in the
+resolved SDK (12.19.2) does not read that key — collection is governed by
+`FIREBASE_ANALYTICS_COLLECTION_ENABLED` / `IS_MEASUREMENT_ENABLED`, both
+absent, so collection is ON by default. The key is the console's stamp
+of whether Google Analytics was linked when the file was generated; if
+it is linked now, events already land, and if not, no local edit links
+it. Nothing to change in the repository.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

@@ -686,14 +686,37 @@ enum Stage {
                     requestPickup(&world, pickupID: carried.pickupID, critical: carried.critical)
                 } else if let stage = world.stage, !stage.dropTable.isEmpty {
                     let roll = world.rng.drops.next(upperBound: 100)
-                    let pick = world.rng.drops.next(upperBound: stage.dropTable.count)
+                    let pickupID = drawDrop(from: stage.dropTable, reserves: fewestReserves(in: world), rng: &world.rng.drops)
                     if roll < stage.dropChancePercent {
-                        requestPickup(&world, pickupID: stage.dropTable[pick], critical: false)
+                        requestPickup(&world, pickupID: pickupID, critical: false)
                     }
                 }
             }
         }
         for tank in dead { world.removeTank(entityID: tank.entityID) }
+    }
+
+    /// The entry a successful enemy-death roll takes (§10.2): one draw over
+    /// the weighted table. R5.18: at low reserves the extra-life entries
+    /// count `DropRules.extraLifeWeightScaleAtLowReserves` times — the
+    /// extra weight is draw space past the table's end that maps back to
+    /// the extra life, so above the threshold the draw is exactly what it
+    /// was (one draw, the table's own index) and replays before R5.18
+    /// only move where the reserves were low.
+    static func drawDrop(from table: [String], reserves: Int, rng: inout SplitMix64) -> String {
+        var extra = 0
+        if reserves <= DropRules.lowReservesThreshold {
+            let lives = table.reduce(0) { $0 + ($1 == "extra_life" ? 1 : 0) }
+            extra = lives * (DropRules.extraLifeWeightScaleAtLowReserves - 1)
+        }
+        let pick = rng.next(upperBound: table.count + extra)
+        return pick < table.count ? table[pick] : "extra_life"
+    }
+
+    /// The reserves the bias looks at: the fewest among the active
+    /// players (one player in V1), in player order.
+    static func fewestReserves(in world: WorldState) -> Int {
+        world.players.filter(\.active).map(\.lives).min() ?? Int.max
     }
 
     // MARK: - Step 9: EnemyDirector (§9.3)

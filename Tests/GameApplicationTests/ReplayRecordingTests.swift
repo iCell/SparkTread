@@ -78,7 +78,7 @@ private let vs01URL = repoRoot
         #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(5)) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        for old in [6, 7, 8, 9, 10, 11, 12, 13, 14, 15] { // 7 precedes GAME_RULES R5 (ADR-0018); 8 the brick strip field (ADR-0020); 9 the shell strength rule (ADR-0021); 10 the AP C speed (R5.8); 11 the AI stall fix (2026-09-16); 12 precedes brick drops (R5.10, ADR-0023); 13 precedes growth lost on death (R5.11, ADR-0024); 14 precedes random brick-drop placement (R5.13); 15 precedes the crumble and the whole-brick fort (R5.14)
+        for old in [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] { // 7 precedes GAME_RULES R5 (ADR-0018); 8 the brick strip field (ADR-0020); 9 the shell strength rule (ADR-0021); 10 the AP C speed (R5.8); 11 the AI stall fix (2026-09-16); 12 precedes brick drops (R5.10, ADR-0023); 13 precedes growth lost on death (R5.11, ADR-0024); 14 precedes random brick-drop placement (R5.13); 15 precedes the crumble and the whole-brick fort (R5.14); 16 precedes the low-reserve extra-life bias (R5.18, ADR-0027)
             json["formatVersion"] = old
             #expect(throws: ReplayPlayer.ReplayError.unsupportedFormat(old)) {
                 try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
@@ -86,11 +86,11 @@ private let vs01URL = repoRoot
         }
         // The same old shape with a current version number is a plain
         // schema error — the format number is the boundary, not the shape.
-        json["formatVersion"] = 16
+        json["formatVersion"] = 17
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(ReplayRecording.self, from: JSONSerialization.data(withJSONObject: json))
         }
-        #expect(ReplayRecording.currentFormatVersion == 16)
+        #expect(ReplayRecording.currentFormatVersion == 17)
     }
 
     @Test func debugMutationsRebaseTheRecording() {
