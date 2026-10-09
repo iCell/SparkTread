@@ -116,6 +116,10 @@ public struct StageState: Codable, Equatable, Sendable {
     public var nextPickupRequestID: Int
     /// Flag On Guard wall cells (§11.2); empty = no temporary walls.
     public var fortTemplate: [Vec2i]
+    /// The authored wall kind of each template cell, parallel to
+    /// `fortTemplate` (R5.14: expiry restores WHOLE brick of that kind, even
+    /// where the cell had been shot away); empty = restore what stands.
+    public var fortTemplateKinds: [TerrainKind]
     /// §10.5 brick drops (owner 2026-10-08): permille chance per brick cell
     /// the PLAYER clears, the stage's cap, how many have been granted, and
     /// the cells cleared this tick awaiting the step-7 roll — always empty
@@ -138,7 +142,7 @@ public struct StageState: Codable, Equatable, Sendable {
                 spawnPointsCells: [Vec2i], telegraphTicks: Int = LifecycleRules.spawnProcessTicks,
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 20,
                 carriedPickupQueue: [CarriedPickup?] = [], hiddenPickups: [HiddenPickup] = [],
-                fortTemplate: [Vec2i] = [],
+                fortTemplate: [Vec2i] = [], fortTemplateKinds: [TerrainKind] = [],
                 brickDropChancePermille: Int = 15, brickDropCap: Int = 2,
                 clearBonus: ScoreRules.ClearBonus = .none,
                 enemyBehavior: EnemyBehaviorProfile = .standard,
@@ -160,6 +164,7 @@ public struct StageState: Codable, Equatable, Sendable {
         self.pendingPickups = []
         self.nextPickupRequestID = 1
         self.fortTemplate = fortTemplate
+        self.fortTemplateKinds = fortTemplateKinds
         self.brickDropChancePermille = brickDropChancePermille
         self.brickDropCap = brickDropCap
         self.brickDropsGranted = 0

@@ -711,7 +711,7 @@ enum Combat {
                 }
             }
         }
-        emitTerrainChanges(&world, changed, events: &events)
+        settleTerrainChanges(&world, changed, owner: owner, events: &events)
     }
 
     private static func noteClearedBrick(_ world: inout WorldState, _ cell: Vec2i) {
@@ -723,9 +723,24 @@ enum Combat {
         world.stage = stage
     }
 
-    static func emitTerrainChanges(_ world: inout WorldState, _ changed: Set<Int>, events: inout [DomainEvent]) {
+    /// After a strip or a blast has taken its quadrants: R5.14's crumble —
+    /// a wall cell left with a single quadrant falls with it, cracks and
+    /// all (a lone quarter-brick standing in a gap was the thing to avoid,
+    /// owner 2026-10-09) — then one terrain event per changed cell. The
+    /// crumble runs AFTER the whole strip, never inside it: emptied mid-
+    /// strip, a cell would let later columns pass through to the material
+    /// behind, which §3.2's "first material" forbids. A brick cell the
+    /// crumble empties for the player's round is a drop candidate like one
+    /// the round emptied itself.
+    static func settleTerrainChanges(_ world: inout WorldState, _ changed: Set<Int>, owner: PlayerID?,
+                                     events: inout [DomainEvent]) {
         for key in changed.sorted() {
             let cx = key % world.arena.cellsWide, cy = key / world.arena.cellsWide
+            let cell = world.terrain[cx, cy]
+            if cell.kind.isWall, cell.quadrantMask.nonzeroBitCount == 1 {
+                world.terrain[cx, cy] = cell.revealedSurface
+                if cell.kind.isBrickFamily, owner != nil { noteClearedBrick(&world, Vec2i(x: cx, y: cy)) }
+            }
             events.append(.terrainChanged(cellX: cx, cellY: cy, quadrantMask: world.terrain[cx, cy].quadrantMask))
         }
     }
@@ -802,7 +817,7 @@ enum Combat {
         where damageQuadrant(&world, cellX: qx / 2, cellY: qy / 2, bit: (qy % 2) * 2 + (qx % 2)) != .none {
             changed.insert((qy / 2) * world.arena.cellsWide + qx / 2)
         }
-        emitTerrainChanges(&world, changed, events: &events)
+        settleTerrainChanges(&world, changed, owner: nil, events: &events)
         if baseHit { applyBaseHit(&world, sourceTeam: projectile.teamID, weapons: weapons, events: &events) }
     }
 

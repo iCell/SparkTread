@@ -536,9 +536,22 @@ enum Stage {
     static func activateFort(_ world: inout WorldState, events: inout [DomainEvent]) {
         guard var base = world.base, let stage = world.stage else { return }
         if base.fortRecord.isEmpty {
-            base.fortRecord = stage.fortTemplate
-                .filter { world.terrain.isInside(cellX: $0.x, cellY: $0.y) }
-                .map { FortCellRecord(cell: $0, original: world.terrain[$0.x, $0.y]) }
+            // R5.14 (owner 2026-10-09): what expiry restores is the WHOLE
+            // authored brick — full quadrants, no cracks — not the damage the
+            // wall had when the shield came. A brick cell records itself
+            // repaired; a cell shot away records its authored kind when the
+            // template knows it; anything else (steel, water, white steel in
+            // a hand-built template) records as it stands.
+            base.fortRecord = stage.fortTemplate.enumerated()
+                .filter { world.terrain.isInside(cellX: $0.element.x, cellY: $0.element.y) }
+                .map { index, cell in
+                    let current = world.terrain[cell.x, cell.y]
+                    let authored = index < stage.fortTemplateKinds.count ? stage.fortTemplateKinds[index] : nil
+                    let kind: TerrainKind? = current.kind.isBrickFamily ? current.kind
+                        : (!current.kind.isWall && (authored?.isBrickFamily ?? false)) ? authored : nil
+                    let original = kind.map { TerrainCell(kind: $0, surface: current.surface == .water ? .ground : current.surface) } ?? current
+                    return FortCellRecord(cell: cell, original: original)
+                }
         } else {
             for i in base.fortRecord.indices { base.fortRecord[i].hardenedMask = 0 }
         }

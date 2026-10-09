@@ -2090,6 +2090,26 @@ restored the same evening — 敌人还是还原吧，不然关卡之间可能�
 §14.1 budget and the authored roster stand as they were; the steel cap
 stays. Commit 095fc4f reverted.
 
+*Lone quadrants crumble; the fort comes back whole — R5.14, ADR-0026
+(2026-10-09, owner, screenshot).* A quarter-brick standing alone in a gap
+should not exist: `Combat.settleTerrainChanges` empties a cell left with
+a single quadrant (cracks cleared) once a strip or a blast has taken its
+quadrants — after the whole strip, never inside it: the first cut put the
+crumble in `damageQuadrant`, and a cell emptied mid-strip let the AP
+round's later columns pass through to the steel behind, which §3.2's
+"first material" forbids and `apDoesNotReachSteelBehindBrick` caught. A
+brick cell the crumble empties for the player's round is a brick-drop
+candidate like one the round emptied itself. And a base shield
+taken over damaged walls restores them WHOLE on expiry: the fort records
+a restore target at first activation — brick-family cells as the same
+kind whole and uncracked, shot-away cells as the template's authored
+kind, which `StageState.fortTemplateKinds` carries from the content;
+steel, water and white steel as they stand — and the existing
+quadrant-aware restoration brings it back. Replay format 15 → 16; the M1
+golden's checksums did not move (its drive never fires). Tests: the
+crumble, the whole fort, the fort test's cracked white brick now
+restores uncracked.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

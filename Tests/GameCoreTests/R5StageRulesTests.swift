@@ -100,6 +100,42 @@ struct R5PickupTests {
     }
 }
 
+@Suite("R5.14 crumble and whole-brick fort")
+struct R5CrumbleAndFortRepairTests {
+    /// A wall cell left with one quadrant falls with the hit: two normal
+    /// rounds against a one-cell-thick wall take the pair of cells to the
+    /// ground with nothing standing, and a cell that starts with two
+    /// quadrants is gone after one quadrant is hit.
+    @Test func aLoneQuadrantCrumbles() {
+        var world = R5.world { R5.column(&$0, x: 10, .brick, ys: 2...5) }
+        world.terrain[10, 3] = TerrainCell(kind: .brick, quadrantMask: 0b0011)   // top half only
+        world.terrain[10, 4] = TerrainCell(kind: .brick, quadrantMask: 0b0011)
+        R5.step(&world, normal: true); R5.step(&world, R5.settle)
+        // The round takes the quadrants nearest the gun; what would have
+        // been a lone quarter in each cell crumbles with them.
+        #expect(world.terrain[10, 3].kind == .ground && world.terrain[10, 4].kind == .ground)
+    }
+
+    /// A shield taken over a shot-up fort hands back whole brick — the
+    /// authored kind, full quadrants, no cracks — once it expires.
+    @Test func theFortComesBackWholeAfterTheShield() {
+        var world = stageWorld {
+            $0.terrain[30, 10] = TerrainCell(kind: .brick, quadrantMask: 0b0011, crackMask: 0)
+            $0.terrain[31, 10] = TerrainCell(kind: .ground)          // shot away entirely
+            $0.terrain[32, 10] = TerrainCell(kind: .whiteBrick, quadrantMask: 0b1110, crackMask: 0b0010)
+            $0.stage?.fortTemplate = [Vec2i(x: 30, y: 10), Vec2i(x: 31, y: 10), Vec2i(x: 32, y: 10)]
+            $0.stage?.fortTemplateKinds = [.brick, .brick, .whiteBrick]
+        }
+        var events: [DomainEvent] = []
+        Stage.activateFort(&world, events: &events)
+        world.base?.shieldRemainingTicks = 1
+        R5.step(&world, 2)
+        #expect(world.terrain[30, 10] == TerrainCell(kind: .brick))
+        #expect(world.terrain[31, 10] == TerrainCell(kind: .brick))      // rebuilt from the template's kind
+        #expect(world.terrain[32, 10] == TerrainCell(kind: .whiteBrick))  // uncracked, whole
+    }
+}
+
 @Suite("R5 Flag On Guard")
 struct R5FortTests {
     private func fortWorld() -> WorldState {
@@ -119,7 +155,10 @@ struct R5FortTests {
         world.base?.shieldRemainingTicks = PickupRuleset.provisional.baseShieldTicks(afterPickupWith: remaining)
     }
 
-    @Test func hardeningRecordsTheOriginalsAndExpiryRestoresThemExactly() {
+    /// R5.14: brick in the template comes back WHOLE — the cracked white
+    /// brick is uncracked after the shield; steel, water and white steel
+    /// still restore as they stood.
+    @Test func hardeningRecordsTheOriginalsAndExpiryRestoresBrickWhole() {
         var world = fortWorld()
         shield(&world)
         #expect(world.terrain[30, 10] == TerrainCell(kind: .steel))
@@ -132,7 +171,7 @@ struct R5FortTests {
         #expect(world.terrain[31, 10].kind == .ground)
         world.base?.shieldRemainingTicks = 1
         R5.step(&world, 2)
-        #expect(world.terrain[30, 10] == TerrainCell(kind: .whiteBrick, crackMask: 0b0001))
+        #expect(world.terrain[30, 10] == TerrainCell(kind: .whiteBrick)) // whole, uncracked (R5.14)
         #expect(world.terrain[31, 10] == TerrainCell(kind: .ground))
         #expect(world.terrain[32, 10] == TerrainCell(kind: .water))
         #expect(world.base?.fortRecord.isEmpty == true)

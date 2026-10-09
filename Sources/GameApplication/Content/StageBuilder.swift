@@ -103,6 +103,7 @@ public enum StageBuilder {
                 HiddenPickup(cell: Vec2i(x: $0.cell[0], y: $0.cell[1]), pickupID: $0.id, critical: $0.critical ?? false)
             },
             fortTemplate: (def.fortTemplate ?? []).map { Vec2i(x: $0[0], y: $0[1]) },
+            fortTemplateKinds: (def.fortTemplate ?? []).map { StageValidator.authoredCell(def, at: $0).kind },
             brickDropChancePermille: def.brickDropChancePermille ?? 15,
             brickDropCap: def.brickDropCap ?? 2,
             // Validated present above; the fallback is unreachable data hygiene.
