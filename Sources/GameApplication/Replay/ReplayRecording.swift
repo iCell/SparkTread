@@ -58,7 +58,7 @@ public struct ReplayRecording: Codable, Equatable, Sendable {
     /// AI, contact resolution — must bump this number so the boundary is
     /// detected; a behaviour change shipped without a bump is undetectable
     /// here and would surface only as a checksum mismatch during playback.
-    public static let currentFormatVersion = 18
+    public static let currentFormatVersion = 19
 
     public let formatVersion: Int
     /// Campaign header (ADR-0013): the stage this recording plays and the

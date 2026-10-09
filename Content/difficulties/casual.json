@@ -16,5 +16,6 @@
   "enemySpecialAmmoPercent": 50,
   "startingLives": 5,
   "dropChancePercentScale": 150,
-  "maxAliveEnemiesPercent": 50
+  "maxAliveEnemiesPercent": 50,
+  "baseShieldDurationPercent": 300
 }

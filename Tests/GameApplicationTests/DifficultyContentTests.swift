@@ -38,6 +38,9 @@ private let vs01URL = repoRoot.appendingPathComponent("Content/stages/frontier_0
         // R5.22 (owner 2026-10-09, option A): the fire cycles stretch 160 / 130 / 100 %.
         #expect(casual.enemyBehavior.fireCyclePercent == 160 && standard.enemyBehavior.fireCyclePercent == 130
                 && veteran.enemyBehavior.fireCyclePercent == 100)
+        // R5.23: the base shield lasts 3× on casual, 2× on standard and veteran.
+        #expect(casual.baseShieldDurationPercent == 300 && standard.baseShieldDurationPercent == 200
+                && veteran.baseShieldDurationPercent == 200)
         // R5.12 (ADR-0025): reserves 5 / 3 / 1, random drops 150 / 100 / 50 %.
         #expect(casual.startingLives == 5 && standard.startingLives == 3 && veteran.startingLives == 1)
         #expect(casual.dropChancePercentScale == 150 && standard.dropChancePercentScale == 100 && veteran.dropChancePercentScale == 50)

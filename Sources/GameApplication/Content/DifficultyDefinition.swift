@@ -34,12 +34,14 @@ public struct DifficultyDefinition: Codable, Equatable, Sendable {
     /// (and on each director phase's cap), never below one. Casual fields
     /// fewer at a time. Absent means 100.
     public var maxAliveEnemiesPercent: Int
+    /// R5.23: percent scale on the base shield's durations (§11.2).
+    public var baseShieldDurationPercent: Int
 
     public init(schemaVersion: Int = 1, id: String, displayNameKey: String,
                 enemyBehavior: EnemyBehaviorProfile, telegraphTicksPercent: Int = 100,
                 composition: CompositionVariant = .baseline, alliedBaseDamage: Bool,
                 enemySpecialAmmoPercent: Int = 100, startingLives: Int = 3, dropChancePercentScale: Int = 100,
-                maxAliveEnemiesPercent: Int = 100) {
+                maxAliveEnemiesPercent: Int = 100, baseShieldDurationPercent: Int = 100) {
         self.schemaVersion = schemaVersion
         self.id = id
         self.displayNameKey = displayNameKey
@@ -51,11 +53,13 @@ public struct DifficultyDefinition: Codable, Equatable, Sendable {
         self.startingLives = startingLives
         self.dropChancePercentScale = dropChancePercentScale
         self.maxAliveEnemiesPercent = maxAliveEnemiesPercent
+        self.baseShieldDurationPercent = baseShieldDurationPercent
     }
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, id, displayNameKey, enemyBehavior, telegraphTicksPercent, composition,
-             alliedBaseDamage, enemySpecialAmmoPercent, startingLives, dropChancePercentScale, maxAliveEnemiesPercent
+             alliedBaseDamage, enemySpecialAmmoPercent, startingLives, dropChancePercentScale, maxAliveEnemiesPercent,
+             baseShieldDurationPercent
     }
 
     public init(from decoder: Decoder) throws {
@@ -71,6 +75,7 @@ public struct DifficultyDefinition: Codable, Equatable, Sendable {
         startingLives = try c.decodeIfPresent(Int.self, forKey: .startingLives) ?? 3
         dropChancePercentScale = try c.decodeIfPresent(Int.self, forKey: .dropChancePercentScale) ?? 100
         maxAliveEnemiesPercent = try c.decodeIfPresent(Int.self, forKey: .maxAliveEnemiesPercent) ?? 100
+        baseShieldDurationPercent = try c.decodeIfPresent(Int.self, forKey: .baseShieldDurationPercent) ?? 100
     }
 
     /// A stage's (or a phase's) cap of enemies alive at once under this
@@ -135,6 +140,7 @@ public enum DifficultyValidator {
         if !(0...99).contains(def.startingLives) { issues.append("startingLives \(def.startingLives) outside 0…99") }
         if !(0...400).contains(def.dropChancePercentScale) { issues.append("dropChancePercentScale \(def.dropChancePercentScale) outside 0…400") }
         if !(10...200).contains(def.maxAliveEnemiesPercent) { issues.append("maxAliveEnemiesPercent \(def.maxAliveEnemiesPercent) outside 10…200") }
+        if !(50...500).contains(def.baseShieldDurationPercent) { issues.append("baseShieldDurationPercent \(def.baseShieldDurationPercent) outside 50…500") }
         return issues
     }
 }

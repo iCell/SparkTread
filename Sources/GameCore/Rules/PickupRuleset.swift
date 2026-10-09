@@ -83,8 +83,9 @@ public struct PickupRuleset: Codable, Equatable, Sendable {
             : Self.saturatingAdd(remaining, invincibilityExtendTicks)
     }
 
-    /// §11.2: remaining = max(remaining + extend, floor).
-    public func baseShieldTicks(afterPickupWith remaining: Int) -> Int {
-        max(Self.saturatingAdd(remaining, baseShieldExtendTicks), baseShieldFloorTicks)
+    /// §11.2: remaining = max(remaining + extend, floor), both scaled by
+    /// the stage's difficulty percent (R5.23).
+    public func baseShieldTicks(afterPickupWith remaining: Int, percent: Int = 100) -> Int {
+        max(Self.saturatingAdd(remaining, baseShieldExtendTicks * percent / 100), baseShieldFloorTicks * percent / 100)
     }
 }

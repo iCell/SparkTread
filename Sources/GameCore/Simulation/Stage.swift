@@ -327,7 +327,8 @@ enum Stage {
         case "base_shield":
             if var base = world.base {
                 let wasActive = base.shieldRemainingTicks > 0
-                base.shieldRemainingTicks = rules.baseShieldTicks(afterPickupWith: base.shieldRemainingTicks)
+                base.shieldRemainingTicks = rules.baseShieldTicks(afterPickupWith: base.shieldRemainingTicks,
+                                                                  percent: world.stage?.baseShieldDurationPercent ?? 100)
                 world.base = base
                 activateFort(&world, events: &events)
                 if !wasActive { events.append(.baseShieldChanged(active: true)) }

@@ -144,6 +144,7 @@ extension WorldState {
             for f in stage.fortTemplate { c.mix(f.x); c.mix(f.y) }
             for k in stage.fortTemplateKinds { c.mix(k.rawValue) }
             c.mix(stage.brickDropChancePermille); c.mix(stage.brickDropCap); c.mix(stage.brickDropsGranted)
+            c.mix(stage.baseShieldDurationPercent)
             c.mix(stage.clearedBrickCells.count)
         } else {
             c.mix(-1)

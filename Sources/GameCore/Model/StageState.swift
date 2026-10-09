@@ -126,6 +126,10 @@ public struct StageState: Codable, Equatable, Sendable {
     /// at a tick's end.
     public var brickDropChancePermille: Int
     public var brickDropCap: Int
+    /// R5.23 (owner 2026-10-09): percent scale on the Flag On Guard
+    /// durations (§11.2: both the extension and the floor), set from the
+    /// difficulty; 100 = the rulebook's 600 / 1200 ticks.
+    public var baseShieldDurationPercent: Int
     public var brickDropsGranted: Int
     public var clearedBrickCells: [Vec2i]
     /// Stage-clear bonuses (ADR-0012).
@@ -143,7 +147,7 @@ public struct StageState: Codable, Equatable, Sendable {
                 playerRespawnCell: Vec2i, dropTable: [String], dropChancePercent: Int = 20,
                 carriedPickupQueue: [CarriedPickup?] = [], hiddenPickups: [HiddenPickup] = [],
                 fortTemplate: [Vec2i] = [], fortTemplateKinds: [TerrainKind] = [],
-                brickDropChancePermille: Int = 30, brickDropCap: Int = 2,
+                brickDropChancePermille: Int = 30, brickDropCap: Int = 2, baseShieldDurationPercent: Int = 100,
                 clearBonus: ScoreRules.ClearBonus = .none,
                 enemyBehavior: EnemyBehaviorProfile = .standard,
                 directorPhases: [DirectorPhase] = []) {
@@ -167,6 +171,7 @@ public struct StageState: Codable, Equatable, Sendable {
         self.fortTemplateKinds = fortTemplateKinds
         self.brickDropChancePermille = brickDropChancePermille
         self.brickDropCap = brickDropCap
+        self.baseShieldDurationPercent = baseShieldDurationPercent
         self.brickDropsGranted = 0
         self.clearedBrickCells = []
         self.clearBonus = clearBonus
