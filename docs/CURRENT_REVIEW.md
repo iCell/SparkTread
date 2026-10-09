@@ -2380,6 +2380,16 @@ the authored windows at 100, the stretched cycles and their open ticks,
 and the decoding default. Replay format 17 → 18; no golden moved (none
 has an enemy firing). Veteran is unchanged.
 
+*R5.23 — the base shield lasts longer (2026-10-09, owner: 把基地变成钢铁之墙
+的那个装备生效时间，在简单难度延长三倍，其余两个难度下面延长两倍).* §11.2's
+extension (600) and floor (1200) both scale by the new difficulty field
+`baseShieldDurationPercent`, carried on the stage like the drop rates:
+casual 300 (one pickup 60 s, a repeat +30 s), standard and veteran 200
+(40 s, +20 s). Absent reads 100 (the Training Arena, older files);
+validated 50…500; mixed into the checksum. `BaseShieldDurationTests`
+(the rule at 100 / 200 / 300 and a pickup collected in a stage) and
+`DifficultyContentTests`. Replay format 18 → 19; no golden moved.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:
