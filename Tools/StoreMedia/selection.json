@@ -1,0 +1,25 @@
+{
+  "_comment": "Which capture fills each store slot, and the region magnified in its callout (x, y, w, h in the capture's pixels). Chosen by eye from the ranked contact sheets (compose.py candidates) of the 2026-10-09 captures; a re-capture means choosing again. iPad captures are the letterboxed landscape band (see compose.py).",
+  "iphone": [
+    { "slot": "hero", "source": "iphone/stage12/shot_092_132.2.png", "zoom": [   1000,   860,   600,   400 ], "icons": [   "player",   "normal_c",   "rapid_d",   "fire_c",   "ap_b",   "explosion_d" ]
+    },
+    { "slot": "defend", "source": "iphone/stage04/shot_017_023.9.png", "zoom": [   990,   920,   600,   400 ]
+    },
+    { "slot": "weapons", "source": "iphone/stage02/shot_059_085.1.png", "zoom": [   830,   90,   600,   400 ]
+    },
+    { "slot": "terrain", "source": "iphone/stage10/shot_025_035.6.png", "zoom": [   900,   480,   600,   400 ]
+    },
+    { "slot": "enemies", "source": "iphone/stage12/shot_015_021.1.png", "zoom": [   1180,   440,   600,   400 ], "icons": [   "normal_a",   "rapid_c",   "fire_b",   "ap_d",   "explosion_c" ]
+    },
+    { "slot": "stages", "source": "iphone/{lang}/select.png"
+    }
+  ],
+  "ipad": [
+    { "slot": "hero", "source": "ipad/stage12/shot_029_070.9.png", "zoom": [   732,   450,   600,   400 ], "icons": [   "player",   "normal_c",   "rapid_d",   "fire_c",   "ap_b",   "explosion_d" ]
+    },
+    { "slot": "weapons", "source": "ipad/stage02/shot_021_052.3.png", "zoom": [   150,   250,   600,   400 ]
+    },
+    { "slot": "terrain", "source": "ipad/stage04/shot_013_031.1.png", "zoom": [   700,   850,   600,   400 ]
+    }
+  ]
+}

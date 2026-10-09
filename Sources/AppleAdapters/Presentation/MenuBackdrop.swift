@@ -17,6 +17,13 @@ import SwiftUI
         try? PixelArt()
     }()
 
+    /// Reads the art from a delivery folder instead of the app bundle — for
+    /// tools on the Mac, where the compiled atlases do not exist.
+    static func useArt(root: URL) {
+        art = try? PixelArt(root: root)
+        cache = [:]
+    }
+
 
     /// The player's own tank facing right, composed and cropped to its body
     /// — the intro's own element. It works here where a watermark did not,
@@ -180,4 +187,18 @@ struct MenuBackdrop: View {
         renderer.isOpaque = true
         return renderer.cgImage
     }
+}
+
+/// The brand pieces the store-art tool (`store-art-renderer`) composes the
+/// App Store screenshots and the preview's cards with — the title's
+/// wordmark, the menus' steel plate, the arena's tank sprites — so the
+/// store pages are drawn in the app's own materials, never re-imagined.
+@MainActor public enum BrandArt {
+    public static var wordmark: some View { TitleWordmark() }
+    public static var baseColor: Color { MenuBackdrop.base }
+    public static func plateTile(scale: Int) -> CGImage? { MenuArt.upscaled("px_steel_joint_15_15", by: scale) }
+    public static func tankIcon(archetypeID: String) -> CGImage? { MenuArt.tankIcon(archetypeID: archetypeID) }
+    public static var playerTank: CGImage? { MenuArt.tankIcon(kind: "player") }
+    /// Tools on the Mac: read the sprites from `Vendor/SparkTreadPixel`.
+    public static func useArt(root: URL) { MenuArt.useArt(root: root) }
 }

@@ -49,7 +49,8 @@ Audio is tied to `Tools/audio_manifest.json` and checked by `Scripts/check-audio
 - The single non-interactive gate is `sh Scripts/ci.sh`: architecture check, `swift run content-validator Content`, audio check, `swift test`, `xcodegen generate`, `xcodebuild test`, smoke render.
 - Device install: `sh Scripts/deploy-device.sh` (needs an unlocked, connected iPhone; run it without the sandbox).
 - iOS app project: generate with `xcodegen generate` from `project.yml` (requires Xcode + xcodegen), scheme `SparkTread`.
-- Useful env: `SPARKTREAD_AUTOSTART`, `MOVEMENT_LAB` (smoke render), `SPARKTREAD_NO_SAVE` (skip persistence).
+- Useful env: `SPARKTREAD_AUTOSTART` (`=<n>` starts stage n, which must be unlocked), `MOVEMENT_LAB` (smoke render), `SPARKTREAD_NO_SAVE` (skip persistence); store capture only: `SPARKTREAD_PILOT` (the autopilot plays), `SPARKTREAD_CUE_LOG` (every sound that starts is logged to the app's tmp), `SPARKTREAD_DIFFICULTY=<id>`, `SPARKTREAD_SCREEN=select|settings`.
+- App Store media: `python3 Tools/StoreMedia/capture.py` (simulator captures), then `compose.py candidates|screens|video` → `AppStoreMedia/<lang>/` (gitignored). Slot frames live in `Tools/StoreMedia/selection.json`, captions in `captions.json`; the art is drawn by `swift run store-art-renderer` with the app's own `BrandArt`.
 
 ## Collaboration
 
@@ -60,7 +61,7 @@ A second reviewer — the Astra agent (Codex, gpt-6-astra) — runs in a Herdr p
 - Changing a fixed decision (plan §4) requires an ADR in `docs/decisions/ADR-NNNN-short-name.md` — never silently reinterpret one.
 - V1 is single-player only: no networking abstractions, no dormant multiplayer sockets or UI.
 - Gameplay rules never live in HUD/animation/audio/scene code.
-- Analytics: the adapters name events through `AnalyticsSink` / `GameAnalytics` (`Sources/AppleAdapters/Analytics`); Firebase lives ONLY in the app target (`FirebaseAnalyticsSink`, `FirebaseAnalyticsCore`) and is configured only when `Sources/GoldenEagleApp/GoogleService-Info.plist` is bundled — the owner supplies that file; never add the SDK to the package.
+- Analytics: the adapters name events through `AnalyticsSink` / `GameAnalytics` (`Sources/AppleAdapters/Analytics`); Firebase lives ONLY in the app target (`FirebaseAnalyticsSink`, `FirebaseAnalyticsCore`) and is configured only when `Sources/GoldenEagleApp/GoogleService-Info.plist` is bundled and never in the simulator (CI and capture runs are not players) — the owner supplies that file; never add the SDK to the package.
 - Every user-facing string is a key in `Sources/AppleAdapters/Resources/Localizable.xcstrings` (en, zh-Hans, zh-Hant, ja, ko, es), read through `@Environment(\.strings)`; never a literal in a view. `LocalizationTests` fails when a language lacks a key.
 - Comments explain constraints and intent, not line-by-line paraphrase.
 - Keep the tree green: run the gate before committing, and report failures with their output instead of describing them.

@@ -10,3 +10,6 @@ xcuserdata/
 .DS_Store
 __pycache__/
 *.pyc
+
+# App Store screenshots and previews (Tools/StoreMedia/compose.py); large, rebuilt from captures.
+/AppStoreMedia/

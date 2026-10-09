@@ -1,0 +1,95 @@
+{
+  "_comment": "App Store screenshot and preview captions (owner 2026-10-09). Every claim is a fact of the shipped game: 12 stages in 4 themes, 20 enemy types, 5 weapon families (normal, rapid, flame, AP, explosive), 3 difficulties named as in Localizable.xcstrings. A line break in a headline is placed by hand per language.",
+  "screens": {
+    "hero": {
+      "en": ["Classic tank\nbattles, reforged", "Pixel-art arcade combat, built for touch."],
+      "zh-Hans": ["经典坦克大战\n全新打造", "为触屏打造的像素街机对战。"],
+      "zh-Hant": ["經典坦克大戰\n全新打造", "為觸控打造的像素街機對戰。"],
+      "ja": ["あの戦車バトルが\n新しくなった", "タッチ操作のための\nピクセルアーケード。"],
+      "ko": ["클래식 탱크 배틀\n새롭게 돌아오다", "터치에 맞춘 픽셀 아케이드 전투."],
+      "es": ["Batallas de tanques\nclásicas, renovadas", "Combate arcade en pixel art, pensado para el tacto."]
+    },
+    "defend": {
+      "en": ["Defend\nyour base", "Hold the line against wave after wave of enemy tanks."],
+      "zh-Hans": ["守住\n你的基地", "顶住一波又一波敌军坦克的进攻。"],
+      "zh-Hant": ["守住\n你的基地", "擋下一波又一波敵軍坦克的進攻。"],
+      "ja": ["基地を\n守り抜け", "押し寄せる敵戦車の波を\n食い止めろ。"],
+      "ko": ["기지를\n사수하라", "끝없이 밀려오는 적 탱크를\n막아내세요."],
+      "es": ["Defiende\ntu base", "Resiste oleada tras oleada de tanques enemigos."]
+    },
+    "weapons": {
+      "en": ["Five weapon\nfamilies", "Normal, rapid, flame, armor-piercing and explosive. Each one hits differently."],
+      "zh-Hans": ["五大\n武器体系", "普通、速射、火焰、穿甲、爆破，每种都有独特手感。"],
+      "zh-Hant": ["五大\n武器系統", "普通、速射、火焰、穿甲、爆破，每種手感都不同。"],
+      "ja": ["5系統の\n武器", "通常・速射・火炎・徹甲・爆破。\n撃ち心地はそれぞれ別物。"],
+      "ko": ["다섯 가지\n무기 계열", "일반·속사·화염·철갑·폭발,\n손맛이 모두 다릅니다."],
+      "es": ["Cinco familias\nde armas", "Normal, ráfaga, fuego, perforante y explosiva. Cada una golpea distinto."]
+    },
+    "terrain": {
+      "en": ["Use the\nterrain", "Blast through brick, cross water, slide on ice and set the grass ablaze."],
+      "zh-Hans": ["地形\n就是战术", "轰开砖墙、横渡水面、冰上滑行、火烧草丛。"],
+      "zh-Hant": ["地形\n就是戰術", "轟開磚牆、橫渡水面、冰上滑行、火燒草叢。"],
+      "ja": ["地形を\n味方に", "レンガを砕き、水を渡り、\n氷を滑り、草むらを焼き払え。"],
+      "ko": ["지형을\n활용하라", "벽돌을 부수고, 물을 건너고,\n얼음 위를 미끄러지고, 풀숲을 태우세요."],
+      "es": ["Usa el\nterreno", "Revienta ladrillos, cruza el agua, derrapa en el hielo y quema la hierba."]
+    },
+    "enemies": {
+      "en": ["20 enemy\ntank types", "Scouts, gunners and shielded heavies, each with its own weapon."],
+      "zh-Hans": ["20 种\n敌方坦克", "侦察车、火力车、带护盾的重坦克，各有专属武器。"],
+      "zh-Hant": ["20 種\n敵方坦克", "偵察車、火力車、帶護盾的重戰車，各有專屬武器。"],
+      "ja": ["敵戦車\n20種", "偵察車からシールド付き重戦車まで、\nそれぞれ固有の武器を持つ。"],
+      "ko": ["적 탱크\n20종", "정찰차부터 방패를 두른 중전차까지,\n저마다 고유 무기를 씁니다."],
+      "es": ["20 tipos de\ntanques enemigos", "Exploradores, artilleros y blindados con escudo, cada uno con su arma."]
+    },
+    "stages": {
+      "en": ["12 stages,\n4 worlds", "Three difficulties, from Casual to Veteran."],
+      "zh-Hans": ["12 个关卡\n4 大世界", "休闲、标准、老兵三档难度，任你挑战。"],
+      "zh-Hant": ["12 個關卡\n4 大世界", "休閒、標準、老兵三種難度，任你挑戰。"],
+      "ja": ["12ステージ\n4つのワールド", "カジュアル・ノーマル・ベテランの\n3段階の難易度。"],
+      "ko": ["12개 스테이지\n4개 월드", "캐주얼부터 베테랑까지\n세 가지 난이도."],
+      "es": ["12 niveles,\n4 mundos", "Tres dificultades, de Casual a Veterano."]
+    }
+  },
+  "video": {
+    "defend": {
+      "en": ["Defend your base", "Wave after wave of enemy tanks"],
+      "zh-Hans": ["守住你的基地", "一波又一波的敌军坦克"],
+      "zh-Hant": ["守住你的基地", "一波又一波的敵軍坦克"],
+      "ja": ["基地を守り抜け", "押し寄せる敵戦車の波"],
+      "ko": ["기지를 사수하라", "끝없이 밀려오는 적 탱크"],
+      "es": ["Defiende tu base", "Oleada tras oleada de tanques enemigos"]
+    },
+    "terrain": {
+      "en": ["Use the terrain", "Brick · Water · Ice · Grass"],
+      "zh-Hans": ["地形就是战术", "砖墙 · 水面 · 冰面 · 草丛"],
+      "zh-Hant": ["地形就是戰術", "磚牆 · 水面 · 冰面 · 草叢"],
+      "ja": ["地形を味方に", "レンガ・水・氷・草むら"],
+      "ko": ["지형을 활용하라", "벽돌 · 물 · 얼음 · 풀숲"],
+      "es": ["Usa el terreno", "Ladrillo · Agua · Hielo · Hierba"]
+    },
+    "weapons": {
+      "en": ["Five weapon families", "Normal · Rapid · Flame · AP · Explosive"],
+      "zh-Hans": ["五大武器体系", "普通 · 速射 · 火焰 · 穿甲 · 爆破"],
+      "zh-Hant": ["五大武器系統", "普通 · 速射 · 火焰 · 穿甲 · 爆破"],
+      "ja": ["5系統の武器", "通常・速射・火炎・徹甲・爆破"],
+      "ko": ["다섯 가지 무기 계열", "일반 · 속사 · 화염 · 철갑 · 폭발"],
+      "es": ["Cinco familias de armas", "Normal · Ráfaga · Fuego · Perforante · Explosiva"]
+    },
+    "enemies": {
+      "en": ["20 enemy tank types", "12 stages across 4 worlds"],
+      "zh-Hans": ["20 种敌方坦克", "4 大世界，12 个关卡"],
+      "zh-Hant": ["20 種敵方坦克", "4 大世界，12 個關卡"],
+      "ja": ["敵戦車20種", "4つのワールド、12ステージ"],
+      "ko": ["적 탱크 20종", "4개 월드, 12개 스테이지"],
+      "es": ["20 tipos de tanques enemigos", "12 niveles en 4 mundos"]
+    },
+    "end": {
+      "en": ["Classic tank battles, reforged", "12 stages · 20 enemy types · 5 weapon families"],
+      "zh-Hans": ["经典坦克大战，全新打造", "12 个关卡 · 20 种敌军 · 5 大武器体系"],
+      "zh-Hant": ["經典坦克大戰，全新打造", "12 個關卡 · 20 種敵軍 · 5 大武器系統"],
+      "ja": ["あの戦車バトルが、新しくなった", "12ステージ・敵戦車20種・武器5系統"],
+      "ko": ["클래식 탱크 배틀, 새롭게 돌아오다", "12개 스테이지 · 적 탱크 20종 · 무기 5계열"],
+      "es": ["Batallas de tanques clásicas, renovadas", "12 niveles · 20 tipos de enemigos · 5 familias de armas"]
+    }
+  }
+}

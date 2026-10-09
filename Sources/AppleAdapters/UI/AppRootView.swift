@@ -34,7 +34,8 @@ public struct AppFlowModel: Equatable, Sendable {
     public var startingLivesByDifficulty: [String: Int] = [:]
 
     public init(campaign: CampaignDefinition?, progress: CampaignProgress? = nil,
-                suspended: SuspendedSession? = nil, autostart: Bool = false, lab: Bool = false) {
+                suspended: SuspendedSession? = nil, autostart: Bool = false, autostartStageIndex: Int = 0,
+                lab: Bool = false) {
         self.campaign = campaign
         if let progress, progress.campaignID == campaign?.id {
             completedStageIDs = Set(progress.completedStageIDs)
@@ -43,7 +44,7 @@ public struct AppFlowModel: Equatable, Sendable {
         }
         if let suspended, suspended.run.campaign.id == campaign?.id { self.suspended = suspended }
         if lab { screen = .playing(stageIndex: nil) }
-        else if autostart, campaign != nil { screen = .playing(stageIndex: 0) }
+        else if autostart, campaign != nil { screen = .playing(stageIndex: autostartStageIndex) }
     }
 
     /// The run a stage card starts: ALWAYS a fresh run from the
@@ -179,12 +180,22 @@ public struct AppRootView: View {
         // The install's progress as the analytics sees it, from the document
         // at launch (the sink is installed by the app before this runs).
         GameAnalytics.recordProgress(completedStageIDs: progress?.completedStageIDs ?? [])
+        // SPARKTREAD_AUTOSTART: straight into play — stage 1, or the stage
+        // number it holds (store capture; the stage must be unlocked).
+        let autostartIndex = env["SPARKTREAD_AUTOSTART"].map { max(0, (Int($0) ?? 1) - 1) }
         var model = AppFlowModel(campaign: campaign, progress: progress, suspended: suspended,
-                                 autostart: env["SPARKTREAD_AUTOSTART"] != nil, lab: lab)
+                                 autostart: autostartIndex != nil, autostartStageIndex: autostartIndex ?? 0, lab: lab)
         model.startingLivesByDifficulty = startingLives
+        // Store capture: a difficulty and a menu screen to open on.
+        if let id = env["SPARKTREAD_DIFFICULTY"], AppFlowModel.difficultyIDs.contains(id) { model.difficultyID = id }
+        switch env["SPARKTREAD_SCREEN"] {
+        case "select": model.openCampaignSelect()
+        case "settings": model.openSettings()
+        default: break
+        }
         _model = State(initialValue: model)
         _storeNotice = State(initialValue: notice)
-        _controller = State(initialValue: Self.makeController(for: model.screen, run: model.run(forStageIndex: 0),
+        _controller = State(initialValue: Self.makeController(for: model.screen, run: model.run(forStageIndex: autostartIndex ?? 0),
                                                               store: store))
     }
 

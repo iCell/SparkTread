@@ -449,6 +449,9 @@ public final class MovementLabController {
     /// Launch-env autopilot for automated capture and demos; player input
     /// (touch/keyboard/controller) always overrides it when present.
     private let autodrive = ProcessInfo.processInfo.environment["MOVEMENT_LAB_AUTODRIVE"] != nil
+    /// Store-capture autopilot (`SPARKTREAD_PILOT`): plays the stage for the
+    /// screenshots and the preview video. Player input overrides it.
+    private var pilot: ShowcasePilot? = ProcessInfo.processInfo.environment["SPARKTREAD_PILOT"] != nil ? ShowcasePilot() : nil
 
     private func autodriveDirection(forTick tick: Int) -> Direction? {
         switch (tick % 1080) {
@@ -596,9 +599,10 @@ public final class MovementLabController {
         }
         guard flow.allowsSimulation else { return }
         let tick = session.world.tick
-        let scripted = autodrive ? autodriveDirection(forTick: tick) : nil
-        let scriptedNormal = autodrive && tick % 45 < 2
-        let scriptedSpecial = autodrive && tick % 130 < 2
+        let piloted = pilot?.decide(world: session.world)
+        let scripted = autodrive ? autodriveDirection(forTick: tick) : piloted?.direction
+        let scriptedNormal = autodrive ? tick % 45 < 2 : piloted?.normalFire ?? false
+        let scriptedSpecial = autodrive ? tick % 130 < 2 : piloted?.specialFire ?? false
         if isLab { session.debugRespawnPlayerIfNeeded() }
         let normalPulse = input.consumeNormalFirePulse()
         let holding = input.held ?? scripted

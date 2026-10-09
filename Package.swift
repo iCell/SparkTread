@@ -53,6 +53,13 @@ let package = Package(
             dependencies: ["AppleAdapters"],
             path: "Tools/LaunchScreenRenderer"
         ),
+        // Composes the App Store screenshots and the preview video's caption
+        // cards from simulator captures (Tools/StoreMedia).
+        .executableTarget(
+            name: "store-art-renderer",
+            dependencies: ["AppleAdapters"],
+            path: "Tools/StoreArtRenderer"
+        ),
         .testTarget(
             name: "GameCoreTests",
             dependencies: ["GameCore"],

@@ -2307,6 +2307,36 @@ amended; the §14.1 table follows.
 Owner's decision afterwards (维持原状): the rosters stay as they are now;
 no deeper cut.
 
+*App Store screenshots and preview (2026-10-09, owner: edited, not bare
+captures; at least English, Simplified and Traditional Chinese, Japanese).*
+All six app languages were produced. Capture (`Tools/StoreMedia/capture.py`):
+a Release simulator build on the iPhone 17 Pro Max (6.9") and the 13-inch
+iPad Pro, progress seeded so every stage is open, and four stages (2, 4,
+10, 12: one per theme) played by a new autopilot, `ShowcasePilot` — an
+input source in AppleAdapters that reads the world and holds a direction
+and the triggers like a thumb would (no rule in it; player input wins;
+only under `SPARKTREAD_PILOT`). Simulator recordings carry no sound, so
+`GameAudio` logs every cue that starts under `SPARKTREAD_CUE_LOG` and the
+soundtrack is rebuilt from the bundled WAVs at the logged times (checked
+against the title's two shells on screen). Composition
+(`Tools/StoreMedia/compose.py` + `store-art-renderer`, a SwiftUI renderer
+using the app's own wordmark, steel plate and tank sprites through the new
+public `BrandArt`): six iPhone slots (hero, defend, weapons, terrain,
+enemies, stages) at 2868×1320, three iPad slots at 2752×2064, each with a
+caption column and a pixel-exact magnified callout of the action; a 24.2 s
+1920×886 30 fps H.264/AAC preview per language — title drive, four
+4.5-second clips chosen by cue density with a motion-centred push-in and
+localized lower thirds, the brand end card over the results music. Output
+in `AppStoreMedia/` (gitignored, 286 MB). Firebase no longer configures in
+the simulator, so the gate's smoke render and capture runs are not counted
+as installs. Found on the way, for the owner: on iPad the title and menu
+backdrop is a fixed 1024×512 field (black around it) and the arena sits in
+a band with tall steel strips; the iPad simulator cannot be rotated from
+the command line in this Xcode, so iPad captures are the letterboxed
+landscape band (the app's real layout at 75 %). The captions' every claim
+is a shipped fact (12 stages, 4 themes, 20 enemy types, 5 weapon families,
+3 difficulties).
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

@@ -198,6 +198,7 @@ public final class GameAudio {
             if entry.voice == nil, !isSuspended, isEnabled { startLoop(name, volume: volume) }
         } else if let entry = loops.removeValue(forKey: name) {
             entry.voice?.stop()
+            if entry.voice != nil { CueLog.shared?.record(name, volume: entry.volume, event: "loop-stop") }
         }
     }
 
@@ -216,6 +217,7 @@ public final class GameAudio {
         }
         loopRetryNotBefore[name] = nil
         loops[name] = (voice, volume)
+        CueLog.shared?.record(name, volume: volume, event: "loop-start")
     }
 
     /// Returns whether a voice actually started. Playback never allocates:
@@ -234,7 +236,9 @@ public final class GameAudio {
               let chosen = pool.first(where: { !$0.isPlaying }) else { return false }
         chosen.volume = volume * masterVolume
         chosen.currentTime = 0
-        return chosen.play()
+        let started = chosen.play()
+        if started { CueLog.shared?.record(name, volume: volume) }
+        return started
     }
 
     /// Plays one drain's events: at most one play per sound name, base
@@ -339,5 +343,30 @@ public final class GameAudio {
             names.removeAll { $0.hasPrefix("sfx_fire_") } // every launch voice
         }
         return names
+    }
+}
+
+/// Store-capture support (`SPARKTREAD_CUE_LOG`): every sound that actually
+/// starts is appended — wall-clock time, event, name, volume — to
+/// `cue_log.txt` in the app's temporary directory. A simulator's screen
+/// recording carries no audio, so the preview tooling rebuilds the
+/// soundtrack from this log and the bundled cue files. Off in every
+/// ordinary run: `shared` is nil unless the variable is set.
+final class CueLog: @unchecked Sendable {
+    static let shared: CueLog? = ProcessInfo.processInfo.environment["SPARKTREAD_CUE_LOG"] != nil ? CueLog() : nil
+
+    private let handle: FileHandle?
+    private let lock = NSLock()
+
+    private init() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("cue_log.txt")
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        handle = try? FileHandle(forWritingTo: url)
+    }
+
+    func record(_ name: String, volume: Float, event: String = "play") {
+        let line = String(format: "%.4f %@ %@ %.3f\n", Date().timeIntervalSince1970, event, name, volume)
+        lock.lock(); defer { lock.unlock() }
+        handle?.write(Data(line.utf8))
     }
 }

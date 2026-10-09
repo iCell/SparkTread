@@ -11,9 +11,15 @@ import Foundation
 final class FirebaseAnalyticsSink: AnalyticsSink, @unchecked Sendable {
     /// Installs the sink if a Firebase configuration ships in the bundle.
     @MainActor static func installIfConfigured() {
+        // Simulator runs are the gate's smoke render and the store capture,
+        // never a player: they must not count as installs or play.
+        #if targetEnvironment(simulator)
+        return
+        #else
         guard Bundle.main.url(forResource: "GoogleService-Info", withExtension: "plist") != nil else { return }
         FirebaseApp.configure()
         GameAnalytics.sink = FirebaseAnalyticsSink()
+        #endif
     }
 
     func log(_ event: AnalyticsEvent) {
