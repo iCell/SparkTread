@@ -7,6 +7,8 @@ import SwiftUI
 /// in fire), so nothing here is a native switch or picker.
 struct SettingsScreen: View {
     let onBack: () -> Void
+    /// What the feedback mail's footer reports about this install.
+    var feedback = FeedbackProgress()
     @Environment(SettingsStore.self) private var settings
     @Environment(\.strings) private var strings
 
@@ -17,7 +19,7 @@ struct SettingsScreen: View {
                 .foregroundStyle(Color.yellow)
                 .padding(.top, 2)
             ScrollView(.vertical, showsIndicators: false) {
-                SettingsList()
+                SettingsList(feedback: feedback)
                     .padding(.horizontal, 60)
                     .padding(.bottom, 24)
                     .frame(maxWidth: 760)
@@ -50,6 +52,7 @@ struct SettingsScreen: View {
 /// The settings themselves, outside the scroll view so they can be
 /// rendered on their own (offscreen checks do not render scroll content).
 struct SettingsList: View {
+    var feedback = FeedbackProgress()
     @Environment(SettingsStore.self) private var settings
     @Environment(\.strings) private var strings
 
@@ -88,6 +91,18 @@ struct SettingsList: View {
                 toggle(strings("settings.highContrast"), $settings.highContrastHUD)
                 toggle(strings("settings.largeHUD"), $settings.largeHUD)
             }
+            section(strings("settings.feedback")) {
+                HStack(spacing: 14) {
+                    Text(strings("settings.feedback.detail"))
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    FeedbackButton(context: FeedbackMail.currentContext(
+                        language: settings.effectiveLanguage.rawValue, difficulty: feedback.difficulty,
+                        stagesCleared: feedback.stagesCleared, stageCount: feedback.stageCount))
+                }
+            }
         }
     }
 
@@ -124,4 +139,11 @@ struct SettingsList: View {
                           selection: value.wrappedValue) { value.wrappedValue = $0 }
         }
     }
+}
+
+/// The install's progress as the feedback footer reports it.
+struct FeedbackProgress: Equatable {
+    var difficulty = "standard"
+    var stagesCleared = 0
+    var stageCount = 0
 }

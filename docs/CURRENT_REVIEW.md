@@ -2345,6 +2345,27 @@ The store media are iPhone only (the iPad files were deleted from
 is offered as an iPhone app in compatibility mode; `ArenaLayoutTests`
 keeps its iPad sizes for that reason.
 
+*Feedback by email (2026-10-09, owner: 直接用 email，发到
+shawn.lee.im@gmail.com).* Settings gains a Feedback section: a line of
+text and a "Send Email" plate (`FeedbackButton`, `FeedbackMail`). It opens
+the system mail composer addressed to the developer, with a localized
+subject carrying the version and a body that leaves room to write above a
+localized prompt line and ends in an English diagnostics footer (version,
+system, device model, language, difficulty, stages cleared). Without a
+Mail account it hands the same message to the default mail app through a
+mailto link; if nothing takes it, a dialog shows the address with a copy
+button. Nine strings in six languages; `FeedbackMailTests` pins the
+address, the localized subject and prompt, the footer and the mailto
+round trip. No SDK and nothing collected unless the player sends it — the
+App Privacy answers are unchanged (optional, user-initiated contact).
+
+*Stage 11's fort, reshaped again (2026-10-09, owner: 第 11 关基地的样子还是很
+奇怪).* The authored fort had two "ears" (rows 21–22) over a stepped U.
+Now a symmetric two-thick fort: roof rows 22–23 (x 25–30), sides x 25–26
+and 29–30 (rows 24–25); the fort template follows (20 cells), so the
+shield hardens and the repair phase restores exactly this. The double
+wall the siege stage teaches is kept; the protrusions are gone.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

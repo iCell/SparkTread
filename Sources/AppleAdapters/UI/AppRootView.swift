@@ -228,7 +228,10 @@ public struct AppRootView: View {
                             onIntroFinished: { introPlayed = true },
                             audio: audio)
             case .settings:
-                SettingsScreen(onBack: { model.backToTitle() })
+                SettingsScreen(onBack: { model.backToTitle() },
+                               feedback: FeedbackProgress(difficulty: model.difficultyID,
+                                                          stagesCleared: model.completedStageIDs.count,
+                                                          stageCount: campaign?.stageIDs.count ?? 0))
             case .campaignSelect:
                 if let campaign {
                     CampaignSelectScreen(campaign: campaign, model: model, stageMaps: stageMaps,
