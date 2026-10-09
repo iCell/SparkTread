@@ -123,7 +123,7 @@ extension WorldState {
             c.mix(stage.clearBonus.tally); c.mix(stage.clearBonus.reward)
             let b = stage.enemyBehavior
             c.mix(b.decisionIntervalTicks); c.mix(b.baseFocusPercent); c.mix(b.wanderPercent)
-            c.mix(b.fireWindowPercent); c.mix(b.courseCommitPercent)
+            c.mix(b.fireWindowPercent); c.mix(b.courseCommitPercent); c.mix(b.fireCyclePercent)
             c.mix(stage.directorPhases.count)
             for phase in stage.directorPhases {
                 c.mix(phase.id); c.mix(phase.afterSpawned); c.mix(phase.reinforcements.count)

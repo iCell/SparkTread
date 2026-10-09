@@ -2366,6 +2366,20 @@ and 29–30 (rows 24–25); the fort template follows (20 cells), so the
 shield hardens and the repair phase restores exactly this. The double
 wall the siege stage teaches is kept; the protrusions are gone.
 
+*R5.22 — the fire cycles stretch by difficulty (2026-10-09, owner: 怎么样
+才能把敌人的火力稍微降低一些 → option A).* Every enemy weapon's cooldown
+is shorter than its fire cycle (32 ticks for rapid, 48 for the others, 64
+for wall breaking) except explosive LV0's 50 against 48, so an enemy that stays lined up fires once per cycle on
+every difficulty; R5.15–R5.17's window scale only trimmed fleeting shots.
+New `EnemyBehaviorProfile.fireCyclePercent` (difficulty files: casual 160,
+standard 130, veteran 100; absent reads 100, validated 50…400) stretches
+each cycle and its open part together, so the window keeps its share and
+sustained fire falls by the factor. The window logic moved into
+`EnemyBehaviorProfile.fireWindows(phase:rapid:)`; `FireCycleTests` pins
+the authored windows at 100, the stretched cycles and their open ticks,
+and the decoding default. Replay format 17 → 18; no golden moved (none
+has an enemy firing). Veteran is unchanged.
+
 ## Remaining gaps / follow-up review
 
 Do not interpret green tests as product completion:

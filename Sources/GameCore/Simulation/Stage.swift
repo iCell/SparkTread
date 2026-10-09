@@ -152,9 +152,9 @@ enum Stage {
             // difficulty, then the shot conditions.
             guard tank.spawnProtectionTicks == 0 else { world.tanks[index] = tank; continue }
             let phase = world.tick + tank.entityID * 11
-            func open(_ base: Int, of period: Int) -> Int { min(period, base * profile.fireWindowPercent / 100) }
-            let alignedWindowOpen = family == "rapid" ? phase % 32 < open(16, of: 32) : phase % 48 < open(12, of: 48)
-            let breakWindowOpen = phase % 64 < open(12, of: 64)
+            let windows = profile.fireWindows(phase: phase, rapid: family == "rapid")
+            let alignedWindowOpen = windows.aligned
+            let breakWindowOpen = windows.breaking
             let weaponID = family == "normal" ? "normal" : family
             let weapon = weapons.weapon(weaponID)
             func canDamage(_ kind: TerrainKind) -> Bool {

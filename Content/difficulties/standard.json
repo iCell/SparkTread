@@ -7,7 +7,8 @@
     "baseFocusPercent": 60,
     "wanderPercent": 15,
     "fireWindowPercent": 55,
-    "courseCommitPercent": 55
+    "courseCommitPercent": 55,
+    "fireCyclePercent": 130
   },
   "telegraphTicksPercent": 115,
   "composition": "baseline",
