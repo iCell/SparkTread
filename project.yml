@@ -68,7 +68,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.icell.sparktread
         MARKETING_VERSION: "0.1.0" # matches the App Store Connect version
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2" # (1) shipped the excerpt audio; ADR-0029 replaced it
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1" # V1 ships for iPhone only (ADR-0028)
         CODE_SIGN_STYLE: Automatic

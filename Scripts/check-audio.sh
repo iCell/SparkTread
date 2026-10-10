@@ -23,7 +23,7 @@ manifest="${MANIFEST:-Tools/audio_manifest.json}"
 
 field() { python3 -c "import json,sys; print(json.load(open('$manifest'))['files']['$1'].get('$2',''))"; }
 # Files by provenance. "fixed" is everything this repository cannot
-# reproduce — the extractor's excerpts and the owner's own assets — and is
+# reproduce — since ADR-0029 that is the owner's own stage card alone — and is
 # verified by hash; the rest must come back byte for byte from the generator.
 names_of() { python3 -c "import json,sys; m=json.load(open('$manifest')); keep=set(sys.argv[1].split(',')); print(' '.join(sorted(n for n,e in m['files'].items() if e.get('attribution') in keep)))" "$1"; }
 names_not_of() { python3 -c "import json,sys; m=json.load(open('$manifest')); keep=set(sys.argv[1].split(',')); print(' '.join(sorted(n for n,e in m['files'].items() if e.get('attribution') not in keep)))" "$1"; }
@@ -42,9 +42,14 @@ run_check() {
         want=$(field "$name" sha256); have=$(shasum -a 256 "$bundled/$name" | cut -c1-64)
         [ "$want" = "$have" ] || { echo "DIFFERS from manifest: $name"; status=1; }
     done
-    recorded=$(python3 -c "import json; print(json.load(open('$manifest')).get('extractor_sha256',''))")
-    actual=$(shasum -a 256 Tools/extract_reference_audio.py | cut -c1-64)
-    [ "$recorded" = "$actual" ] || { echo "EXTRACTOR CHANGED without re-extraction (manifest extractor_sha256 stale)"; status=1; }
+    # The extractor only has to agree with the manifest while an excerpt is
+    # still bundled. Since ADR-0029 none is, and the manifest records no
+    # extractor: the tool is history, not a step in building what ships.
+    if [ -n "$excerpts" ]; then
+        recorded=$(python3 -c "import json; print(json.load(open('$manifest')).get('extractor_sha256',''))")
+        actual=$(shasum -a 256 Tools/extract_reference_audio.py | cut -c1-64)
+        [ "$recorded" = "$actual" ] || { echo "EXTRACTOR CHANGED without re-extraction (manifest extractor_sha256 stale)"; status=1; }
+    fi
 
     # 2. Synthesized: regenerate against a copy of the manifest; compare files and manifest.
     cp "$manifest" "$tmp/manifest.json"
@@ -71,8 +76,12 @@ run_check() {
     done
 
     # 3. Excerpts re-extracted when the pinned source is at hand: bytes AND
-    #    every manifest field of every excerpt entry.
-    if [ -n "${SPARKTREAD_REFERENCE_WAV:-}" ] && [ -f "${SPARKTREAD_REFERENCE_WAV}" ]; then
+    #    every manifest field of every excerpt entry. Dead since ADR-0029 —
+    #    nothing is bundled from a recording any more — and kept only so the
+    #    check still holds if an excerpt were ever reintroduced.
+    if [ -z "$excerpts" ]; then
+        echo "Audio check: no excerpts bundled (ADR-0029); nothing to re-extract."
+    elif [ -n "${SPARKTREAD_REFERENCE_WAV:-}" ] && [ -f "${SPARKTREAD_REFERENCE_WAV}" ]; then
         cp "$manifest" "$tmp/manifest2.json"
         if SPARKTREAD_AUDIO_OUT="$tmp/orig" SPARKTREAD_AUDIO_MANIFEST="$tmp/manifest2.json" \
             python3 Tools/extract_reference_audio.py > "$tmp/extract.log" 2>&1; then
@@ -122,32 +131,26 @@ PY
         if [ "$got" -eq "$2" ]; then echo "selftest: $1 → $( [ $2 -eq 0 ] && echo passes || echo fails ) as expected"
         else echo "selftest: FAILED — $1 (exit $got, expected $2): $(grep -v '^$' "$work/log" | tail -2)"; status=1; fi
     }
-    # The mutated excerpt must BE an excerpt (R27-01): the card became a
-    # generated jingle, so the cases target the results passage and assert
-    # its attribution first; generated entries get their own case.
-    excerpt=sfx_stage_win.wav; generated=sfx_base_hit.wav; owned=sfx_stage_card.wav
+    # Each case must act on a file of the provenance it claims to test
+    # (R27-01), so every fixture's attribution is asserted first. Since
+    # ADR-0029 there is no excerpt to mutate: the gate asserts instead that
+    # none exists, which is the decision itself held in place.
+    generated=sfx_base_hit.wav; owned=sfx_stage_card.wav
     assert_attribution() { # file, expected
         have=$(python3 -c "import json; print(json.load(open('Tools/audio_manifest.json'))['files']['$1'].get('attribution'))")
         [ "$have" = "$2" ] || { echo "selftest: FAILED — $1 is $have, not $2"; return 1; }
     }
-    assert_attribution "$excerpt" excerpt || return 1
+    excerpts_now=$(names_of excerpt)
+    [ -z "$excerpts_now" ] || {
+        echo "selftest: FAILED — ADR-0029 forbids bundling audio from another game's recording, but these carry attribution excerpt: $excerpts_now"
+        return 1; }
     assert_attribution "$generated" provisional || return 1
     assert_attribution "$owned" owner || return 1
     setup; expect "untouched copy" 0
-    setup; edit "$excerpt" sha256 0000000000000000000000000000000000000000000000000000000000000000; expect "excerpt hash corrupted ($excerpt)" 1
-    setup; edit - extractor_sha256 0000000000000000000000000000000000000000000000000000000000000000; expect "extractor hash stale" 1
-    setup; cp "$work/audio/sfx_dry_fire.wav" "$work/audio/$excerpt"; expect "excerpt bytes replaced ($excerpt)" 1
     setup; edit "$generated" sha256 0000000000000000000000000000000000000000000000000000000000000000; expect "generated entry hash corrupted ($generated)" 1
     setup; cp "$work/audio/sfx_dry_fire.wav" "$work/audio/$generated"; expect "generated file bytes replaced ($generated)" 1
     setup; edit "$owned" sha256 0000000000000000000000000000000000000000000000000000000000000000; expect "owner entry hash corrupted ($owned)" 1
     setup; cp "$work/audio/sfx_dry_fire.wav" "$work/audio/$owned"; expect "owner file bytes replaced ($owned)" 1
-    if [ -n "${SPARKTREAD_REFERENCE_WAV:-}" ] && [ -f "${SPARKTREAD_REFERENCE_WAV}" ]; then
-        setup; edit "$excerpt" window_seconds "[0, 1]"; expect "excerpt window corrupted (source-backed, $excerpt)" 1
-        setup; edit "$excerpt" source_sha256 "\"deadbeef\""; expect "excerpt source hash corrupted (source-backed, $excerpt)" 1
-        setup; edit "$excerpt" processing "\"wrong\""; expect "excerpt processing corrupted (source-backed, $excerpt)" 1
-    else
-        echo "selftest: source-backed metadata cases skipped (set SPARKTREAD_REFERENCE_WAV)"
-    fi
     # Builder refusal must leave a protected file's bytes untouched (R25-03).
     setup; edit sfx_dry_fire.wav attribution "\"excerpt\""
     before=$(shasum -a 256 "$work/audio/sfx_dry_fire.wav" | cut -c1-64)

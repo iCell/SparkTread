@@ -1,7 +1,5 @@
 {
-  "creative_decision": "owner, 2026-09-10: the game's sounds are to be the original \u51b3\u6218\u5766\u514b sounds; excerpts of the public recording are used wherever it holds an isolated instance (attribution 'excerpt'); the rest is synthesized and provisional (ADR-0011, accepted by the owner 2026-09-10)",
-  "extractor": "Tools/extract_reference_audio.py",
-  "extractor_sha256": "2931dbbce52dc9eb0909478496d083a8166cb26f931b8c23a79a63949ebaf24f",
+  "creative_decision": "owner, 2026-10-10 (ADR-0029, superseding the 2026-09-10 decision recorded in ADR-0011): no audio taken from a recording of another game ships in the product. The six excerpts of the \u51b3\u6218\u5766\u514b recording and the shot derived from one of them are synthesized here instead, from the same measurements, keeping each cue's function, duration and level; the measurements themselves stay, as the pixel art's reverse-analysis does \u2014 what is reproduced is how a sound behaves, never the recording",
   "files": {
     "sfx_base_destroyed.wav": {
       "attribution": "derived",
@@ -54,23 +52,16 @@
       "sha256": "59b8e472df1905c70de813ba6db0941dd808156643b7ac95b75be6950dba29d6"
     },
     "sfx_fire_normal.wav": {
-      "attribution": "excerpt",
+      "attribution": "derived",
       "milliseconds": 340,
-      "note": "shot glide: isolated instance, silence before and after",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
-      "sha256": "5fa5fc6d2ecc451eeeac25cf0f58f20a21b3365b7164c1a413ba8a98c60fe42c",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        185.29,
-        185.63
-      ]
+      "note": "the tank's gun, synthesized 2026-10-10 (ADR-0029) to replace an excerpt of the \u51b3\u6218\u5766\u514b recording. Built to the excerpt's measured shape \u2014 a bright crack leading, most energy above 2.5 kHz, almost nothing under 150 Hz \u2014 at its duration (340 ms) and its level (\u221216.3 dBFS RMS), so the mix did not move when the material changed.",
+      "sha256": "aa4b2defa80540f8ee2ab0352776340575f73080c983ca2bd88398a62949a87f"
     },
     "sfx_fire_rapid.wav": {
       "attribution": "derived",
       "milliseconds": 200,
-      "note": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
-      "sha256": "c87fb2c83f030138a6393b6ca16fff898b52115c876311f2d096309addaa92dd"
+      "note": "the shot replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a byte-identical copy of sfx_fire_normal and the player could not hear which channel fired, and rapid is the special a new campaign starts with. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round. Since ADR-0029 the shot it stretches is the synthesized one, not an excerpt.",
+      "sha256": "70ac372f2baea5629c119eae2415037233389decd055aacd1a5e2b98505c98f5"
     },
     "sfx_flame_loop.wav": {
       "attribution": "provisional",
@@ -83,17 +74,10 @@
       "sha256": "c5f075a9931c5e7c2b683ae8d0baf865d649271720d057c3b078a7c705f9c19a"
     },
     "sfx_hit_steel.wav": {
-      "attribution": "excerpt",
+      "attribution": "derived",
       "milliseconds": 220,
-      "note": "click: isolated instance, assigned to steel/boundary",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/15 ms, peak 0.8",
-      "sha256": "059a9c7a15d33d86135c807d178a8aaaeaae2abe1193692340738e00625ef7a7",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        102.26,
-        102.48
-      ]
+      "note": "a round off steel, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. A bright click over a low thunk: this is the one impact in the set whose weight sits under 150 Hz (the excerpt measured \u22123.5 dB there against its top band), which is what makes steel read as steel and not as brick. 220 ms, \u221215.5 dBFS RMS, as before.",
+      "sha256": "b0228cafb8297499fc2e61a24fce5fb2df3b0f9dcc70016f709cf9be53fa1da4"
     },
     "sfx_hit_tank.wav": {
       "attribution": "provisional",
@@ -107,17 +91,10 @@
       "sha256": "d9634820754c26b3ae364cb0cfdd41f5448a22fafcc6ed9064b28da133d40f4f"
     },
     "sfx_pickup_collect.wav": {
-      "attribution": "excerpt",
+      "attribution": "derived",
       "milliseconds": 740,
-      "note": "pickup jingle: isolated instance (cut before its repeat)",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/30 ms, peak 0.8",
-      "sha256": "4ee2832b298a0adaa577da971c0841c7422bc2a27e8f4e7596b615f8e151dadc",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        104.74,
-        105.48
-      ]
+      "note": "a pick-up collected, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. A six-step rise in the jingle voice landing on a held note, no bass (the excerpt measured \u221231.9 dB under 150 Hz). The figure is an original E minor pentatonic rise, deliberately not the reference's; the spawn cue keeps its own C G C G, so appearing and collecting stay distinguishable and collecting stays the louder. 740 ms, \u221216.3 dBFS RMS.",
+      "sha256": "9abac4ff9be914b83514cfc59376257bebdcbe56a12c77fa4f6b488a00f5012e"
     },
     "sfx_pickup_spawn.wav": {
       "attribution": "derived",
@@ -125,17 +102,10 @@
       "sha256": "98781f36199f924f45e91d7dd2f0b0ce9f3f700a61510b0621cdf28ee394273b"
     },
     "sfx_player_explode.wav": {
-      "attribution": "excerpt",
+      "attribution": "derived",
       "milliseconds": 800,
-      "note": "heavy explosion: isolated instance, silence before and after",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
-      "sha256": "959db6646d5995861b60eeefaaa44f92d03693c22c5abb80da08072fc65e4da2",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        100.2,
-        101.0
-      ]
+      "note": "the player's tank destroyed, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. The heaviest destruction after the base itself: a bandpassed body around 520 Hz leads, where the excerpt centred its energy (150 Hz\u20131 kHz), with a collapse under it and a settling bed. 800 ms, \u221210.2 dBFS RMS.",
+      "sha256": "a9f2f2e9600cd253e32c6ca81d06a17c7fbfbfbd1ed388b9ac06e1726b3a02bd"
     },
     "sfx_spawn_warp.wav": {
       "attribution": "provisional",
@@ -149,17 +119,10 @@
       "sha256": "49412872923f1e72d40870d892d3211f214f7afbfc01120fbdb9d005ba5ff031"
     },
     "sfx_stage_win.wav": {
-      "attribution": "excerpt",
-      "milliseconds": 4200,
-      "note": "end-of-stage passage: the results-screen drum loop from its rise to the next card (continuous; faded)",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 5/60 ms, peak 0.8",
-      "sha256": "4a714a63573ed56e60f0e8f706484e782484c0412028a9a28d5eef6205561ebb",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        74.0,
-        78.2
-      ]
+      "attribution": "derived",
+      "milliseconds": 4218,
+      "note": "the stage end, for BOTH outcomes, synthesized 2026-10-10 (ADR-0029) to replace the excerpt of the reference's closing passage. A drum riff: the owner's \u201cdong x6, x6, x1, x4\u201d phrasing and then its first two groups again, over strokes built to the measurement kept in the generator for this purpose (body 150-195 Hz, broadband, 120 ms to -10 dB; bands 0 dB under 250 Hz, -6 to 500 Hz, about -16 above). Strokes 0.12 s apart inside a group, 0.24 s between groups; the last of each group rings longer. What is reproduced is a kit and a phrasing, not a tune. 4.2 s, -20.8 dBFS RMS, as the excerpt was.",
+      "sha256": "48fe06127eb7ffa9d4bd1d46371ff534b35de4684b3522b9009522800c60e71f"
     },
     "sfx_tally_tick.wav": {
       "attribution": "derived",
@@ -167,17 +130,10 @@
       "sha256": "225c3a025c5cb38ecbc3e0954d5322cd63f13dce0bfee7a814582f74e9d77835"
     },
     "sfx_tank_explode.wav": {
-      "attribution": "excerpt",
-      "milliseconds": 860,
-      "note": "enemy destroyed: the kill with the score roll (confirmed), isolated",
-      "processing": "mono mix, windowed-sinc resample 48000\u219222050 (64 taps, Hann, 0.92 Nyquist), DC removed, fades 2/20 ms, peak 0.8",
-      "sha256": "6e55539dc1fb3fa2db7b015664d9ee878e6a65fbe2a511834acf5545504589d5",
-      "source": "public gameplay recording BV14b411K7bv, audio format 30216 decoded to 48 kHz stereo WAV",
-      "source_sha256": "df9ad4771af3c7d6fa4cdddf30b4a1cab92d3ca7a031a3853dc67cf0cf7eb723",
-      "window_seconds": [
-        21.86,
-        22.72
-      ]
+      "attribution": "derived",
+      "milliseconds": 850,
+      "note": "an enemy destroyed, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. The same family as the player's death, lighter and shorter in the body, with the score rolling up under its tail \u2014 the excerpt carried that roll, and the kill reads as one event only while the roll stays well below the blast. 860 ms, \u221212.4 dBFS RMS.",
+      "sha256": "c000bc8f83c0b47276ba5b69cb8eb8b2722e93c6c35f9bdd1cee6149c3983406"
     },
     "sfx_title_tread.wav": {
       "attribution": "invented",
@@ -187,9 +143,9 @@
     }
   },
   "generator": "Tools/build_audio_assets.py",
-  "generator_sha256": "8584bddc9ec94d071fce3161db4988952e0895e38213908b1612e401df26211d",
+  "generator_sha256": "1bac3e3693c2bea5bf72b10a8a155e584190baa32111d03482493768598dce90",
   "native_rate_hz": 8363,
   "output_rate_hz": 22050,
-  "rights_review": "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held \u2014 the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)",
-  "source": "measurements of the public reference gameplay recording BV14b411K7bv, 2026-09-10; procedure in Tools/reference_measure/"
+  "rights_review": "owner decision 2026-10-10 (ADR-0029), prompted by item 6 of App Review's 0.1.0 information request: every cue that ships is either synthesized by this generator or supplied by the owner. No third-party recording, and nothing derived from one, is bundled; no third-party licence is needed. The prior position \u2014 excerpts held under no licence, 2026-09-10 \u2014 is superseded",
+  "source": "measurements of the public reference gameplay recording BV14b411K7bv, 2026-09-10; procedure in Tools/reference_measure/. Measurements only: since ADR-0029 no audio from that recording is bundled"
 }

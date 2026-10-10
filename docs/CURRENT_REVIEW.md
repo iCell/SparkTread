@@ -2432,3 +2432,45 @@ Do not interpret green tests as product completion:
   6), the external playtest build, the "final replacement visual
   language", performance/export targets, and a PLAYED golden (the chained
   campaign replay is scripted instant wins, not a played run).
+
+## No third-party audio ships (2026-10-10, ADR-0029)
+
+App Review answered the 0.1.0 submission with the standard information
+request for an account with limited review history. Its item 6 asks for
+documentation authorising any protected third-party material, and the
+manifest's own `rights_review` said plainly that none was held: six shipped
+cues were excerpts of the public 决战坦克 recording, and `sfx_fire_rapid` was
+one of them stretched 12 %.
+
+The owner chose to hold no third-party material rather than disclose
+unlicensed audio. All seven are now synthesized by
+`Tools/build_audio_assets.py` from the measurements that were already in the
+file — in `sfx_stage_win`'s case, from the riff analysis the generator had
+been carrying since 2026-09-16 for exactly this eventuality.
+
+Each replacement was built to its predecessor's duration and RMS so the mix
+does not move; measured before and after:
+
+| cue | ms | RMS dBFS | crest dB (was → is) | <150 Hz (was → is) |
+|---|---|---|---|---|
+| `sfx_fire_normal` | 340 | −16.3 | 14.4 → 8.5 | −17.8 → −14.0 |
+| `sfx_fire_rapid` | 200 | −16.3 | 13.2 → 7.3 | −18.5 → −14.4 |
+| `sfx_hit_steel` | 220 | −15.5 | 13.6 → 11.5 | −3.5 → −3.9 |
+| `sfx_pickup_collect` | 740 | −16.3 | 14.3 → 12.0 | −31.9 → −20.4 |
+| `sfx_player_explode` | 800 | −10.2 | 8.3 → 8.7 | −15.7 → −9.7 |
+| `sfx_tank_explode` | 850 | −12.4 | 10.4 → 11.4 | −13.8 → −10.8 |
+| `sfx_stage_win` | 4218 | −20.8 | 18.8 → 13.8 | −8.5 → −8.3 |
+
+Durations and levels are unchanged by construction. The crests sit inside
+the range the rest of the synthesized set already occupies (4.1 dB for
+`sfx_life_up` to 16.1 for `sfx_hit_brick`); the shot and the jingle are
+denser than the recordings they replace, which is the one audible difference
+measurement predicts.
+
+`Scripts/check-audio.sh` reports *0 excerpts*, and its selftest now asserts
+that no manifest entry carries attribution `excerpt` — the decision is held
+by the gate rather than by habit. The extractor stays in the tree as
+history; it is no longer a step in building anything that ships.
+
+**Open for the owner:** the seven replacements have not been auditioned.
+Levels are verified by measurement, not by ear.

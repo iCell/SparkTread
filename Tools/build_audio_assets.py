@@ -5,9 +5,12 @@ only — no built-in music — so this generates exactly that set.
 
 Pure stdlib (wave/struct/math): square + triangle voices and an NES-style
 15-bit LFSR noise channel, fixed seeds, so re-running the script reproduces
-byte-identical WAVs. One cue is not synthesized at all — the stage card is
-re-sequenced out of the bundled results excerpt's own drum strokes (read
-from the repository and checked against its committed hash).
+byte-identical WAVs. One cue is not synthesized at all: the stage card is
+the owner's own audio, bundled as given and verified by hash.
+
+Since ADR-0029 (owner 2026-10-10) nothing here is cut from, or derived from,
+a recording of another game: App Review asked for authorisation for protected
+third-party material, and the answer the owner chose is to hold none.
 Output: Sources/AppleAdapters/Resources/Audio/*.wav
 (22050 Hz, mono, 16-bit).
 
@@ -56,7 +59,13 @@ MANIFEST = os.environ.get("SPARKTREAD_AUDIO_MANIFEST") or COMMITTED_MANIFEST
 NOTES = {
     "sfx_life_up": "an extra life collected (the extra_life pickup), added 2026-10-08 at the owner's request that the 1UP sound differ from the other pickups and serve the function of Mario's 1-up chirp. The FUNCTION only: a quick rising figure that lands and rings. The notes are an original three-step rise, G5-D6-G6 (a fifth then a fourth), with the top note held and given a slow vibrato — not the Nintendo six-note arpeggio, whose sequence is deliberately not reproduced (standing rule: take a reference's function, never its tune; ADR-0011). 25 % square for the chirp with a triangle an octave under the held note for body, native 8363 Hz. Levelled under the reference's pickup jingle so a life reads as a prize, not an alarm.",
     "sfx_title_tread": "the launch sequence's sound, added 2026-10-03 at the owner's request (配合背景音乐，可以是履带碾过的声音): the tank that drives through the title, heard on its tracks — two tracks of jittered link slaps (clack, ping, ground thud), a rolling noise bed high-passed at 140 Hz so its weight sits where a phone speaker carries it, a metal-on-metal hiss following the slaps, a pitch factor that turns over as the tank passes, and from 2.565 s (its rear clearing the wordmark at 170 pt/s) a recession of −34 dB with the top closing to 500 Hz, silent at 5.3 s when the drive ends. Stereo — the only stereo cue in the set — panned by the tank's place on the screen: from 218 pt left of centre, through the middle at 1.28 s, to full right as it leaves (constant-power law referenced so the centre equals a mono cue on both speakers). No reference: 决战坦克 has no tread sound, and the game itself still has none (owner 2026-09-10) — this plays only under the launch, which is the one place a tank is heard moving. Steady part levelled to the two music cues' −20.8 dBFS RMS.",
-    "sfx_fire_rapid": "the shot excerpt replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a third byte-identical copy of sfx_fire_normal and the player could not hear which channel fired. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round; the excerpt itself is unchanged and still serves the normal launch.",
+    "sfx_fire_rapid": "the shot replayed 12 % faster and cut to 200 ms, so the special channel is audibly its own weapon: until 2026-10-01 this was a byte-identical copy of sfx_fire_normal and the player could not hear which channel fired, and rapid is the special a new campaign starts with. 200 ms also clears the fastest cadence R5.6 allows (13 ticks, 217 ms), so a burst reads as separate shots. Same gun, lighter round. Since ADR-0029 the shot it stretches is the synthesized one, not an excerpt.",
+    "sfx_fire_normal": "the tank's gun, synthesized 2026-10-10 (ADR-0029) to replace an excerpt of the 决战坦克 recording. Built to the excerpt's measured shape — a bright crack leading, most energy above 2.5 kHz, almost nothing under 150 Hz — at its duration (340 ms) and its level (−16.3 dBFS RMS), so the mix did not move when the material changed.",
+    "sfx_hit_steel": "a round off steel, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. A bright click over a low thunk: this is the one impact in the set whose weight sits under 150 Hz (the excerpt measured −3.5 dB there against its top band), which is what makes steel read as steel and not as brick. 220 ms, −15.5 dBFS RMS, as before.",
+    "sfx_pickup_collect": "a pick-up collected, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. A six-step rise in the jingle voice landing on a held note, no bass (the excerpt measured −31.9 dB under 150 Hz). The figure is an original E minor pentatonic rise, deliberately not the reference's; the spawn cue keeps its own C G C G, so appearing and collecting stay distinguishable and collecting stays the louder. 740 ms, −16.3 dBFS RMS.",
+    "sfx_player_explode": "the player's tank destroyed, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. The heaviest destruction after the base itself: a bandpassed body around 520 Hz leads, where the excerpt centred its energy (150 Hz–1 kHz), with a collapse under it and a settling bed. 800 ms, −10.2 dBFS RMS.",
+    "sfx_tank_explode": "an enemy destroyed, synthesized 2026-10-10 (ADR-0029) to replace an excerpt. The same family as the player's death, lighter and shorter in the body, with the score rolling up under its tail — the excerpt carried that roll, and the kill reads as one event only while the roll stays well below the blast. 860 ms, −12.4 dBFS RMS.",
+    "sfx_stage_win": "the stage end, for BOTH outcomes, synthesized 2026-10-10 (ADR-0029) to replace the excerpt of the reference's closing passage. A drum riff: the owner's \u201cdong x6, x6, x1, x4\u201d phrasing and then its first two groups again, over strokes built to the measurement kept in the generator for this purpose (body 150-195 Hz, broadband, 120 ms to -10 dB; bands 0 dB under 250 Hz, -6 to 500 Hz, about -16 above). Strokes 0.12 s apart inside a group, 0.24 s between groups; the last of each group rings longer. What is reproduced is a kit and a phrasing, not a tune. 4.2 s, -20.8 dBFS RMS, as the excerpt was.",
     "sfx_stage_card": "an original opening figure played on the stage-end excerpt's own pitched drum, re-sequenced from that excerpt and nothing else (owner 2026-10-01: the opening must carry a tune and be a set with the victory cue; the owner's reference for the FUNCTION was the Battle City NES start theme, whose melody is deliberately not copied or paraphrased — standing rule, and ADR-0011 records the owner settling the same question on 2026-09-10). The passage is grid-sliced at its measured ≈0.118 s sixteenth; the most cleanly pitched slice (autocorrelation of its tom band, 110.8 Hz) is resampled per note to play a twelve-note figure in C minor pentatonic across C3-E♭4 — the key taken from this excerpt's own faint harmonic stabs — over quarter-note kicks and off-beat ticks, with a tom run-up and a crash landing where the intro hands over to play. A room bed grain-built from the excerpt's band above 2 kHz keeps any step from being silent; the cue is levelled to the excerpt's own RMS and soft-saturated so twelve short pitched hits do not lose level to one crash. Same kit, room, tempo and level as the stage end by construction; no synthesized instrument anywhere in it. Three drum-only shapes (roll_hit, three_strikes, crescendo) were built from the same strokes and auditioned first — SHAPE in the generator selects",
 }
 
@@ -67,12 +76,20 @@ ATTRIBUTION = {
     "sfx_base_destroyed": "derived", "sfx_pickup_spawn": "derived", "sfx_deflect": "derived",
     "sfx_hit_brick": "derived", "sfx_tally_tick": "derived",
     "sfx_fire_rapid": "derived",
+    # The seven that replaced the excerpts (ADR-0029, owner 2026-10-10):
+    # synthesized from the same measurements, at the levels the excerpts held.
+    "sfx_fire_normal": "derived", "sfx_hit_steel": "derived",
+    "sfx_pickup_collect": "derived", "sfx_player_explode": "derived",
+    "sfx_tank_explode": "derived", "sfx_stage_win": "derived",
 }
 SOURCE_NOTE = ("measurements of the public reference gameplay recording BV14b411K7bv, "
-               "2026-09-10; procedure in Tools/reference_measure/")
+               "2026-09-10; procedure in Tools/reference_measure/. Measurements only: "
+               "since ADR-0029 no audio from that recording is bundled")
 _written = []
-# Names owned by Tools/extract_reference_audio.py (manifest attribution
-# "excerpt"): PROTECTED before any file is written (R25-03), not merely
+# Names this generator must never claim (manifest attribution "owner" —
+# "excerpt" is kept in the tuple so a stray excerpt could never be
+# overwritten silently, but since ADR-0029 nothing carries it):
+# PROTECTED before any file is written (R25-03), not merely
 # refused at manifest time after an overwrite.
 PROTECTED = set()
 
@@ -224,33 +241,6 @@ def lowpass_glide(sig, cutoffs):
 
 
 
-
-
-def read_bundled(name):
-    """Samples of a COMMITTED bundled WAV as floats, for a cue derived from
-    an excerpt. The bytes are read from the repository (never from OUT,
-    which is a scratch directory while Scripts/check-audio.sh runs) and must
-    hash to the committed manifest's entry: a cue cut out of an excerpt is
-    only reproducible while the excerpt is the one that was cut."""
-    path = os.path.join(BUNDLED_AUDIO, name + ".wav")
-    if not os.path.exists(path):
-        raise SystemExit(f"{name}.wav is missing from {os.path.normpath(BUNDLED_AUDIO)}: cannot derive from it")
-    with open(path, "rb") as f:
-        digest = hashlib.sha256(f.read()).hexdigest()
-    try:
-        with open(COMMITTED_MANIFEST) as f:
-            want = json.load(f)["files"][name + ".wav"]["sha256"]
-    except (OSError, KeyError, ValueError) as error:
-        raise SystemExit(f"no committed manifest entry for {name}.wav ({error}): cannot derive from it")
-    if digest != want:
-        raise SystemExit(
-            f"{name}.wav does not match the committed manifest (have {digest[:12]}…, "
-            f"want {want[:12]}…): re-extract it, or regenerate the manifest deliberately")
-    with wave.open(path, "rb") as f:
-        if (f.getnchannels(), f.getsampwidth(), f.getframerate()) != (1, 2, OUTPUT_RATE):
-            raise SystemExit(f"{name}.wav is not mono 16-bit {OUTPUT_RATE} Hz: cannot derive from it")
-        frames = f.readframes(f.getnframes())
-    return [s / 32767.0 for s in struct.unpack(f"<{len(frames) // 2}h", frames)]
 
 
 def resample(sig, ratio):
@@ -412,19 +402,16 @@ def write_manifest():
     with open(os.path.abspath(__file__), "rb") as f:
         generator = hashlib.sha256(f.read()).hexdigest()
     entries = {}
-    # Files this generator does not produce — the extractor's excerpts and the
-    # owner's own assets — keep their entries, and the extractor's record, from
-    # the previous manifest untouched.
-    extractor_record = {}
+    # The one file this generator does not produce — the owner's own stage
+    # card — keeps its entry from the previous manifest untouched. Since
+    # ADR-0029 there are no excerpts to carry, and no extractor record: the
+    # extractor is history, not a step in building what ships.
     if os.path.exists(MANIFEST):
         with open(MANIFEST) as f:
             previous = json.load(f)
         for name, entry in previous.get("files", {}).items():
             if entry.get("attribution") in NOT_GENERATED:
                 entries[name] = entry
-        for key in ("extractor", "extractor_sha256", "rights_review"):
-            if key in previous:
-                extractor_record[key] = previous[key]
     for name, ms, digest in sorted(_written):
         if entries.get(name + ".wav", {}).get("attribution") in NOT_GENERATED:
             raise SystemExit(f"{name} is not a generated cue (attribution "
@@ -442,13 +429,10 @@ def write_manifest():
         "output_rate_hz": OUTPUT_RATE,
         "native_rate_hz": NATIVE_RATE,
         "source": SOURCE_NOTE,
-        "creative_decision": "owner, 2026-09-10: the game's sounds are to be the original 决战坦克 sounds; excerpts of the public recording are used wherever it holds an isolated instance (attribution 'excerpt'); the rest is synthesized and provisional (ADR-0011, accepted by the owner 2026-09-10)",
-        "rights_review": extractor_record.get("rights_review", "owner decision 2026-09-10 (recorded): the owner reviewed and accepts the use of the recording excerpts, the synthesized voices and the original jingle in the product; no third-party licence is held — the decision and its responsibility are the owner's (ASSET_PRODUCTION_MANIFEST.md)"),
+        "creative_decision": "owner, 2026-10-10 (ADR-0029, superseding the 2026-09-10 decision recorded in ADR-0011): no audio taken from a recording of another game ships in the product. The six excerpts of the 决战坦克 recording and the shot derived from one of them are synthesized here instead, from the same measurements, keeping each cue's function, duration and level; the measurements themselves stay, as the pixel art's reverse-analysis does — what is reproduced is how a sound behaves, never the recording",
+        "rights_review": "owner decision 2026-10-10 (ADR-0029), prompted by item 6 of App Review's 0.1.0 information request: every cue that ships is either synthesized by this generator or supplied by the owner. No third-party recording, and nothing derived from one, is bundled; no third-party licence is needed. The prior position — excerpts held under no licence, 2026-09-10 — is superseded",
         "files": dict(sorted(entries.items())),
     }
-    for key in ("extractor", "extractor_sha256"):
-        if key in extractor_record:
-            manifest[key] = extractor_record[key]
     with open(MANIFEST, "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
         f.write("\n")
@@ -890,21 +874,6 @@ def build():
         write_stereo("sfx_title_tread", zoh(left, NATIVE_RATE, OUTPUT_RATE),
                      zoh(right, NATIVE_RATE, OUTPUT_RATE), scale)
 
-    # ---------------------------------------------- rapid launch (derived)
-    # Owner 2026-10-01 review: `sfx_fire_rapid` was a third byte-identical
-    # copy of the shot excerpt, so the special channel sounded exactly like
-    # the normal one and the player could not hear which weapon was firing —
-    # and rapid is the default special weapon a new campaign starts with
-    # (TankState), with ammo to spend (50/250), so it is the cue they hear
-    # most. It is now DERIVED from that same excerpt rather than being it:
-    # the shot replayed 12 % faster, which is also 12 % shorter, and cut to
-    # 200 ms. Same gun, lighter and quicker round — and 200 ms clears even
-    # the fastest cadence R5.6 allows (13 ticks, 217 ms), so twelve shots a
-    # second read as twelve shots instead of one smear. The excerpt itself is
-    # untouched and still serves the normal launch.
-    shot = read_bundled("sfx_fire_normal")
-    rapid = resample(shot, 1.12)[:int(OUTPUT_RATE * 0.200)]
-    write_rms("sfx_fire_rapid", fade_out(fade_in(rapid, 2), 24), -16.3)
 
     # ------------------------------------------------ reference-derived set
     # CANDIDATE set (ADR-0011, accepted 2026-09-10): re-synthesised from Claude's
@@ -987,24 +956,168 @@ def build():
                      concat(apply(square(flat(3144, n), 0.5), env_hold(n, 1, 0.4)),
                             apply(square(flat(1852, n), 0.5), env_hold(n, 1, 0.5))), peak=0.15)
 
-        # The 决战坦克 recording closes a stage with a DRUM RIFF the owner
-        # described as "dong ×6, ×6, ×1, ×4"; the results asset is an excerpt
-        # of that passage (Tools/extract_reference_audio.py), and since
-        # 2026-09-16 the stage card is a new pattern re-sequenced from that
-        # same excerpt's strokes.
-        # What remains here is the analysis of the passage, kept because no
-        # synthesized `dong`/`riff` survives it. Measured (hits.py, heuristic, 40–400 Hz onsets, window
-        # 73.5–78.4 s): ≈37 hits in groups of 5–7, ≈0.12 s between hits,
-        # ≈0.24 s from a group's last hit to the next group's first; one hit
-        # (76.20–76.31 s): body ≈150–195 Hz, broadband stroke, ≈120 ms to
-        # −10 dB (bands: 0–250 Hz 0 dB, 250–500 −6, ≈ −16 flat above 500 Hz).
-        # The earlier "throbbing bed" was an interpretation error: band
-        # averages and 20 ms envelopes discard the rhythm's structure.
-        # Stage lost: no separate stinger — the owner (2026-09-10 evening)
-        # wants the reference's results passage (the `sfx_stage_win`
-        # excerpt) at every stage end; the invented falling variant and
-        # the 6-6-1-4 riff helper it used were removed (the riff analysis
-        # stays in Tools/reference_measure/README.md as history).
+        # ------------------------------------------------------------------
+        # The seven that replaced the excerpts (ADR-0029, owner 2026-10-10).
+        #
+        # App Review's 0.1.0 information request asked, in item 6, for
+        # authorisation covering any protected third-party material. Six cues
+        # were processed cuts of a public recording of 决战坦克 and a seventh
+        # was that shot stretched 12 %, held under no licence. The owner chose
+        # to hold none and replace them. Each recipe below keeps the cue's
+        # FUNCTION, its duration and the RMS the 2026-10-01 mix pass gave it,
+        # so nothing in the game moves in the mix; the material is ours, built
+        # from the same measurements as the rest of this block.
+
+        # The tank's gun. The excerpt measured almost nothing under 150 Hz and
+        # most of its energy above 2.5 kHz — a crack, not a boom — so the bite
+        # leads, a falling air layer carries the departure, and the low layer
+        # is barely there. 340 ms, −16.3 dBFS RMS, as the excerpt was.
+        n = samples(340)
+        crack = samples(28)
+        glide = samples(190)
+        low = samples(110)
+        shot_native = saturate(mix(
+            (apply(bandpass(noise(crack, NATIVE_RATE, 0x5A1), 3200, 0.9),
+                   env_decay(crack, 1, 1.8)), 1.2),
+            (apply(noise_sweep(n, 3900, 900, 0x5A2), env_hold(n, 2, 0.75)), 1.0),
+            (apply(square(expo_sweep(1700, 430, glide), 0.45),
+                   env_decay(glide, 1, 2.2)), 0.5),
+            (apply(triangle(sweep(180, 110, low, 1.3)), env_decay(low, 2, 3.0)), 0.16)), 1.0)
+        write_native_rms("sfx_fire_normal", shot_native, -16.3)
+
+        # A round off steel: a bright click with a real low thunk under it.
+        # The excerpt is the one impact in the set whose weight sits under
+        # 150 Hz (−3.5 dB against its top band), which is what makes steel
+        # read as steel rather than as brick.
+        n = samples(220)
+        click, ring = samples(22), samples(60)
+        write_native_rms("sfx_hit_steel",
+                         saturate(mix(
+                             (apply(bandpass(noise(click, NATIVE_RATE, 0x57E), 3500, 1.0),
+                                    env_decay(click, 1, 1.6)), 1.3),
+                             (apply(square(expo_sweep(2600, 1700, ring), 0.5),
+                                    env_decay(ring, 1, 2.6)), 0.6),
+                             (apply(triangle(sweep(140, 62, n, 1.2)),
+                                    env_decay(n, 2, 1.9)), 1.3)), 1.5),
+                         -15.5)
+
+        # Pick-up collected: the reward. A rising figure in the jingle voice,
+        # no bass at all (the excerpt measured −31.9 dB under 150 Hz), landing
+        # on a held note. An original E-minor-pentatonic rise — the spawn cue
+        # keeps its own C G C G figure, so appearing and collecting stay
+        # distinguishable, and collecting stays the louder of the two.
+        def pnote(freq, ms, power=1.8):
+            m = samples(ms)
+            return apply(triangle(flat(freq, m)), env_decay(m, 1, power))
+        jingle = concat(pnote(1319, 90), pnote(1760, 90), pnote(2093, 90),
+                        pnote(2637, 90), pnote(3136, 110), pnote(2637, 270, 2.6))
+        write_native_rms("sfx_pickup_collect",
+                         apply(jingle, env_db(len(jingle),
+                                              [(0, -1), (470, -2), (560, -3), (740, -26)])),
+                         -16.3)
+
+        # The player's tank destroyed: the heaviest destruction in the game
+        # after the base itself. The excerpt centres its energy between 150 Hz
+        # and 1 kHz, so a bandpassed body leads, with a collapse under it and
+        # a long settling bed. 800 ms, −10.2 dBFS RMS.
+        n = samples(800)
+        crack, thump, bed = samples(40), samples(420), samples(600)
+        write_native_rms("sfx_player_explode",
+                         saturate(mix(
+                             (apply(noise(crack, 11025, 0x9D1),
+                                    env_decay(crack, 1, 1.8)), 0.8),
+                             (apply(bandpass(noise(n, NATIVE_RATE, 0x9D2), 520, 0.6),
+                                    env_decay(n, 2, 2.0)), 2.8),
+                             (apply(noise_sweep(n, 4000, 900, 0x9D3),
+                                    env_decay(n, 2, 2.8)), 0.55),
+                             (apply(triangle(sweep(240, 70, thump, 1.5)),
+                                    env_decay(thump, 3, 2.2)), 0.75),
+                             (apply(lowpass(noise(bed, NATIVE_RATE, 0x9D4), 300, 2),
+                                    env_db(bed, [(0, -8), (120, -4), (600, -34)])), 0.9),
+                             # under 150 Hz: the collapse, where the excerpt
+                             # measured -15.7 against its loudest band
+                             (apply(triangle(sweep(115, 44, bed, 1.2)),
+                                    env_decay(bed, 3, 2.0)), 1.5)), 3.0),
+                         -10.2)
+
+        # An enemy destroyed. The same family as the player's death but
+        # lighter and shorter-bodied, then the score rolling up under it —
+        # the excerpt carried that roll, and the kill reads as one event only
+        # while the roll stays well below the blast.
+        boom_n, hit = samples(520), samples(32)
+        roll_rise = samples(300)
+        boom = saturate(mix(
+            (apply(noise(hit, 11025, 0x7C1), env_decay(hit, 1, 1.8)), 0.7),
+            (apply(bandpass(noise(boom_n, NATIVE_RATE, 0x7C2), 620, 0.7),
+                   env_decay(boom_n, 2, 2.2)), 2.4),
+            (apply(noise_sweep(boom_n, 4000, 1100, 0x7C3), env_decay(boom_n, 2, 2.8)), 0.5),
+            (apply(triangle(sweep(220, 80, roll_rise, 1.5)),
+                   env_decay(roll_rise, 3, 2.3)), 0.6),
+            (apply(triangle(sweep(105, 42, samples(380), 1.2)),
+                   env_decay(samples(380), 3, 2.0)), 1.2)), 3.2)
+        blip_n = samples(50)
+        def blip(freq):
+            return apply(square(flat(freq, blip_n), 0.5), env_hold(blip_n, 1, 0.5))
+        roll = concat(blip(2400), blip(2800), blip(3200), blip(3600))
+        write_native_rms("sfx_tank_explode",
+                         mix((boom, 1.0),
+                             ([0.0] * samples(650) + roll, 0.22)),
+                         -12.4)
+
+        # The stage end, for BOTH outcomes (the owner settled that on
+        # 2026-09-10 and ADR-0029 does not reopen it: one cue closes a stage,
+        # win or lose). The owner described the reference's closing passage as
+        # "dong ×6, ×6, ×1, ×4"; the measurement kept in this file for exactly
+        # this day (hits.py, 40–400 Hz onsets, window 73.5–78.4 s) found ≈37
+        # strokes in groups of 5–7, ≈0.12 s apart, ≈0.24 s between groups, one
+        # stroke's body ≈150–195 Hz, broadband, ≈120 ms to −10 dB, its bands
+        # 0 dB under 250 Hz, −6 to 500 Hz, ≈−16 flat above. That is a
+        # description of a drum, not a tune: what is reproduced is the kit and
+        # the phrasing, and the strokes are ours. The owner's four groups, then
+        # the first two again, fill the 4.2 s this cue has always occupied.
+        def dong(index, ms=150):
+            m = samples(ms)
+            body = apply(triangle(expo_sweep(195, 150, m)),
+                         env_db(m, [(0, -1), (120, -10), (ms, -36)]))
+            stroke = apply(lowpass(noise(m, NATIVE_RATE, 0x0D00 + index), 2500, 1),
+                           env_decay(m, 1, 3.0))
+            skin_n = samples(30)
+            skin = apply(bandpass(noise(skin_n, NATIVE_RATE, 0x0E00 + index), 1500, 0.8),
+                         env_decay(skin_n, 1, 2.2))
+            floor_n = samples(min(ms, 180))
+            floor = apply(triangle(sweep(120, 68, floor_n, 1.2)),
+                          env_decay(floor_n, 2, 2.2))
+            return mix((body, 1.0), (stroke, 0.42), (skin, 0.45), (floor, 0.85))
+
+        # Strokes land on a timeline: 0.12 s to the next stroke inside a
+        # group, 0.24 s to the next group, the last stroke of each group left
+        # ringing longer. Six groups fill 4.2 s, the length this cue has had
+        # since it was an excerpt.
+        riff = []
+        cursor, index = 0, 0
+        for hits in [6, 6, 1, 4, 6, 6]:
+            for hit_number in range(hits):
+                last_of_group = hit_number == hits - 1
+                stroke = dong(index, 260 if last_of_group else 150)
+                index += 1
+                if len(riff) < cursor + len(stroke):
+                    riff += [0.0] * (cursor + len(stroke) - len(riff))
+                for i, value in enumerate(stroke):
+                    riff[cursor + i] += value
+                cursor += samples(240) if last_of_group else samples(120)
+        write_native_rms("sfx_stage_win", riff, -20.8)
+
+    # ---------------------------------------------- rapid launch (derived)
+    # The special channel must not sound like the normal one: until
+    # 2026-10-01 it was a byte-identical copy and the player could not hear
+    # which weapon fired, and rapid is the special a new campaign starts with
+    # (TankState, 50/250 rounds), so it is the cue they hear most. It is the
+    # shot above replayed 12 % faster — 12 % shorter with it — and cut to
+    # 200 ms, which clears the fastest cadence R5.6 allows (13 ticks, 217 ms),
+    # so twelve shots a second read as twelve shots. Same gun, lighter round.
+    rapid = resample(zoh(shot_native, NATIVE_RATE, OUTPUT_RATE),
+                     1.12)[:int(OUTPUT_RATE * 0.200)]
+    write_rms("sfx_fire_rapid", fade_out(fade_in(rapid, 2), 24), -16.3)
 
 
 if __name__ == "__main__":
